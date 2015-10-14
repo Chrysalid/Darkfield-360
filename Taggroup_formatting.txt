@@ -1,0 +1,55 @@
+Persistant Tags for Toolkit
+---------------------------
+These tags are saved within the Gatan Digital Micrograph software for future use.
+They can be seen in the Global Tags group and accessed with GetPersistentTagGroup();
+
+Darkfield360
+	DiffractionScale
+		<camera length>:<scale constant> // Number of (1/nm) per pixel
+		20cm:0.0095
+		30cm:0.0070
+		...
+	TiltCalibration
+		<cameraLength>
+			xTiltx: <conversion factor> // number of x pixels moved per 1 unit of xTilt
+			xTilty: <conversion factor> // number of y pixels moved per 1 unit of xTilt
+			yTiltx: <conversion factor> // number of x pixels moved per 1 unit of yTilt
+			yTilty: <conversion factor> // number of y pixels moved per 1 unit of yTilt
+		20cm
+			xTiltx: 1000
+			xTilty: 0
+			yTiltx: 0
+			yTilty: 1000
+
+
+Image Tags
+----------
+These tags are stored with each image and image display.
+Access them with ImageGetTagGroup()
+
+Darkfield360
+	DiffractionScale:<value used>
+	ImageMode:<value reported by scope>
+	ImageType:<value recorded by toolkit> // Options are DP, DF, BF, Bin
+	CameraLength: <value>
+	ExposureTime: <value>
+	
+	RingMode: 0/1
+	IntegratedImage: 0/1
+	NumberOfIntegrations: 0/value
+	DegreeStep: 0/value // if ring mode is used each 'step' is a certain number of degrees apart.
+	
+	ShadowDistance: 0/value
+	ShadowValue: 0/1/2 // If shadowing is happening then 1 = higher D-spacing, 2 = lower D-spacing
+
+	xTiltValue: <value>
+	yTiltValue: <value>
+	TiltCalibration
+		xTiltx: <conversion factor> // number of x pixels moved per 1 unit of xTilt
+		xTilty: <conversion factor> // number of y pixels moved per 1 unit of xTilt
+		yTiltx: <conversion factor> // number of x pixels moved per 1 unit of yTilt
+		yTilty: <conversion factor> // number of y pixels moved per 1 unit of yTilt
+	DSpacing: <value in Angstroms>
+	
+	ImageSetID: <unique ID for each set of images>
+	ImageSpotNumber: <numbered from 0 for each image in a set>

@@ -23,11 +23,12 @@ Popup interface with option radio buttons for image processing
 
 Tag group save methods
 	- Save image information for processing
-	- Each set of images get a unique ID
+	- See the Taggroup_formatting.txt file for information
+	
 
-	Cycle through saved tilt settings
+Cycle through saved tilt settings
 
 Interface to change calibration values
-	- Tag group to save them ?
-	- Save/Load
-	- Import/Export text files
+	- Tag group to save them
+	- Save/Load to persistant tags
+		- See the Taggroup_formatting.txt file
