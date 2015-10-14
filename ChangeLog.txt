@@ -1,0 +1,97 @@
+Change Log
+	04/09/2015 	Added additional marker ring button
+					Can add ring components of a set D-Spacing to any window to help with analysis.
+				Update all windows during darkfield imaging cycle. (updateAllImages() function)
+				
+	09/09/2015	Enhanced ability to find the background brightness level by using % of dimmest pixels to ignore.
+					This changed inputs for levelAndDespeckleImage() function
+				Changed image saving/displaying for imageRingDP() function
+				Fixed unnoticed bug in generating tilt coordinates for ring analysis mode
+					Was not moving by an angle step size each time, was just moving 1°.
+				Added functions to load an entire directory of images.
+					makeFileListGroup() creates a list of all files in a directory
+						Note: Changed existing function of this name to makeDFFileListGroup(), since it makes a highly specialised list and not a generic one.
+					makeImageIDList() opens all the files in a filelist and returns an indexed taglist of imageIDs
+				Added image alignment functions.
+					findAllShifts() to analyse an image ID list and return values used for alignment
+					createAlignedImage() to output a single image given the above variables
+					alignAllImages() to create a set of aligned images from an image id list
+					createAverageAlignedImage() to make an averaged image from a set. Good for quick assessments.
+				Added buttons to align an entire directory and to create binaries from an entire directory
+				
+	10/09/2015	Added processDarkFieldImages() function to make an all-purpose function for processing a directory of well-defined images.
+					Handles making binaries, shadowing, saving/displaying based on a Taggroup made by makeDFFileListGroup()
+					Now saves resulting images to a subdirectory with a timestamp to prevent over-writing.
+					Does not yet do anything with Ring Exposures.
+				Added transparencyExport() function to create Gifs from Binaries.
+					Added to processDarkFieldImages() function as an option.
+					Added to binaryAllImages() function as an option. All gifs are just saved with the original file and with the same name.
+				Added Manual Alignment dialog system based on a stripped down version of Mitchell's work.
+					Is not used yet, but code is confirmed to work.
+					Note: Cannot adjust values when it is working. Need a pause method or something.
+				
+	11/09/2015	Refined Manual Alignment dialog. Cannot use keyboard to control it.
+					Uses multiple threads so it can update the images at the same time as being controlled and buttons being pressed.
+					Should be able to make the initialization function pose the dialog, take a pair of variables to output data to and then run.
+					Wrap that in a function with two image inputs, two offset output variables and a true/false return on completion.
+					
+	14/09/2015	Started Major rewrite to sort out the nesting of objects and how to pass data between them.
+					The hierarchy will be 		Toolkit Dialog 	
+													|-> dataObject 
+													|-> KeyListener
+													|-> alignmentDialog
+					The dataObject will be re-written so it does not contain the listener or alignment stuff. Instead they will be inside the toolkit object.
+					All object classes will be created at start up and used when needed. They cannot be created on the fly without using libraries.
+	15/09/2015	Many functions have been moved into the class objects that make the most sense.
+				Created new 'Interface' ToolkitInterface. This reserves certain function names for use by the Toolkit object.
+					The other classes can reference these functions before the functions have been defined.
+					But watch out, these functions will accept ANY object calling them, and if it is not the Toolkit they will not have the method defined and crash.
+				Toolkit object is now the dominant object and contains the other object classes.
+					Requires testing to find any bugs introduced by re-write.
+	16/09/2015	Moved the image processing/alignment functions to the Alignment Dialog object.
+				Added AllowControl and EMOnline variable to toolkit object.
+					If Microscope is offline or there is no View Window then certain buttons will not trigger their functions.
+					This should allow the toolkit to work more easily when using an offline copy of DM
+					Also prevents accidental presses of tilt controls ruining a microscope alignment.
+	17/09/2015	Created definitions for DM scripting language and class/function detection in notepad++
+				Changed debug setting system. Only the Toolkit object sets the debug mode and then pushes this setting out to its member objects.
+					Removed .getDebugMode() from interfaces
+				Minor bug fixes
+	18/09/2015	Fixed Toolkit deconstructor to remove the KeyListener object from the view screen when the toolkit is closed.
+					This may fix a number of unexplained bugs caused by numerous keylisteners stacking on top of one another if the view window was not closed between toolkits.
+				Ringmode angle calculations used ° instead of radians in Trig functions. Fixed this.
+				ImageRingDP() function fixed to clean images and take images at the correct points.
+				Added state checks to StoreTilt() functions to prompt if scope is not in Diffraction mode
+				Added checks for existing data before storing rings or ROI DP. Asks to delete previous data before it records new data.
+				Fixed Ring DP Storing not stopping if 'cancel' was used for the number of points prompt.
+				Created 'Align Two Images' button to try and get the alignment system working.
+					Can start a dialog now. It does not have a close method and the thread does not stop when the dialog is destroyed.
+						Don't think thread objects get copied, only the reference?
+						Currently a modeless dialog which is not ideal.
+						Closing dialog will use uiframe method to get 'window frame' and then run close on it.
+	21/09/2015	alignTwoImages() function has been built in to the alignmentDialog class.
+					Input is the two images, Output is the offset in 2 variables and 0/1 for if the user cancelled/pressed OK.
+					Dialog is modal and requires that the 'Start Alignment' button is pressed to kick it all off.
+					OK/Cancel button are added on the button automatically.
+					Window needs positioning correctly, but this is a minor issue.
+					The dialogs created go out of scope when the toolkit is closed. Not sure if this will create a problem but cannot find way around it.
+				Created the AlignDirectory function/s. This will open all the images in a directory and let the user manually align them
+					uses the alignTwoImages() function, so has the same issues as that, but over and over.
+					Can now align + binary entire directories. Ready to make composite images inside digital micrograph.
+				Created createMap() function to build a composite map from a directory containing an aligned Base image and the aligned Binaries
+	22/09/2015	Fixed the alignTwoImages() function to make the child dialog drop out of scope when it has returned the offsets.
+				AlignAllImages function for manually aligning a directory now quits correctly when the user presses cancel.
+				alignTwoImages() dialog now has simulataneous and alternating view modes. They can be changed with the mode radio button during image alignment.
+				Updated version number to 17.
+				Merged 'Binary Directory' and 'Process Directory' Buttons into 'Binary directory' button. Calls the ProcessDirectoryButtonPress function which can then use binaryAllImages() or processDarkFieldImages() functions based on user selections.
+				Fixed Marker Ring so colours are auto-selected.
+				Fixed CreateMap() + CreateAlignedImage() functions to propogate tags.
+				New function copyScale(im1,imRef) to propogate scales
+	23/09/2015	Fixed SetAutoSaveDir() to not simply fail if the current autosave directory does not exist.
+				Fixed makeImageIDList() to prevent the (attempted) opening of non-image files.
+				Fixed createMap() to open all binary files as binary images. It will transform the image into binary if it is not all ready, unless it is the base image.
+				Hopefully fixed an issue with our JEOL 2100 that would prevent automation of DF imaging by asking over and over to put the scope into imaging mode. The problem is that our 2100 was reporting ALL modes as MAG1 because of a fault.
+				Updated version number to 18
+				Fixed DrawReticle() function to add an argument to prevent updating the toolkit markerRing and ringRadiusText objects to the new components. This was causing DP-images to update the marker ring and make the toolkit point at the wrong marker.
+					I think this is what caused the problem with tilt calibration that I had seen. Will need testing to confirm.
+	28/09/2015	Changed all SaveImage() commands to SaveAsGatan commands to avoid conflicting file extensions and saving errors.

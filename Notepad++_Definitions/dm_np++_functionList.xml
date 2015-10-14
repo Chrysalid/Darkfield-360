@@ -1,0 +1,33 @@
+<association userDefinedLangName="Digital Micrograph Script" id="dm_function"/>
+
+<parser id="dm_function" displayName="DM Class" commentExpr="((/\*.*?\*)/|(//.*?$))">
+	<classRange
+		mainExpr="^[\t ]*class[\t ]+[\w]+[\s]*(:[\s]*[\w]+[\s]*)?\{"
+		openSymbole = "\{"
+		closeSymbole = "\}"
+		displayMode="node">
+		<className>
+			<nameExpr expr="class[\t ]+[\w]+"/>
+			<nameExpr expr="[\t ]+[\w]+"/>
+			<nameExpr expr="[\w]+"/>
+		</className>
+		<function
+			mainExpr="^[\t ]*((static|const|virtual)[\s]+)?([\w]+([\s]+[\w]+)?([\s]+|\*[\s]+|[\s]+\*|[\s]+\*[\s]+))?([\w_]+[\s]*::)?(?!(if|while|for|switch))[\w_~]+[\s]*\([^\)\(]*\)([\s]*const[\s]*)?[\n\s]*\{">
+			<functionName>
+				<funcNameExpr expr="(?!(if|while|for))[\w_~]+[\s]*\("/>
+				<funcNameExpr expr="(?!(if|while|for))[\w_~]+"/>
+			</functionName>
+		</function>
+	</classRange>
+	<function
+		mainExpr="^[\t ]*((static|const|virtual)[\s]+)?[\w]+([\s]+[\w]+)?([\s]+|\*[\s]+|[\s]+\*|[\s]+\*[\s]+)([\w_]+[\s]*::)?(?!(if|while|for))[\w_]+[\s]*\([^\)\(]*\)([\s]*const[\s]*)?[\n\s]*\{"
+		displayMode="$className->$functionName">
+		<functionName>
+			<nameExpr expr="(?!(if|while|for))[\w_]+[\s]*\("/>
+			<nameExpr expr="(?!(if|while|for))[\w_]+"/>
+		</functionName>
+		<className>
+			<nameExpr expr="[\w_]+(?=[\s]*::)"/>
+		</className>
+	</function>
+</parser>
