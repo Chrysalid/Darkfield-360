@@ -1,0 +1,33 @@
+Required Features
+-----------------
+
+
+
+
+
+
+Bug Fixes
+---------
+
+
+
+
+
+Desired Features
+----------------
+
+Allow colour selection in createMap()
+	- Make a generic colour selection dialog
+
+Popup interface with option radio buttons for image processing
+
+Tag group save methods
+	- Save image information for processing
+	- Each set of images get a unique ID
+
+	Cycle through saved tilt settings
+
+Interface to change calibration values
+	- Tag group to save them ?
+	- Save/Load
+	- Import/Export text files
