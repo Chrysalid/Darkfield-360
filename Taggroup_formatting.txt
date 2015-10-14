@@ -4,6 +4,11 @@ These tags are saved within the Gatan Digital Micrograph software for future use
 They can be seen in the Global Tags group and accessed with GetPersistentTagGroup();
 
 Darkfield360
+	CameraLengths // preset camera lengths that can be used
+		<indexedList>:<cameraLength>
+		20cm
+		25cm
+		...
 	DiffractionScale
 		<camera length>:<scale constant> // Number of (1/nm) per pixel
 		20cm:0.0095
