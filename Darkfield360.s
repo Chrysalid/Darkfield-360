@@ -1529,8 +1529,16 @@ class MyDataObject
 	TagGroup tiltVectorCalibrations;
 	number shadowDistanceNM;
 	TagGroup DFList;
+	number digitalMicrographVersion; //1 or 2. 2 is newer and uses different close dialog codes.
 
-
+	number getDigitalMicrographVersion(object self){
+		return digitalMicrographVersion;
+	}
+	number setDigitalMicrographVersion(object self, number value){
+		digitalMicrographVersion = value;
+		return value;
+	}
+	
 	number getToggle(object self) {
 		return toggle;
 	}
@@ -2225,7 +2233,7 @@ class MyDataObject
 			result("\n\tLoaded tilt calibrations");
 		}
 		
-		TagGroupOpenBrowserWindow(cameraLengths, 0);
+		//TagGroupOpenBrowserWindow(cameraLengths, 0);
 		return 1;
 	}
 	
@@ -2307,6 +2315,16 @@ class MyDataObject
 		return 1;
 	}
 	
+	/* Function to return a tag-group list of possible camera lengths */
+	TagGroup getAvailableCameraLengths(object self){
+		if( TagGroupIsValid(CameraLengths) ){
+			return cameraLengths;
+		} else {
+			TagGroup EmptyCameraList = NewTagList();
+			EmptyCameraList.TagGroupInsertTagAsString(infinity(), "None");
+			return EmptyCameraList;
+		}
+	}
 	// Constructor
 	MyDataObject(object self)
 		{
@@ -2324,7 +2342,11 @@ class MyDataObject
 			// yTiltVectorX = 0; // number of pixels moved in the (pixel) X axis per tiltY unit
 			// yTiltVectorY = -1000; // number of pixels moved in the (pixel) Y axis per tiltY unit
 			// cameraLength = 20;
-			
+			if( DoesFunctionExist("Notes") ){ // is a hacked check for version number
+				digitalMicrographVersion = 2;
+			} else {
+				digitalMicrographVersion = 1;
+			}			
 			result("\nToolkit data store has been created with ObjectID " + self.ScriptObjectGetID())
 		}
 	// Function called on any destruction event.
@@ -2889,19 +2911,31 @@ class CreateDF360DialogClass : uiframe
 
 	TagGroup makeCameraDropDownMenu(object self) // creates the pulldown menu to select camera length
 	{
+		if(debugMode==1){result("\nBuilding a new camera drop down menu");}
 		TagGroup pulldown_items;
 		TagGroup pulldown = DLGCreatePopup(pulldown_items, 1, "trackCameraLengthChange")
 		pulldown_items.DLGAddPopupItemEntry("Set Camera Length");
-		pulldown_items.DLGAddPopupItemEntry("20cm");
-		pulldown_items.DLGAddPopupItemEntry("25cm");
-		pulldown_items.DLGAddPopupItemEntry("30cm");
-		pulldown_items.DLGAddPopupItemEntry("40cm");
-		pulldown_items.DLGAddPopupItemEntry("50cm");
-
+		TagGroup CameraLengths
+		if(ScriptObjectIsValid(dataObject)==1){
+			if(debugMode==1){result(" from stored table...");}
+			CameraLengths = dataObject.getAvailableCameraLengths();
+		} else {
+		if(debugMode==1){result(" from scratch...");}
+			CameraLengths = NewTagList();
+			CameraLengths.TagGroupInsertTagAsString(infinity(), "None");
+		}		
+		number availableCameraLengths = CameraLengths.TagGroupCountTags();
+		number i;
+		for(i=0; i < availableCameraLengths; i++){
+			string value;
+			TagGroupGetIndexedTagAsString(CameraLengths, i, value)
+			pulldown_items.DLGAddPopupItemEntry(value);
+		}
 		pulldown.DLGIdentifier("CameraDropDown"); // Used to ID the menu in other functions.
-
+		if(debugMode==1){result("  Done.");}
+		//TagGroupOpenBrowserWindow(pulldown, 0);
 		return pulldown;
-	}	
+	}
 		
 	taggroup makeDF360panels(object self)
 	{
@@ -5331,7 +5365,8 @@ object startToolkit () {
 		TagGroupGetTagAsTagGroup(GetPersistentTagGroup(), "Darkfield360", persistentSave);
 		dataObject.loadPersistent(persistentSave); // load it as normal to make sure all dataobject values are set
 	}
-	//TagGroupOpenBrowserWindow(dataObject.cameraLengths, 0);
+	
+	//TagGroupOpenBrowserWindow(dataObject.getAvailableCameraLengths(), 0);
 	
 	return Toolkit;
 }
