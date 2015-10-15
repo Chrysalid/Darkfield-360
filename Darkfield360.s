@@ -2202,7 +2202,7 @@ class MyDataObject
 	
 	/* Function to load data from a Darkfield360 tag group (usually from persistent memory) into the dataObject */
 	number loadPersistent(object self, TagGroup persistentTG){
-		result("\nLoading a tag group...");
+		result("\nLoading saved program settings...");
 		string tagPath = "Darkfield360";
 		if(TagGroupIsValid(persistentTG) != 1){
 			result("\n\tTag group input is not valid")
@@ -2214,7 +2214,7 @@ class MyDataObject
 		number CameraLengthsDoesExist = TagGroupDoesTagExist(persistentTG, tagPath);
 		if(CameraLengthsDoesExist==1){ // set the dataobject tag to the cameralengths data
 			TagGroupGetTagAsTagGroup(persistentTG, tagPath, cameraLengths);
-			result("\n\tLoaded CL list");
+			result("\n\tLoaded camera length options");
 		}
 		
 		// Check if calibration scale data exists.
@@ -2222,7 +2222,7 @@ class MyDataObject
 		number scaleDoesExist = TagGroupDoesTagExist(persistentTG, tagPath);
 		if(scaleDoesExist==1){ // set the dataobject tag to the diffraction scale taggroup
 			TagGroupGetTagAsTagGroup(persistentTG, tagPath, DiffractionScale);
-			result("\n\tLoaded scale values");
+			result("\n\tLoaded camera length scale calibrations");
 		}
 		
 		// Check if tilt calibration data exists.
@@ -2911,7 +2911,7 @@ class CreateDF360DialogClass : uiframe
 
 	TagGroup makeCameraDropDownMenu(object self) // creates the pulldown menu to select camera length
 	{
-		if(debugMode==1){result("\nBuilding a new camera drop down menu");}
+		if(debugMode==1){result("\nConstructing the camera length drop down menu");}
 		TagGroup pulldown_items;
 		TagGroup pulldown = DLGCreatePopup(pulldown_items, 1, "trackCameraLengthChange")
 		pulldown_items.DLGAddPopupItemEntry("Set Camera Length");
@@ -3064,13 +3064,37 @@ class CreateDF360DialogClass : uiframe
 	//*********************
 	// SELF STARTING
 	//*********************
-	// When the class is constructed it should create its own dialog.
+	// When the class is constructed it sets up a lot of stuff, but is finalised with the updateDialog() function.
 	
 	// Constructor
 	CreateDF360DialogClass(object self)
 	{
 		ToolkitID = self.ScriptObjectGetID();
 		debugMode = 1;
+		
+	}
+		
+	// Function called on any destruction event.
+	~CreateDF360DialogClass(object self)
+	{
+		imageDisplay imgdisp;
+		if(returnViewImageDisplay(debugMode,imgdisp)){
+			component annotid=imgdisp.ComponentGetChild(0)
+			while (annotid.ComponentIsValid()){
+				annotid.componentremovefromparent();
+				annotid=imgdisp.ComponentGetChild(0);
+			}
+			self.beamCentre();
+			// Stop the keyhandler
+			if(debugMode==1){result("\nRemoving KeyHandler from View display");}
+			KeyListener.stopListening(imgdisp);
+		}
+	result("\nToolkit has been closed.");
+	}
+	
+	// Function to put the final dialog together and show it. Have the various objects stored inside it before hand.
+	void updateDialog(object self){
+		result("\nInitializing Toolkit...");
 		// Configure the positioning in the top right of the application window
 		TagGroup position;
 		position = DLGBuildPositionFromApplication()
@@ -3096,26 +3120,6 @@ class CreateDF360DialogClass : uiframe
 		
 		self.updateEMstatus();
 	}
-		
-	// Function called on any destruction event.
-	~CreateDF360DialogClass(object self)
-	{
-		imageDisplay imgdisp;
-		if(returnViewImageDisplay(debugMode,imgdisp)){
-			component annotid=imgdisp.ComponentGetChild(0)
-			while (annotid.ComponentIsValid()){
-				annotid.componentremovefromparent();
-				annotid=imgdisp.ComponentGetChild(0);
-			}
-			self.beamCentre();
-			// Stop the keyhandler
-			if(debugMode==1){result("\nRemoving KeyHandler from View display");}
-			KeyListener.stopListening(imgdisp);
-		}
-	result("\nToolkit has been closed.");
-	}
-	
-	
 	//********************************
 	// RING CONTROL FUNCTIONS
 	//********************************
@@ -5325,15 +5329,12 @@ class CreateDF360DialogClass : uiframe
 // This function is called when the toolkit starts.
 // The data object will be made, a reference DP taken, key handler started and the dataObject returned to be installed in the dialogue object.
 object startToolkit () {
-	// Construct the Toolkit. This automatically creates the toolkit dialog.
-	object Toolkit = alloc(CreateDF360DialogClass);
 	
 	result("\nCreating toolkit data store...")
 	object dataObject = alloc(MyDataObject); // This is the object that will contain everything else.
 	
 	result("\nSetting Variables.")
 	// Set Variables
-	// Toolkit.ToggleDebugMode() // comment out to deactivate debugMode on startup. Can be toggled on toolkit manually
 	dataObject.setDFExposure(30); // # of seconds to expose the camera for taking DarkField images.
 	dataObject.setBFExposure(1); // # of seconds to expose the camera for taking Diffraction Pattern images.
 	dataObject.setDPExposure(0.5); // # of seconds to expose the camera for taking BrightField images.
@@ -5342,17 +5343,12 @@ object startToolkit () {
 	dataArray := RealImage( "Data Array", 4, 5000, 10 ); // 5000 x 10 sized
 	dataObject.setDataArray(dataArray);
 	
-	result("\nAttaching data store to Toolkit...")
-	Toolkit.storeDataObject(dataObject);
-	
 	result("\nCreating KeyListener for shortcut commands...")
 	// Create objects that will be used later but must be created now before the class drops from scope
 	object KeyListener=alloc(MyKeyHandler) // Key handler for the view Window for shortcut key presses. Not attached yet.
-	Toolkit.storeKeyListener(KeyListener); 	// Insert it into toolkit. To make it listen for key presses on a display use Toolkit.startListening(ImageDisplay);
 	
 	result("\nCreating Alignment Dialog System...")
 	object alignmentDialog = alloc(alignmentdialog); // The aligning image dialog. Is not displayed or created yet.
-	Toolkit.storeAlignmentDialog(alignmentDialog); // Stored in toolkit object. Starting it up might be tricky? Problem for future Matt.
 	
 	// Load the persistent tags from the micrograph memory.
 	if(dataObject.checkPersistent()==1){ // If there is a Darkfield360 tag set then load it...
@@ -5368,6 +5364,15 @@ object startToolkit () {
 	
 	//TagGroupOpenBrowserWindow(dataObject.getAvailableCameraLengths(), 0);
 	
+		// Construct the Toolkit. This automatically creates the toolkit dialog.
+	object Toolkit = alloc(CreateDF360DialogClass);
+	// Toolkit.ToggleDebugMode() // comment out to deactivate debugMode on startup. Can be toggled on toolkit manually
+	result("\nAttaching data store to Toolkit...")
+	Toolkit.storeDataObject(dataObject);
+	Toolkit.storeKeyListener(KeyListener); 	// Insert it into toolkit. To make it listen for key presses on a display use Toolkit.startListening(ImageDisplay);
+	Toolkit.storeAlignmentDialog(alignmentDialog); // Stored in toolkit object.
+	
+	Toolkit.updateDialog();	
 	return Toolkit;
 }
 
