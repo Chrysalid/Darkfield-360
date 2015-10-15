@@ -1524,6 +1524,9 @@ class MyDataObject
 	string originalScaleString // scale the system is set to at the start of the session
 	number refScale;
 	number cameraLength;
+	TagGroup cameraLengths;
+	TagGroup DiffractionScale;
+	TagGroup tiltVectorCalibrations;
 	number shadowDistanceNM;
 	TagGroup DFList;
 
@@ -2072,8 +2075,6 @@ class MyDataObject
 	}
 	
 	/* Function to generate a tag group that will be used as the persistent tags
-		When changing settings, create the tag group from the original values and then edit that tag group.
-		Then update the persistent tags with the editted taggroup.
 	*/
 	TagGroup createPersistent(object self){
 		if(debugMode==1){result("\nGenerating a persistent tag group...");}
@@ -2189,6 +2190,121 @@ class MyDataObject
 			taggroupdeletetagwithlabel(GetPersistentTagGroup(), tagPath)
 		}
 		taggroupaddlabeledtaggroup(GetPersistentTagGroup(), tagPath, updatedTagGroup);	
+	}
+	
+	/* Function to load data from a Darkfield360 tag group (usually from persistent memory) into the dataObject */
+	number loadPersistent(object self, TagGroup persistentTG){
+		result("\nLoading a tag group...");
+		string tagPath = "Darkfield360";
+		if(TagGroupIsValid(persistentTG) != 1){
+			result("\n\tTag group input is not valid")
+			return 0;
+		}
+		
+		// Check if cameraLength options exist
+		tagPath = "CameraLengths";
+		number CameraLengthsDoesExist = TagGroupDoesTagExist(persistentTG, tagPath);
+		if(CameraLengthsDoesExist==1){ // set the dataobject tag to the cameralengths data
+			TagGroupGetTagAsTagGroup(persistentTG, tagPath, cameraLengths);
+			result("\n\tLoaded CL list");
+		}
+		
+		// Check if calibration scale data exists.
+		tagPath = "DiffractionScale";
+		number scaleDoesExist = TagGroupDoesTagExist(persistentTG, tagPath);
+		if(scaleDoesExist==1){ // set the dataobject tag to the diffraction scale taggroup
+			TagGroupGetTagAsTagGroup(persistentTG, tagPath, DiffractionScale);
+			result("\n\tLoaded scale values");
+		}
+		
+		// Check if tilt calibration data exists.
+		tagPath = "TiltCalibration";
+		number tiltDoesExist = TagGroupDoesTagExist(persistentTG, tagPath);
+		if(tiltDoesExist==1){ // set the dataobject tag to the tilt calibration taggroup
+			TagGroupGetTagAsTagGroup(persistentTG, tagPath, tiltVectorCalibrations);
+			result("\n\tLoaded tilt calibrations");
+		}
+		
+		TagGroupOpenBrowserWindow(cameraLengths, 0);
+		return 1;
+	}
+	
+	/* Function to create the persistent image tags to store information. Requires a lot of inputs.
+		createImageTags( imageSetID, imageSpotID, ImageType, ImageMode,	ringMode, integratedImage, NumberOfIntegrations,\
+		DegreeStep, shadowDistance,	shadowValue, DSpacingAng, xTilt, yTilt, exposureTime )
+	*/
+	TagGroup createImageTags(object self, number imageSetID, number imageSpotID, string ImageType, string ImageMode,\
+	number ringMode, number integratedImage, number NumberOfIntegrations, number DegreeStep, number shadowDistance,\
+	number shadowValue, number DSpacingAng, number xTilt, number yTilt, number exposureTime ){
+		if(debugMode==1){result("\nGenerating an image tag group...");}
+		TagGroup persistentTG = NewTagGroup();
+		persistentTG.TagGroupCreateNewLabeledTag("Toolkit Version");
+		persistentTG.TagGroupSetTagAsNumber("Toolkit Version", versionNumber);
+		
+		TagGroup tiltCalibrationData = NewTagGroup();
+		tiltCalibrationData.TagGroupCreateNewLabeledTag("xTiltx");
+		tiltCalibrationData.TagGroupSetTagAsNumber("xTiltx", xTiltVectorX);
+		tiltCalibrationData.TagGroupCreateNewLabeledTag("xTilty");
+		tiltCalibrationData.TagGroupSetTagAsNumber("xTilty", xTiltVectorY);
+		tiltCalibrationData.TagGroupCreateNewLabeledTag("yTiltx");
+		tiltCalibrationData.TagGroupSetTagAsNumber("yTiltx", yTiltVectorX);
+		tiltCalibrationData.TagGroupCreateNewLabeledTag("yTilty");
+		tiltCalibrationData.TagGroupSetTagAsNumber("yTilty", yTiltVectorX);
+		persistentTG.taggroupaddlabeledtaggroup("TiltCalibration", tiltCalibrationData);
+		
+		persistentTG.TagGroupCreateNewLabeledTag("CameraLength");
+		persistentTG.TagGroupSetTagAsNumber("CameraLength", cameraLength);
+				
+		persistentTG.TagGroupCreateNewLabeledTag("XTiltValue");
+		persistentTG.TagGroupCreateNewLabeledTag("YTiltValue");
+		persistentTG.TagGroupSetTagAsNumber("XTiltValue", xTilt);
+		persistentTG.TagGroupSetTagAsNumber("YTiltValue", yTilt);
+		
+		persistentTG.TagGroupCreateNewLabeledTag("ImageSetID");
+		persistentTG.TagGroupCreateNewLabeledTag("ImageSpotID");
+		persistentTG.TagGroupCreateNewLabeledTag("ImageType");
+		persistentTG.TagGroupCreateNewLabeledTag("ImageMode");
+		persistentTG.TagGroupSetTagAsNumber("ImageSetID", imageSetID);
+		persistentTG.TagGroupSetTagAsNumber("ImageSpotID", imageSpotID);
+		persistentTG.TagGroupSetTagAsString("ImageType", imageType);
+		persistentTG.TagGroupSetTagAsString("ImageMode", imageMode);
+		
+		persistentTG.TagGroupCreateNewLabeledTag("RingMode");
+		persistentTG.TagGroupCreateNewLabeledTag("IntegratedImage");
+		persistentTG.TagGroupCreateNewLabeledTag("NumberOfIntegrations");
+		persistentTG.TagGroupCreateNewLabeledTag("DegreeStep");
+		persistentTG.TagGroupCreateNewLabeledTag("ShadowDistance");
+		persistentTG.TagGroupCreateNewLabeledTag("ShadowValue");
+		persistentTG.TagGroupCreateNewLabeledTag("DSpacingAng");
+		persistentTG.TagGroupCreateNewLabeledTag("ExposureTime");
+		
+		persistentTG.TagGroupSetTagAsNumber("RingMode", ringMode);
+		persistentTG.TagGroupSetTagAsNumber("IntegratedImage", integratedImage);
+		persistentTG.TagGroupSetTagAsNumber("NumberOfIntegrations", NumberOfIntegrations);
+		persistentTG.TagGroupSetTagAsNumber("DegreeStep", DegreeStep);
+		persistentTG.TagGroupSetTagAsNumber("ShadowDistance", ShadowDistance);
+		persistentTG.TagGroupSetTagAsNumber("ShadowValue", shadowValue);
+		persistentTG.TagGroupSetTagAsNumber("DSpacingAng", DSpacingAng);
+		persistentTG.TagGroupSetTagAsNumber("ExposureTime", ExposureTime);
+		
+		return persistentTG;
+	}
+	
+	/* Function to check if an image has the toolkit tags */
+	number checkImageTags(object self, image &theImage){
+		TagGroup persistentTG = theImage.ImageGetTagGroup();
+		if(TagGroupIsValid(persistentTG) == 0){
+				if(debugMode==1){result("\nNo Persistent image tags detected.");}
+				return -1;
+		}
+		string tagPath = "Darkfield360";
+		number doesExist = TagGroupDoesTagExist(persistentTG, tagPath);
+		if(doesExist == 0){
+			if(debugMode==1){result("\nDarkfield image tag group not found.");}
+			return 0;
+		}
+		if(debugMode==1){result("\nDarkfield image tag group found.");}
+		return 1;
 	}
 	
 	// Constructor
@@ -5204,8 +5320,18 @@ object startToolkit () {
 	object alignmentDialog = alloc(alignmentdialog); // The aligning image dialog. Is not displayed or created yet.
 	Toolkit.storeAlignmentDialog(alignmentDialog); // Stored in toolkit object. Starting it up might be tricky? Problem for future Matt.
 	
-	dataObject.updatePersistent(dataObject.createPersistent());
-	TagGroupOpenBrowserWindow(GetPersistentTagGroup(),0);
+	// Load the persistent tags from the micrograph memory.
+	if(dataObject.checkPersistent()==1){ // If there is a Darkfield360 tag set then load it...
+		TagGroup persistentSave
+		TagGroupGetTagAsTagGroup(GetPersistentTagGroup(), "Darkfield360", persistentSave);
+		dataObject.loadPersistent(persistentSave);
+	} else { // If there is not a darkfield360 tag set create one...
+		TagGroup persistentSave = dataObject.createPersistent();
+		dataObject.updatePersistent(persistentSave); // save it to memory
+		TagGroupGetTagAsTagGroup(GetPersistentTagGroup(), "Darkfield360", persistentSave);
+		dataObject.loadPersistent(persistentSave); // load it as normal to make sure all dataobject values are set
+	}
+	//TagGroupOpenBrowserWindow(dataObject.cameraLengths, 0);
 	
 	return Toolkit;
 }

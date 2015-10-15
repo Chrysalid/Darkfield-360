@@ -54,7 +54,7 @@ Darkfield360
 		xTilty: <conversion factor> // number of y pixels moved per 1 unit of xTilt
 		yTiltx: <conversion factor> // number of x pixels moved per 1 unit of yTilt
 		yTilty: <conversion factor> // number of y pixels moved per 1 unit of yTilt
-	DSpacing: <value in Angstroms>
+	DSpacingAng: <value in Angstroms>
 	
 	ImageSetID: <unique ID for each set of images>
 	ImageSpotNumber: <numbered from 0 for each image in a set>
