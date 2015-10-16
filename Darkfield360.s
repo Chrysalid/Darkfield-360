@@ -327,6 +327,7 @@ string PadWithZeroes(number value, number PadOutTo) {
 	return startstring;
 	}
 
+/* Makes the image take up all available screen space. Used to position the alignment dialogs. */
 void zoomImage(image myImage){
 	// Taken from http://www.dmscripting.com/files/Zoom_To_Full_Screen.s
 	number screenWidth, screenHeight, imagewidth, imageheight, zoomfactor
@@ -762,6 +763,7 @@ TagGroup createDFList (number tracker, number shadowing, number integration, num
 	
 	return DFList;
 }
+
 
 // ********************************
 //	Image Alignment Dialog Class
@@ -2311,7 +2313,16 @@ class MyDataObject
 		number scaleCalibration;
 		DiffractionScale.TagGroupGetTagAsNumber(label, scaleCalibration);
 		return scaleCalibration;	
-	}	
+	}
+	
+	/* Function to return the scale calibration table. */
+	TagGroup getScaleCalibrationTable(object self){
+		return DiffractionScale;
+	}
+	/* Function to set the scale calibration table. */
+	TagGroup setScaleCalibrationTable(object self){
+		// delete existing table first...
+	}
 	
 	// Constructor
 	MyDataObject(object self)
@@ -2349,6 +2360,135 @@ class MyDataObject
 	}
 }
 
+
+// ********************************
+//	Scale Calibration Dialog Class
+// ********************************
+// It is used to enter/display the calibration scale factors and camera length options.
+
+class ScaleValueDialog : uiframe
+{
+	// Global variables
+	number dataObjectID;
+	number toolkitID;
+	number scaleValueID;
+	number debugMode;
+	object childDialog; // Store a clone of this dialog here for repeated use.
+	number availableValueFields; // stores the number of Value fields.
+	
+	// Tells the dialog what Toolkit it belongs to and which dataObject to use.
+	// Uses Weak Referencing so it can go out of scope once the Toolkit is destroyed.
+	void initialise(object self, number theToolkitID, number theDataObjectID)
+	{
+		dataObjectID = theDataObjectID; // The ID of the dataObject
+		ToolkitID = theToolkitID; // ID of the toolkit object this object will be kept inside of.
+		availableValueFields = 5; // Number of value fields that can be used.
+	}
+	/* Function to create the dialog (minus the OK/Cancel buttons) */
+	TagGroup createFields (object self){
+		taggroup box_items
+		taggroup box=dlgcreatebox("Configure Scale Factors", box_items)
+		box.dlgexternalpadding(5,3).dlginternalpadding(12,5)
+		
+		
+		tagGroup value1Label = DLGCreateStringField( "", 10 ).dlgidentifier("value1Label");
+		tagGroup value1Factor = DLGCreateIntegerField( 0, 10 ).dlgidentifier("value1Factor");
+		taggroup value1Fields = dlggroupitems(value1Label, value1Factor).dlgtablelayout(2,1,0);
+		
+		tagGroup value2Label = DLGCreateStringField( "", 10 ).dlgidentifier("value2Label");
+		tagGroup value2Factor = DLGCreateIntegerField( 0, 10 ).dlgidentifier("value2Factor");
+		taggroup value2Fields = dlggroupitems(value2Label, value2Factor).dlgtablelayout(2,1,0);
+		
+		tagGroup value3Label = DLGCreateStringField( "", 10 ).dlgidentifier("value1Labe3");
+		tagGroup value3Factor = DLGCreateIntegerField( 0, 10 ).dlgidentifier("value3Factor");
+		taggroup value3Fields = dlggroupitems(value3Label, value3Factor).dlgtablelayout(2,1,0);
+		
+		tagGroup value4Label = DLGCreateStringField( "", 10 ).dlgidentifier("value4Label");
+		tagGroup value4Factor = DLGCreateIntegerField( 0, 10 ).dlgidentifier("value4Factor");
+		taggroup value4Fields = dlggroupitems(value4Label, value4Factor).dlgtablelayout(2,1,0);
+		
+		tagGroup value5Label = DLGCreateStringField( "", 10 ).dlgidentifier("value5Label");
+		tagGroup value5Factor = DLGCreateIntegerField( 0, 10 ).dlgidentifier("value5Factor");
+		taggroup value5Fields = dlggroupitems(value5Label, value5Factor).dlgtablelayout(2,1,0);
+		
+		// Populate the fields with the existing values
+		tagGroup availableCameraLengths = GetScriptObjectFromID(dataObjectID).getAvailableCameraLengths();
+		tagGroup calibrationValues = GetScriptObjectFromID(dataObjectID).getScaleCalibrationTable();
+		number totalCameraLengths = TagGroupCountTags(availableCameraLengths);
+		number i;
+		for(i=0; i < availableValueFields; i++){
+			string theLabel;
+			number theFactor;
+			string identifier = "value" + (i+1);
+			availableCameraLengths.TagGroupGetIndexedTagAsString(i, theLabel);
+			calibrationValues.TagGroupGetTagAsNumber(theLabel, theFactor);
+			self.DLGValue(identifier + "Factor", theFactor);
+			self.DLGValue(identifier + "Label", theLabel );
+		}
+		// Put them all together
+		box_items.DLGAddElement(value5Fields);
+		box_items.DLGAddElement(value4Fields);
+		box_items.DLGAddElement(value3Fields);
+		box_items.DLGAddElement(value2Fields);
+		box_items.DLGAddElement(value1Fields);
+		box_items.dlgtablelayout(1,5,0);		
+		return box
+	}
+	
+	/* Function to create the new tag lists from the field values and uploadthem to the dataObject */
+	number uploadFields (object self){
+		return 1;
+	}
+	
+	/* Create the Dialog. Must be called before showScaleValueDialog. Uses the CreateFields function output */
+	void generateDialog(object self){
+		self.super.init( self.createFields() );
+	}
+	
+	/* Function to make the dialog visible on screen after it is constructed. */
+	number showCalibrationDialog(object self){
+		return self.pose(); // displays dialog as modal; it will make the script wait until it is done, so the loops etc. must be started before this.
+		// returns 1 if ok is pressed, 0 if cancelled
+	}
+
+	// Function used to summon forth the calibration dialog. Dialog is Modal.
+	// Returns 1 if ok button pressed, 0 if cancelled.
+	number inputNewCalibration(object self)
+	{
+		if(debugMode==1){result("\nCreating child dialog Object (calibration options)");}
+		childDialog = self.ScriptObjectClone(); // Make a copy of itself and store it.
+		if(debugMode==1){result("\nGenerating child dialog");}
+		childDialog.generateDialog(); // Make the dialog for this copy
+		if(debugMode==1){result("\nShowing child dialog");}
+		number useValues = childDialog.showCalibrationDialog();	// Display the child with Pose() system
+		if(useValues == 1){
+			childDialog.uploadFields();
+		}
+		childDialog = NULL; // NULL the childDialog so it can go out of scope.
+		return useValues;
+	}
+
+	
+	// The constructor
+	ScaleValueDialog(object self)
+	{
+		scaleValueID = self.ScriptObjectGetID();
+	}
+	
+	// The destructor (does nothing)
+	~ScaleValueDialog(object self)
+	{
+		result("\nScale Calibration Dialog with ID: "+self.ScriptObjectGetID()+" closed.");
+	}
+		
+	void setDebugMode(object self, number input)
+	{
+		debugMode = input;
+		if(debugMode == 1){result("\n\tDebug Mode Activated in Scale Calibration Dialog");}
+	}
+}
+
+
 // *******************************
 // SHORTCUT KEYS
 // *******************************
@@ -2356,6 +2496,7 @@ class MyDataObject
 // Add a key listener to an imagedisplay dervied from
 // D. R. G. Mitchell, adminnospam@dmscripting.com (remove the nospam to make this work)
 // www.dmscripting.com
+
 
 class MyKeyHandler
 {
@@ -2543,6 +2684,8 @@ class CreateDF360DialogClass : uiframe
 	number KeyListenerID;
 	object imageAlignmentDialog;
 	number imageAlignmentDialogID;
+	object scaleCalibrationDialog;
+	number scaleCalibrationDialogID;
 	component markerRing;
 	component ringRadiusText;
 	
@@ -2629,6 +2772,20 @@ class CreateDF360DialogClass : uiframe
 	number getAlignmentDialogID(object self)
 	{
 		return imageAlignmentDialogID;
+	}
+	
+	/* Store the scale calibration dialog for future use. */
+	number storeCalibrationDialog(object self, object theCalibrationDialog)
+	{
+		scaleCalibrationDialog = theCalibrationDialog;
+		scaleCalibrationDialogID = scaleCalibrationDialog.ScriptObjectGetID();
+		scaleCalibrationDialog.initialise(ToolkitID, dataObjectID); // Tell the object who it belongs to
+		scaleCalibrationDialog.setDebugMode(debugMode);
+		return scaleCalibrationDialogID;
+	}
+	number getscaleCalibrationDialogID(object self)
+	{
+		return scaleCalibrationDialogID;
 	}
 	
 	/* Function to draw the lines on the View Window used to centre the beam and pick spots.
@@ -5339,6 +5496,9 @@ object startToolkit () {
 	result("\nCreating Alignment Dialog System...")
 	object alignmentDialog = alloc(alignmentdialog); // The aligning image dialog. Is not displayed or created yet.
 	
+	result("\nCreating Calibration Input Dialog...")
+	object calibrationDialog = alloc(ScaleValueDialog);
+	
 	// Load the persistent tags from the micrograph memory.
 	if(dataObject.checkPersistent()==1){ // If there is a Darkfield360 tag set then load it...
 		TagGroup persistentSave
@@ -5360,6 +5520,7 @@ object startToolkit () {
 	Toolkit.storeDataObject(dataObject);
 	Toolkit.storeKeyListener(KeyListener); 	// Insert it into toolkit. To make it listen for key presses on a display use Toolkit.startListening(ImageDisplay);
 	Toolkit.storeAlignmentDialog(alignmentDialog); // Stored in toolkit object.
+	Toolkit.storeCalibrationDialog(calibrationDialog);
 	
 	Toolkit.updateDialog();
 	return Toolkit;
