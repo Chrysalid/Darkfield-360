@@ -301,26 +301,6 @@ number true = 1;
 number false = 0;
 number versionNumber = 0.20
 
-/* Function that returns the scale of (1/nm) per pixel based on camera length.
-	These values are the scales used in units of (1/nm) per pixel for each camera length.
-	I have worked these out for our JEOL 2100, but have yet to make them easier to configure.
-	A custom scale factor can be entered on the help/option menu of the toolkit.*/
-number pickScale(number cameraLength){
-	if(cameraLength==20){
-	return 0.0095
-	} else if(cameraLength==25){
-	return 0.0081
-	} else if(cameraLength==30){
-	return 0.0070
-	} else if(cameraLength==40){
-	return 0.0054
-	} else if(cameraLength==50){
-	return 0.0044
-	} else {
-		return 0;
-	}
-}
-
 /* Calculates and returns several statistics for an image.
 	Taken from www.dmscripting.com
  */
@@ -2325,6 +2305,14 @@ class MyDataObject
 			return EmptyCameraList;
 		}
 	}
+	
+	/* Function to return the binned image scale from the calibration table. */
+	number getScaleCalibration(object self, string label){
+		number scaleCalibration;
+		DiffractionScale.TagGroupGetTagAsNumber(label, scaleCalibration);
+		return scaleCalibration;	
+	}	
+	
 	// Constructor
 	MyDataObject(object self)
 		{
@@ -4794,12 +4782,13 @@ class CreateDF360DialogClass : uiframe
 		string returnname;
 		dlggetnthlabel(tg, returnno, returnname) // convert option # to label
 		if(debugMode==true){result("\nSelection is " + returnname);}
-		returnname = returnname.left(2)
-		if(debugMode==true){result("\nCL is " + returnname);}
-		dataObject.setCameraLength(val(returnname));
-		// Update the scales (made for only our 2100 right now)
-
-		number newScale = pickScale(val(returnname));
+		
+		number returnCL = val(returnname.left(2));
+		if(debugMode==true){result("\nCL is " + returnCL);}
+		dataObject.setCameraLength(returnCL);
+		
+		// Update the scales
+		number newScale = dataObject.getScaleCalibration(returnname);
 		if(debugMode==true){result("\nNew Scale is " + newScale);}
 
 		dataObject.setRefScale(newScale);
@@ -5372,7 +5361,7 @@ object startToolkit () {
 	Toolkit.storeKeyListener(KeyListener); 	// Insert it into toolkit. To make it listen for key presses on a display use Toolkit.startListening(ImageDisplay);
 	Toolkit.storeAlignmentDialog(alignmentDialog); // Stored in toolkit object.
 	
-	Toolkit.updateDialog();	
+	Toolkit.updateDialog();
 	return Toolkit;
 }
 
