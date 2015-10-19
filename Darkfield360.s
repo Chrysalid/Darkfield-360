@@ -2369,12 +2369,21 @@ class MyDataObject
 class ScaleValueDialog : uiframe
 {
 	// Global variables
+	number scaleValueID; // Used by child dialog to return values to parent.
+	object childDialog; // Store a clone of this dialog here for repeated use.
+	TagGroup returnedCameraLengths; // Used by child dialog to return values to parent.
+	TagGroup returnedCalibrationFactors; // Used by child dialog to return values to parent.
 	number dataObjectID;
 	number toolkitID;
-	number scaleValueID;
 	number debugMode;
-	object childDialog; // Store a clone of this dialog here for repeated use.
 	number availableValueFields; // stores the number of Value fields.
+	
+	void takeCameraLengths(object self, tagGroup cameraLengthList){ // updates the returnedCameraLengths taggroup in this object.
+		returnedCameraLengths = cameraLengthList;
+	}
+	void takeCalibrationFactors(object self, tagGroup calibrationFactorList){ // updates the returnedCalibrationFactors taggroup in this object.
+		returnedCalibrationFactors = calibrationFactorList;
+	}
 	
 	// Tells the dialog what Toolkit it belongs to and which dataObject to use.
 	// Uses Weak Referencing so it can go out of scope once the Toolkit is destroyed.
@@ -2383,61 +2392,148 @@ class ScaleValueDialog : uiframe
 		dataObjectID = theDataObjectID; // The ID of the dataObject
 		ToolkitID = theToolkitID; // ID of the toolkit object this object will be kept inside of.
 		availableValueFields = 5; // Number of value fields that can be used.
+		returnedCameraLengths =  GetScriptObjectFromID(dataObjectID).getAvailableCameraLengths();
+		returnedCalibrationFactors = GetScriptObjectFromID(dataObjectID).getScaleCalibrationTable();
 	}
+	
 	/* Function to create the dialog (minus the OK/Cancel buttons) */
 	TagGroup createFields (object self){
+		if(debugMode==1){result("\n\tCreating fields for calibration dialog.");}
 		taggroup box_items
 		taggroup box=dlgcreatebox("Configure Scale Factors", box_items)
 		box.dlgexternalpadding(5,3).dlginternalpadding(12,5)
 		
+		tagGroup availableCameraLengths = GetScriptObjectFromID(dataObjectID).getAvailableCameraLengths();
+		//TagGroupOpenBrowserWindow(availableCameraLengths,0);
+		tagGroup calibrationValues = GetScriptObjectFromID(dataObjectID).getScaleCalibrationTable();
+		//TagGroupOpenBrowserWindow(calibrationValues,0);
+		number totalCameraLengths = TagGroupCountTags(availableCameraLengths);
 		
-		tagGroup value1Label = DLGCreateStringField( "", 10 ).dlgidentifier("value1Label");
-		tagGroup value1Factor = DLGCreateIntegerField( 0, 10 ).dlgidentifier("value1Factor");
+		if(debugMode==1){result("\n\tPopulating fields for calibration dialog.");}
+		string theLabel;
+		availableCameraLengths.TagGroupGetIndexedTagAsString(0, theLabel);
+		number theFactor;
+		calibrationValues.TagGroupGetTagAsNumber(theLabel, theFactor);
+		tagGroup value0Label = DLGCreateStringField( theLabel, 10, "changedLabel" ).dlgidentifier("value0Label");
+		tagGroup value0Factor = DLGCreateRealField( theFactor, 20, 10, "changedValue" ).dlgidentifier("value0Factor");
+		taggroup value0Fields = dlggroupitems(value0Label, value0Factor).dlgtablelayout(2,1,0);
+
+		availableCameraLengths.TagGroupGetIndexedTagAsString(1, theLabel);
+		calibrationValues.TagGroupGetTagAsNumber(theLabel, theFactor);
+		tagGroup value1Label = DLGCreateStringField( theLabel, 10, "changedLabel" ).dlgidentifier("value1Label");
+		tagGroup value1Factor = DLGCreateRealField( theFactor, 20, 10, "changedValue" ).dlgidentifier("value1Factor");
 		taggroup value1Fields = dlggroupitems(value1Label, value1Factor).dlgtablelayout(2,1,0);
 		
-		tagGroup value2Label = DLGCreateStringField( "", 10 ).dlgidentifier("value2Label");
-		tagGroup value2Factor = DLGCreateIntegerField( 0, 10 ).dlgidentifier("value2Factor");
+		availableCameraLengths.TagGroupGetIndexedTagAsString(2, theLabel);
+		calibrationValues.TagGroupGetTagAsNumber(theLabel, theFactor);
+		tagGroup value2Label = DLGCreateStringField( theLabel, 10, "changedLabel" ).dlgidentifier("value2Label");
+		tagGroup value2Factor = DLGCreateRealField( theFactor, 20, 10, "changedValue" ).dlgidentifier("value2Factor");
 		taggroup value2Fields = dlggroupitems(value2Label, value2Factor).dlgtablelayout(2,1,0);
 		
-		tagGroup value3Label = DLGCreateStringField( "", 10 ).dlgidentifier("value1Labe3");
-		tagGroup value3Factor = DLGCreateIntegerField( 0, 10 ).dlgidentifier("value3Factor");
+		availableCameraLengths.TagGroupGetIndexedTagAsString(3, theLabel);
+		calibrationValues.TagGroupGetTagAsNumber(theLabel, theFactor);
+		tagGroup value3Label = DLGCreateStringField( theLabel, 10, "changedLabel" ).dlgidentifier("value3Label");
+		tagGroup value3Factor = DLGCreateRealField( theFactor, 20, 10, "changedValue" ).dlgidentifier("value3Factor");
 		taggroup value3Fields = dlggroupitems(value3Label, value3Factor).dlgtablelayout(2,1,0);
 		
-		tagGroup value4Label = DLGCreateStringField( "", 10 ).dlgidentifier("value4Label");
-		tagGroup value4Factor = DLGCreateIntegerField( 0, 10 ).dlgidentifier("value4Factor");
+		availableCameraLengths.TagGroupGetIndexedTagAsString(4, theLabel);
+		calibrationValues.TagGroupGetTagAsNumber(theLabel, theFactor);
+		tagGroup value4Label = DLGCreateStringField( theLabel, 10, "changedLabel" ).dlgidentifier("value4Label");
+		tagGroup value4Factor = DLGCreateRealField( theFactor, 20, 10, "changedValue" ).dlgidentifier("value4Factor");
 		taggroup value4Fields = dlggroupitems(value4Label, value4Factor).dlgtablelayout(2,1,0);
 		
-		tagGroup value5Label = DLGCreateStringField( "", 10 ).dlgidentifier("value5Label");
-		tagGroup value5Factor = DLGCreateIntegerField( 0, 10 ).dlgidentifier("value5Factor");
-		taggroup value5Fields = dlggroupitems(value5Label, value5Factor).dlgtablelayout(2,1,0);
-		
-		// Populate the fields with the existing values
-		tagGroup availableCameraLengths = GetScriptObjectFromID(dataObjectID).getAvailableCameraLengths();
-		tagGroup calibrationValues = GetScriptObjectFromID(dataObjectID).getScaleCalibrationTable();
-		number totalCameraLengths = TagGroupCountTags(availableCameraLengths);
-		number i;
-		for(i=0; i < availableValueFields; i++){
-			string theLabel;
-			number theFactor;
-			string identifier = "value" + (i+1);
-			availableCameraLengths.TagGroupGetIndexedTagAsString(i, theLabel);
-			calibrationValues.TagGroupGetTagAsNumber(theLabel, theFactor);
-			self.DLGValue(identifier + "Factor", theFactor);
-			self.DLGValue(identifier + "Label", theLabel );
-		}
-		// Put them all together
-		box_items.DLGAddElement(value5Fields);
-		box_items.DLGAddElement(value4Fields);
-		box_items.DLGAddElement(value3Fields);
-		box_items.DLGAddElement(value2Fields);
+		if(debugMode==1){result("\n\tGrouping fields for calibration dialog.");}
+		TagGroup combo
+		box_items.DLGAddElement(value0Fields);
 		box_items.DLGAddElement(value1Fields);
-		box_items.dlgtablelayout(1,5,0);		
+		box_items.DLGAddElement(value2Fields);
+		box_items.DLGAddElement(value3Fields);
+		box_items.DLGAddElement(value4Fields);
+		if(debugMode==1){result("\n\tReturning tag group for calibration dialog.");}
 		return box
 	}
 	
-	/* Function to create the new tag lists from the field values and uploadthem to the dataObject */
-	number uploadFields (object self){
-		return 1;
+	/* Function to create the new tag lists from the field values and uploadthem to the parent dialog. */
+	number uploadFields(object self){
+		if(debugMode==1){result("\n\tCreating new CL value table...");}
+		TagGroup CLValues = NewTagList();
+		string value;
+		self.DLGGetValue("value0Label", value );
+		CLValues.TagGroupInsertTagAsString(infinity(), value);
+		self.DLGGetValue("value1Label", value );
+		CLValues.TagGroupInsertTagAsString(infinity(), value);
+		self.DLGGetValue("value2Label", value );
+		CLValues.TagGroupInsertTagAsString(infinity(), value);
+		self.DLGGetValue("value3Label", value );
+		CLValues.TagGroupInsertTagAsString(infinity(), value);
+		self.DLGGetValue("value4Label", value );
+		CLValues.TagGroupInsertTagAsString(infinity(), value);
+		if(debugMode==1){result(" Done.");}
+		// push to parent dialog.
+		GetScriptObjectFromID(scaleValueID).takeCameraLengths(CLValues);
+		
+		if(debugMode==1){result("\n\tCreating new default calibration table values");}
+		TagGroup diffractionData = NewTagGroup();
+		string theLabel
+		number theFactor
+		self.DLGGetValue("value0Label", theLabel );
+		self.DLGGetValue("value0Factor", theFactor );
+		diffractionData.TagGroupCreateNewLabeledTag(theLabel);
+		diffractionData.TagGroupSetTagAsNumber(theLabel, theFactor);
+		self.DLGGetValue("value1Label", theLabel );
+		self.DLGGetValue("value1Factor", theFactor );
+		diffractionData.TagGroupCreateNewLabeledTag(theLabel);
+		diffractionData.TagGroupSetTagAsNumber(theLabel, theFactor);
+		self.DLGGetValue("value2Label", theLabel );
+		self.DLGGetValue("value2Factor", theFactor );
+		diffractionData.TagGroupCreateNewLabeledTag(theLabel);
+		diffractionData.TagGroupSetTagAsNumber(theLabel, theFactor);
+		self.DLGGetValue("value3Label", theLabel );
+		self.DLGGetValue("value3Factor", theFactor );
+		diffractionData.TagGroupCreateNewLabeledTag(theLabel);
+		diffractionData.TagGroupSetTagAsNumber(theLabel, theFactor);
+		self.DLGGetValue("value4Label", theLabel );
+		self.DLGGetValue("value4Factor", theFactor );
+		diffractionData.TagGroupCreateNewLabeledTag(theLabel);
+		diffractionData.TagGroupSetTagAsNumber(theLabel, theFactor);
+		if(debugMode==1){result(" Done.");}
+		// push to parent dialog.
+		GetScriptObjectFromID(scaleValueID).takeCalibrationFactors(diffractionData);	
+	}
+	
+	/* Function to save temporary tag groups to persistent memory */
+	void saveToPersistent(object self){
+		if(debugMode==1){result("\n\tSaving new values to memory...");}
+		if( GetScriptObjectFromID(dataObjectID).checkPersistent() != 1){
+			result("\nError: Permanent Tags not found.")
+			return;
+		}
+		// update the permenent tags, then re-load them into the dataObject
+		string tagPath = "tag path variable";
+		// Check if cameraLength options exist
+		tagPath = "Darkfield360:CameraLengths";
+		number CameraLengthsDoesExist = TagGroupDoesTagExist(GetPersistentTagGroup(), tagPath);		
+
+		if(cameraLengthsDoesExist==1) {
+			if(debugMode==1){result("\n\tExisting CL values found. Deleting them...");}
+			taggroupdeletetagwithlabel(GetPersistentTagGroup(), tagPath)
+			if(debugMode==1){result(" Done.");}
+		}
+		TagGroupSetTagAsTagGroup(GetPersistentTagGroup(), tagPath, returnedCameraLengths);
+		if(debugMode==1){result("\n\tNew CL values saved");}
+		
+		// Check if calibration scale data exists as well.
+		tagPath = "Darkfield360:DiffractionScale";
+		number scaleDoesExist = TagGroupDoesTagExist(GetPersistentTagGroup(), tagPath);
+		if(scaleDoesExist==1) {
+			if(debugMode==1){result("\n\tExisting calibration factor values found. Deleting them...");}
+			taggroupdeletetagwithlabel(GetPersistentTagGroup(), tagPath)
+			if(debugMode==1){result(" Done.");}
+		}
+		TagGroupSetTagAsTagGroup(GetPersistentTagGroup(), tagPath, returnedCalibrationFactors);
+		if(debugMode==1){result("\n\tNew calibration factors saved");}
+		if(debugMode==1){result("\nSaving Complete.");}
+		
 	}
 	
 	/* Create the Dialog. Must be called before showScaleValueDialog. Uses the CreateFields function output */
@@ -2462,7 +2558,8 @@ class ScaleValueDialog : uiframe
 		if(debugMode==1){result("\nShowing child dialog");}
 		number useValues = childDialog.showCalibrationDialog();	// Display the child with Pose() system
 		if(useValues == 1){
-			childDialog.uploadFields();
+			// save temporary tag groups to the persistent memory
+			self.saveToPersistent();
 		}
 		childDialog = NULL; // NULL the childDialog so it can go out of scope.
 		return useValues;
@@ -2485,6 +2582,18 @@ class ScaleValueDialog : uiframe
 	{
 		debugMode = input;
 		if(debugMode == 1){result("\n\tDebug Mode Activated in Scale Calibration Dialog");}
+	}
+	
+	void changedLabel(object self, tagGroup tg){ //Change method detects when a CL label is changed. tg is the source of the call
+		//string value=tg.dlggetvalue()
+		// create the camera length and calibration tables whenever there is a change and upload them to the parent dialog.
+		self.uploadFields();
+	}
+	
+	void changedValue(object self, tagGroup tg){ //Change method detects when a calibration factor is changed. tg is the source of the call
+		// number value=tg.dlggetvalue()
+		// create the camera length and calibration tables whenever there is a change and upload them to the parent dialog.
+		self.uploadFields();
 	}
 }
 
@@ -5406,32 +5515,11 @@ class CreateDF360DialogClass : uiframe
 
 	void enterScaleButtonPress (object self) // Set the scale to something more awesome. Adjust for Binning.
 	{
-		number newScale;
-		result("\n\nThe scale value is the number of (1/nm) per pixel on an UNBINNED image at these microscope settings." + \
-				"\nEach camera length will have a different scale. The scale can also be set using DiffTools," + \
-				"\nbut an easier method is being developed for this script. Until then, here are some known values" + \
-				"\nfor the Birmingham CEM JEOL 2100:" + \
-				"\nCamera Length of 20cm: 0.00939" \
-				);
-		if(!getNumber("Enter Scale (1/nm per pixel):", 0.00939, newScale)){
-			Throw("Scale calibration input cancelled by user");
-		}
-		number binning = dataObject.getBinningMultiplier()
-		if(binning.isNaN() || binning == 0){
-			Throw("Binning has not been set. Run Calibration first")
-		}
-		newScale = newScale * binning;
-		if(debugMode==true){result("\nNewScale will be: " + newScale + " (1/nm) per pixel");}
-
-		image viewImage;
-		if(!returnViewImage(debugMode, viewImage)){
-			result("\nNo Image Detected. No scale set.")
-			exit(0)
-		}
-		ImageSetDimensionScale(viewImage, 0, newScale)
-		ImageSetDimensionUnitString(viewImage, 0, "1/nm" )
-		ImageSetDimensionScale(viewImage, 1, newScale)
-		ImageSetDimensionUnitString(viewImage, 1, "1/nm" )
+		result("\n\nThe scale factor is the number of (1/nm) per pixel on an UNBINNED image at these microscope settings." + \
+				"\nEach camera length will have a different scale.");
+		number useValues = scaleCalibrationDialog.inputNewCalibration();
+		if(useValues){result("\n\nNew values loaded into memory. Please restart the Toolkit.");}
+		else {result("\nCalibration input cancelled by user. No data has been changed.");}
 	}
 		
 	void manualTiltCalibrationButtonPress (object self)
