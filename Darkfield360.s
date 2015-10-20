@@ -2128,6 +2128,26 @@ class MyDataObject
 		return toReturn;
 	}
 
+	/* Function to change just the image sets from a tag group */
+	void setImageSets(object self, TagGroup newImageSets){
+		imageSets = NULL;
+		imageSets = newImageSets;	
+	}
+	/* Function to change just the image sets from a tag group */
+	void setAvailableCameraLengths(object self, TagGroup newTags){
+		cameraLengths = NULL;
+		cameraLengths = newTags;
+	}
+	/* Function to change just the image sets from a tag group */
+	void setScaleCalibrationTable(object self, TagGroup newTags){
+		DiffractionScale = NULL;
+		DiffractionScale = newTags;
+	}
+	/* Function to change just the image sets from a tag group */
+	void setTiltVectorCalibrations(object self, TagGroup newTags){
+		tiltVectorCalibrations = NULL;
+		tiltVectorCalibrations = newTags;
+	}
 	/* Function to check if persistent tags are present */
 	number checkPersistent(object self){
 		TagGroup persistentTG = GetPersistentTagGroup();
@@ -2325,6 +2345,7 @@ class MyDataObject
 		persistentTG.TagGroupCreateNewLabeledTag("ImageSets");
 		
 		if(persistentExists == 0){ // only dataObject values might be present.
+			if(debugMode==1){result("\nusing only dataObjects or making blank...");}
 			if(CameraLengthsDoesExist){ // if data object has it...
 				persistentTG.TagGroupSetTagAsTagGroup("CameraLengths", cameraLengths);
 			} else { //if data object does not have it, make a new blank one.
@@ -2368,28 +2389,35 @@ class MyDataObject
 				TagGroup BlankImageSets = NewTagGroup();
 				persistentTG.TagGroupSetTagAsTagGroup("ImageSets", BlankImageSets);
 			}
+			if(debugMode==1){result(" Done.");}
 			return persistentTG;
 		}
 		
 		// Persistent memory contains a Darkfield360 tag group, but we do not know what is inside it.
 		TagGroup darkfield360
 		TagGroupGetTagAsTagGroup(GetPersistentTagGroup(), "Darkfield360", darkfield360);
+		if(debugMode==1){result("\nLooking in permanent memory");}
 		
 		string tagPath;
 		TagGroup loadedCameraLengths, loadedDiffractionScale, loadedTiltCalibration, loadedImageSets;
 
 		tagPath = "Darkfield360:CameraLengths";
 		if(TagGroupGetTagAsTagGroup(GetPersistentTagGroup(), tagPath, loadedCameraLengths)){
+			if(debugMode==1){result("\n\tFound CL List");}
 			// If the tag path exists then we can decide which data to use.
 			if(CameraLengthsDoesExist == 1 && dataDominant == 1){
+				if(debugMode==1){result("\n\tUsing DataObject CL List");}
 				persistentTG.TagGroupSetTagAsTagGroup("CameraLengths", cameraLengths); // use dataObject
 			} else {
+				if(debugMode==1){result("\n\tUsing CL List from memory");}
 				persistentTG.TagGroupSetTagAsTagGroup("CameraLengths", loadedCameraLengths); // use persistent memory
 			}
 		} else { // camera lengths data not in persistent memory
 			if(CameraLengthsDoesExist){ // if data object has it...
+				if(debugMode==1){result("\n\tUsing CL List from memory");}
 				persistentTG.TagGroupSetTagAsTagGroup("CameraLengths", cameraLengths);
 			} else { //if data object does not have it, make a new blank one.
+				if(debugMode==1){result("\n\tMaking Blank CL List");}
 				TagGroup CLValues = NewTagList();
 				CLValues.TagGroupInsertTagAsString(infinity(), "None");
 				persistentTG.TagGroupSetTagAsTagGroup("CameraLengths", CLValues);
@@ -2461,6 +2489,7 @@ class MyDataObject
 				persistentTG.TagGroupSetTagAsTagGroup("ImageSets", BlankImageSets);
 			}
 		}
+		if(debugMode==1){result("\nReturning TagGroup");}
 		return persistentTG;		
 	}
 	
@@ -2793,39 +2822,12 @@ class ScaleValueDialog : uiframe
 		GetScriptObjectFromID(scaleValueID).takeCalibrationFactors(diffractionData);	
 	}
 	
-	/* Function to save temporary tag groups to persistent memory */
-	void saveToPersistent(object self){
-		if(debugMode==1){result("\n\tSaving new values to memory...");}
-		if( GetScriptObjectFromID(dataObjectID).checkPersistent() != 1){
-			result("\nError: Permanent Tags not found.")
-			return;
-		}
-		// update the permenent tags, then re-load them into the dataObject
-		string tagPath = "tag path variable";
-		// Check if cameraLength options exist
-		tagPath = "Darkfield360:CameraLengths";
-		number CameraLengthsDoesExist = TagGroupDoesTagExist(GetPersistentTagGroup(), tagPath);		
-
-		if(cameraLengthsDoesExist==1) {
-			if(debugMode==1){result("\n\tExisting CL values found. Deleting them...");}
-			taggroupdeletetagwithlabel(GetPersistentTagGroup(), tagPath)
-			if(debugMode==1){result(" Done.");}
-		}
-		TagGroupSetTagAsTagGroup(GetPersistentTagGroup(), tagPath, returnedCameraLengths);
-		if(debugMode==1){result("\n\tNew CL values saved");}
-		
-		// Check if calibration scale data exists as well.
-		tagPath = "Darkfield360:DiffractionScale";
-		number scaleDoesExist = TagGroupDoesTagExist(GetPersistentTagGroup(), tagPath);
-		if(scaleDoesExist==1) {
-			if(debugMode==1){result("\n\tExisting calibration factor values found. Deleting them...");}
-			taggroupdeletetagwithlabel(GetPersistentTagGroup(), tagPath)
-			if(debugMode==1){result(" Done.");}
-		}
-		TagGroupSetTagAsTagGroup(GetPersistentTagGroup(), tagPath, returnedCalibrationFactors);
-		if(debugMode==1){result("\n\tNew calibration factors saved");}
+	/* Function to save temporary tag groups to dataObject */
+	void saveToDataObject(object self){
+		if(debugMode==1){result("\n\tSaving new values to dataObject...");}
+		GetScriptObjectFromID(dataObjectID).setAvailableCameraLengths(returnedCameraLengths);
+		GetScriptObjectFromID(dataObjectID).setScaleCalibrationTable(returnedCalibrationFactors);
 		if(debugMode==1){result("\nSaving Complete.");}
-		
 	}
 	
 	/* Create the Dialog. Must be called before showScaleValueDialog. Uses the CreateFields function output */
@@ -2841,6 +2843,7 @@ class ScaleValueDialog : uiframe
 
 	// Function used to summon forth the calibration dialog. Dialog is Modal.
 	// Returns 1 if ok button pressed, 0 if cancelled.
+	// Stores any results in the dataObject if 'ok' is pressed, no need to do anything else.
 	number inputNewCalibration(object self)
 	{
 		if(debugMode==1){result("\nCreating child dialog Object (calibration options)");}
@@ -2850,8 +2853,8 @@ class ScaleValueDialog : uiframe
 		if(debugMode==1){result("\nShowing child dialog");}
 		number useValues = childDialog.showCalibrationDialog();	// Display the child with Pose() system
 		if(useValues == 1){
-			// save temporary tag groups to the persistent memory
-			self.saveToPersistent();
+			// save temporary tag groups to the dataObject
+			self.saveToDataObject();
 		}
 		childDialog = NULL; // NULL the childDialog so it can go out of scope.
 		return useValues;
@@ -3826,20 +3829,26 @@ class CreateDF360DialogClass : uiframe
 		panel5.dlgaddelement(recentreBeamButton)
 		
 		// Panel 6 is for options
-		taggroup panel6=dlgcreatepanel()
-		panel6.dlgaddelement(dlgcreatelabel("Options")) // Label
-		panel6.dlgaddelement(dlgcreatelabel("")) // Blank
+		taggroup panel6=dlgcreatepanel();
+		panel6.dlgaddelement(dlgcreatelabel("Options")); // Label
+		panel6.dlgaddelement(dlgcreatelabel("")); // Blank
 		TagGroup dsDebug = DLGCreatePushButton("Debug Mode", "debugToggleButtonPress");
-		panel6.dlgaddelement(dsDebug)
+		panel6.dlgaddelement(dsDebug);
 		TagGroup changeSaveDir = DLGCreatePushButton("Save Directory", "saveDirButtonPress");
-		panel6.dlgaddelement(changeSaveDir)
-		TagGroup enterScaleButton = DLGCreatePushButton("Set Scale", "enterScaleButtonPress")
+		panel6.dlgaddelement(changeSaveDir);
+		TagGroup enterScaleButton = DLGCreatePushButton("Set Scale", "enterScaleButtonPress");
 		panel6.dlgaddelement(enterScaleButton);
-		TagGroup manualTiltEntryButton = DLGCreatePushButton("Tilt Calibration", "manualTiltCalibrationButtonPress")
-		panel6.dlgaddelement(manualTiltEntryButton)
-		TagGroup captureViewButton = DLGCreatePushButton("Capture View", "captureViewButtonPress")
-		panel6.dlgaddelement(captureViewButton)
-		panel6.dlgtablelayout(2,8,0); // Arrange the buttons
+		TagGroup manualTiltEntryButton = DLGCreatePushButton("Tilt Calibration", "manualTiltCalibrationButtonPress");
+		panel6.dlgaddelement(manualTiltEntryButton);
+		TagGroup captureViewButton = DLGCreatePushButton("Capture View", "captureViewButtonPress");
+		panel6.dlgaddelement(captureViewButton);
+		TagGroup saveSettingsToFile = DLGCreatePushButton("Save Settings File", "saveToolKitVariablesToFilePress");
+		panel6.dlgaddelement(saveSettingsToFile);
+		TagGroup loadSettingsFromFile = DLGCreatePushButton("Load Settings File", "loadToolkitVariablesFromFilePress");
+		panel6.dlgaddelement(loadSettingsFromFile);
+		TagGroup saveSettingsToDM = DLGCreatePushButton("Set as Default", "saveVariablesToMemoryPress");
+		panel6.dlgaddelement(saveSettingsToDM);
+		panel6.dlgtablelayout(2,12,0); // Arrange the buttons
 		
 		// Panel 7 is for final Imaging steps
 		taggroup panel7=dlgcreatepanel()
@@ -6095,7 +6104,33 @@ class CreateDF360DialogClass : uiframe
 	
 	void captureViewButtonPress (object self)
 	{
-			self.captureViewScreen();
+		self.captureViewScreen();
+	}
+	
+	// Saves the DataObject variables into a settings file. Any gaps will be filled from permanent memory.
+	void saveToolKitVariablesToFilePress (object self)
+	{
+		string path;
+		if(SaveAsDialog( "Save Settings As...", "Darkfield_Settings", path )){
+			TagGroupSaveToFile( dataObject.createPersistent(1), path );
+		}
+	}
+	
+	// Loads variables from a settings file and into the dataObject (not to permanent memory)
+	void loadToolkitVariablesFromFilePress (object self)
+	{
+		string path;
+		if(OpenDialog( path )){
+			TagGroup ToLoad = NewTagGroup();
+			if(TagGroupLoadFromFile( ToLoad, path )){
+				dataObject.loadPersistent(ToLoad); // Loads into the dataObject
+			}		
+		}	
+	}
+	
+	// Stores the current dataObject variables in the permanent memory
+	void saveVariablesToMemoryPress(object self){
+		dataObject.updatePersistent(dataObject.createPersistent(1));
 	}
 }
 
@@ -6134,13 +6169,13 @@ object startToolkit () {
 	result("\nCreating Tilt Calibration Input Dialog...")
 	object tiltDialog = alloc(TiltValueDialog);
 	
-	TagGroup persistentSave = dataObject.createDefaultPersistent(); // make a blank set of data
-	dataObject.updatePersistent(persistentSave); // save it to memory
-	dataObject.overWriteDataObject(); // load it as normal to make sure all dataobject values are set
-	
-	//TagGroupOpenBrowserWindow(dataObject.getAvailableCameraLengths(), 0);
-	
-		// Construct the Toolkit. This automatically creates the toolkit dialog.
+	if(dataObject.checkPersistent()==false){
+		TagGroup persistentSave = dataObject.createDefaultPersistent(); // make a blank set of data
+		dataObject.updatePersistent(persistentSave); // save it to memory
+	}
+	dataObject.overWriteDataObject(); // load variables from permanent memory into the dataObject.
+
+	// Construct the Toolkit. This automatically creates the toolkit dialog.
 	object Toolkit = alloc(CreateDF360DialogClass);
 	// Toolkit.ToggleDebugMode() // comment out to deactivate debugMode on startup. Can be toggled on toolkit manually
 	result("\nAttaching data store to Toolkit...")
@@ -6151,8 +6186,6 @@ object startToolkit () {
 	Toolkit.storeTiltDialog(tiltDialog);
 	
 	Toolkit.updateDialog();
-	
-	TagGroupOpenBrowserWindow(dataObject.createPersistent(0), 0);
 	
 	return Toolkit;
 }
