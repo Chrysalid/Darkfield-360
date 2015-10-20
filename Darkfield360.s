@@ -3044,29 +3044,14 @@ class TiltValueDialog : uiframe
 		GetScriptObjectFromID(scaleValueID).takeTiltFactors(diffractionData, thisCameraLength);
 	}
 	
-	/* Function to save temporary tag groups to persistent memory */
-	void saveToPersistent(object self){
-		if(debugMode==1){result("\n\tSaving new values to memory...");}
-		if( GetScriptObjectFromID(dataObjectID).checkPersistent() != 1){
-			result("\nError: Permanent Tags not found.")
-			return;
-		}
-		// update the permenent tags, then re-load them into the dataObject
-		string tagPath = "tag path variable";
-		// Check if cameraLength options exist
-		tagPath = "Darkfield360:TiltCalibration";
-		number CameraLengthsDoesExist = TagGroupDoesTagExist(GetPersistentTagGroup(), tagPath);		
-
-		if(cameraLengthsDoesExist==1) {
-			if(debugMode==1){result("\n\tExisting Tilt values found. Deleting them all.");}
-			taggroupdeletetagwithlabel(GetPersistentTagGroup(), tagPath)
-			if(debugMode==1){result(" Done.");}
-			
-		}
-		TagGroup thisTagGroup = TagGroupGetOrCreateTagGroup( GetPersistentTagGroup(), tagPath );
-		TagGroupSetTagAsTagGroup(GetPersistentTagGroup(), tagPath, returnedTiltVectorCalibrations);
-		if(debugMode==1){result("\nNew tilt vector values saved");}		
+	
+	/* Function to save temporary tag groups to dataObject */
+	void saveToDataObject(object self){
+		if(debugMode==1){result("\n\tSaving new values to dataObject...");}
+		GetScriptObjectFromID(dataObjectID).setTiltVectorCalibrations(returnedTiltVectorCalibrations);
+		if(debugMode==1){result("\nSaving Complete.");}
 	}
+	
 	
 	/* Create the Dialog. Must be called before showScaleValueDialog. Uses the CreateFields function output */
 	void generateDialog(object self){
@@ -3090,9 +3075,8 @@ class TiltValueDialog : uiframe
 		if(debugMode==1){result("\nShowing child dialog");}
 		number useValues = childDialog.showCalibrationDialog();	// Display the child with Pose() system
 		if(useValues == 1){
-			// save temporary tag groups to the persistent memory
-			result("\nSaving to memory.")
-			self.saveToPersistent();
+			// save temporary tag groups to the dataObject
+			self.saveToDataObject();
 		}
 		childDialog = NULL; // NULL the childDialog so it can go out of scope.
 		return useValues;
