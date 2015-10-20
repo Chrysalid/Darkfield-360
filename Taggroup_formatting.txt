@@ -25,7 +25,46 @@ Darkfield360
 			xTilty: 0
 			yTiltx: 0
 			yTilty: 1000
-
+	ImageSets
+		<set ID> // should these be deleted when toolkit is opened/closed? Need to export each as a text file when saving.
+			SetName
+			CreationTime: <time in milliseconds image set tag was created>
+			ImagesTaken: 0/1; // if the image set has been taken (1) or if it is waiting to be taken (0).
+			DiffractionScale:<value used>
+			CameraLength: <value>
+			ImageNotes: <string value>
+			
+			RingMode: 0/1
+			IntegratedImage: 0/1
+			NumberOfIntegrations: 0/value
+			DegreeStep: 0/value // if ring mode is used each 'step' is a certain number of degrees apart.
+			ShadowDistance: 0/value
+			
+			TiltCalibration
+				xTiltx: <conversion factor> // number of x pixels moved per 1 unit of xTilt
+				xTilty: <conversion factor> // number of y pixels moved per 1 unit of xTilt
+				yTiltx: <conversion factor> // number of x pixels moved per 1 unit of yTilt
+				yTilty: <conversion factor> // number of y pixels moved per 1 unit of yTilt
+			TiltXCenter
+			TiltYCenter
+			
+			Images
+				[0]
+				[1]
+				...
+				[image order]
+					CreationTime
+					UniqueImageID
+					SavedAsFile: 0/1
+					FileName:
+					ImageMode:<value reported by scope>
+					ImageType:<value recorded by toolkit> // Options are DP, DF, BF, Bin
+					ExposureTime: <value>
+					xTiltValue: <value>
+					yTiltValue: <value>
+					DSpacingAng: <value in Angstroms>
+					ImageSpotNumber: <numbered from 0 for each image in a set>
+				
 
 Image Tags
 ----------

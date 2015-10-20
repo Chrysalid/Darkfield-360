@@ -1,10 +1,17 @@
 Required Features
 -----------------
+Interface to change calibration values
+	- Tag group to save them
+	- Save/Load to persistant tags
+		- See the Taggroup_formatting.txt file
 
+Save file tag instead of debug assuming no
 
+Popup interface with option radio buttons for image processing
 
-
-
+Tag group save methods
+	- Save image information for processing
+	- See the Taggroup_formatting.txt file for information
 
 Bug Fixes
 ---------
@@ -19,16 +26,5 @@ Desired Features
 Allow colour selection in createMap()
 	- Make a generic colour selection dialog
 
-Popup interface with option radio buttons for image processing
-
-Tag group save methods
-	- Save image information for processing
-	- See the Taggroup_formatting.txt file for information
-	
-
 Cycle through saved tilt settings
 
-Interface to change calibration values
-	- Tag group to save them
-	- Save/Load to persistant tags
-		- See the Taggroup_formatting.txt file
