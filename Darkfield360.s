@@ -355,6 +355,20 @@ void zoomImage(image myImage){
 	SetImagePositionWithinWindow( myImage, 0, 0 );
 }
 
+/* Convert between commonly used unit types */
+number convertInverseNMToAngstrom(number InverseNM){
+	number Angstroms;
+	Angstroms = (1 / InverseNM) * 10;
+	return Angstroms;
+}
+
+number convertAngstromToInverseNM(number Angstroms){
+	number InverseNM;
+	InverseNM = 1 / (Angstroms / 10);
+	return InverseNM;
+}
+
+
 /* Functions to print out instructions to the output window. */
 void printCommands(){
 	result("\n\nShortcut Keys Available:");
@@ -1505,11 +1519,12 @@ class MyDataObject
 	number originalScale // scale the system is set to at the start of the session
 	string originalScaleString // scale the system is set to at the start of the session
 	number refScale;
-	number cameraLength;
+	string cameraLength;
 	TagGroup cameraLengths;
 	TagGroup DiffractionScale;
 	TagGroup tiltVectorCalibrations;
 	TagGroup imageSets;
+	string currentImageSet; // the imageSetID of the imageSet being created at the moment. Do not save this.
 	number shadowDistanceNM;
 	TagGroup DFList;
 	number digitalMicrographVersion; //1 or 2. 2 is newer and uses different close dialog codes.
@@ -1733,12 +1748,11 @@ class MyDataObject
 		return shadowDistanceNM;
 	}
 	
-	number getCameraLength(object self) {
+	string getCameraLength(object self) {
 		return cameraLength;
 	}
-	number setCameraLength(object self, number newValue) {
+	void setCameraLength(object self, string newValue) {
 		cameraLength = newValue;
-		return cameraLength;
 	}
 	
 	TagGroup getDFList(object self){
@@ -2052,17 +2066,6 @@ class MyDataObject
 	//		TagGroup Functions
 	//--------------------------------------
 	
-	/* Function used to generate a 10 digit random number string for use in imageSet naming */
-	string getRandomTenDigits(object self){
-		string randomString = "i";
-		number i;
-		for(i=0; i<9; i++){
-			number digit = floor(random() * 10);
-			randomString = randomString + digit;
-		}
-		return randomString;
-	}
-	
 	/* show tag groups for debugging
 		0 = TagGroup cameraLengths;
 		1 = TagGroup DiffractionScale;
@@ -2127,7 +2130,6 @@ class MyDataObject
 		TagGroup toReturn = imageSets.TagGroupClone();
 		return toReturn;
 	}
-
 	/* Function to change just the image sets from a tag group */
 	void setImageSets(object self, TagGroup newImageSets){
 		imageSets = NULL;
@@ -2148,6 +2150,13 @@ class MyDataObject
 		tiltVectorCalibrations = NULL;
 		tiltVectorCalibrations = newTags;
 	}
+	string getCurrentImageSet(object self){
+		return currentImageSet;
+	}
+	void setCurrentImageSet(object self, string input){
+		currentImageSet = input;
+	}
+	
 	/* Function to check if persistent tags are present */
 	number checkPersistent(object self){
 		TagGroup persistentTG = GetPersistentTagGroup();
@@ -2493,141 +2502,7 @@ class MyDataObject
 		return persistentTG;		
 	}
 	
-		/* Function to create a new tag group to be added to the ImageSets group.
-		Mostly blank since each value will need to be filled in at various points in the process.
-	*/
-	TagGroup createNewImageSet(object self){
-		TagGroup imageSet = NewTagGroup();
-		string imageSetID = self.getRandomTenDigits();
-		imageSet.TagGroupCreateNewLabeledTag(imageSetID);
-		
-		TagGroup imageSetData = newTagGroup(); // make blank labels
-		imageSetData.TagGroupCreateNewLabeledTag("ImageSetName") // A name for the image set provided by the user
-		imageSetData.TagGroupCreateNewLabeledTag("CreationTime") //<time in milliseconds image set tag was created>
-		imageSetData.TagGroupCreateNewLabeledTag("ImagesTaken") // 0/1; // if the image set has been taken (1) or if it is waiting to be taken.
-		imageSetData.TagGroupCreateNewLabeledTag("DiffractionScale") //<value used>
-		imageSetData.TagGroupCreateNewLabeledTag("CameraLength");
-		imageSetData.TagGroupCreateNewLabeledTag("RingMode");
-		imageSetData.TagGroupCreateNewLabeledTag("IntegratedImage"); // 0/1
-		imageSetData.TagGroupCreateNewLabeledTag("NumberOfIntegrations") // 0/value
-		imageSetData.TagGroupCreateNewLabeledTag("DegreeStep"); // if ring mode is used each 'step' is a certain number of degrees apart.
-		imageSetData.TagGroupCreateNewLabeledTag("ShadowDistance"); // 0/value
-		imageSetData.TagGroupCreateNewLabeledTag("ImageNotes"); // String
-		
-		number time = GetCurrentTime();
-		number dateFormat = 2
-		number timeFormat = 2
-		number format = dateFormat + 16 * timeFormat
-		string theTime = FormatTimeString( time, format );
-		
-		imageSetData.TagGroupSetTagAsString("CreationTime", theTime );
-		imageSetData.TagGroupSetTagAsNumber("ImagesTaken", 0 );
-		
-		imageSetData.TagGroupSetTagAsNumber("DiffractionScale", 0 );
-		imageSetData.TagGroupSetTagAsNumber("CameraLength", 0 );
-		imageSetData.TagGroupSetTagAsNumber("RingMode", 0 );
-		imageSetData.TagGroupSetTagAsNumber("IntegratedImage", 0 );
-		imageSetData.TagGroupSetTagAsNumber("NumberOfIntegrations", 0 );
-		imageSetData.TagGroupSetTagAsNumber("DegreeStep", 0 );
-		imageSetData.TagGroupSetTagAsNumber("ShadowDistance", 0 );
-		
-		TagGroup imageTagList = NewTagList()
-		imageSetData.TagGroupSetTagAsTagGroup("Images", imageTagList);
-		
-		imageSet.TagGroupSetTagAsTagGroup(imageSetID, imageSetData);
-		return imageSet;
-	}
-	
-	void addImageSetToDataObject(object self, TagGroup imageSet){
-		String imageSetID = imageSet.TagGroupGetTagLabel( 0 );
-		if(TagGroupIsValid(ImageSets) == false){
-			ImageSets = NewTagGroup();
-		}
-		ImageSets.TagGroupCreateNewLabeledTag(imageSetID);
-		
-		TagGroup subGroup
-		imageSet.TagGroupGetTagAsTagGroup(imageSetID, subGroup);
-		
-		ImageSets.TagGroupSetTagAsTagGroup(imageSetID, subGroup);	
-	}
-	
-	/* Function to create the persistent image tags to store information. Requires a lot of inputs.
-		createImageTags( imageSetID, imageSpotID, ImageType, ImageMode,	ringMode, integratedImage, NumberOfIntegrations,\
-		DegreeStep, shadowDistance,	shadowValue, DSpacingAng, xTilt, yTilt, exposureTime )
-	*/
-	TagGroup createImageTags(object self, number imageSetID, number imageSpotID, string ImageType, string ImageMode,\
-	number ringMode, number integratedImage, number NumberOfIntegrations, number DegreeStep, number shadowDistance,\
-	number shadowValue, number DSpacingAng, number xTilt, number yTilt, number exposureTime ){
-		if(debugMode==1){result("\nGenerating an image tag group...");}
-		TagGroup persistentTG = NewTagGroup();
-		persistentTG.TagGroupCreateNewLabeledTag("Toolkit Version");
-		persistentTG.TagGroupSetTagAsNumber("Toolkit Version", versionNumber);
-		
-		TagGroup tiltCalibrationData = NewTagGroup();
-		tiltCalibrationData.TagGroupCreateNewLabeledTag("xTiltx");
-		tiltCalibrationData.TagGroupSetTagAsNumber("xTiltx", xTiltVectorX);
-		tiltCalibrationData.TagGroupCreateNewLabeledTag("xTilty");
-		tiltCalibrationData.TagGroupSetTagAsNumber("xTilty", xTiltVectorY);
-		tiltCalibrationData.TagGroupCreateNewLabeledTag("yTiltx");
-		tiltCalibrationData.TagGroupSetTagAsNumber("yTiltx", yTiltVectorX);
-		tiltCalibrationData.TagGroupCreateNewLabeledTag("yTilty");
-		tiltCalibrationData.TagGroupSetTagAsNumber("yTilty", yTiltVectorX);
-		persistentTG.taggroupaddlabeledtaggroup("TiltCalibration", tiltCalibrationData);
-		
-		persistentTG.TagGroupCreateNewLabeledTag("CameraLength");
-		persistentTG.TagGroupSetTagAsNumber("CameraLength", cameraLength);
-				
-		persistentTG.TagGroupCreateNewLabeledTag("XTiltValue");
-		persistentTG.TagGroupCreateNewLabeledTag("YTiltValue");
-		persistentTG.TagGroupSetTagAsNumber("XTiltValue", xTilt);
-		persistentTG.TagGroupSetTagAsNumber("YTiltValue", yTilt);
-		
-		persistentTG.TagGroupCreateNewLabeledTag("ImageSetID");
-		persistentTG.TagGroupCreateNewLabeledTag("ImageSpotID");
-		persistentTG.TagGroupCreateNewLabeledTag("ImageType");
-		persistentTG.TagGroupCreateNewLabeledTag("ImageMode");
-		persistentTG.TagGroupSetTagAsNumber("ImageSetID", imageSetID);
-		persistentTG.TagGroupSetTagAsNumber("ImageSpotID", imageSpotID);
-		persistentTG.TagGroupSetTagAsString("ImageType", imageType);
-		persistentTG.TagGroupSetTagAsString("ImageMode", imageMode);
-		
-		persistentTG.TagGroupCreateNewLabeledTag("RingMode");
-		persistentTG.TagGroupCreateNewLabeledTag("IntegratedImage");
-		persistentTG.TagGroupCreateNewLabeledTag("NumberOfIntegrations");
-		persistentTG.TagGroupCreateNewLabeledTag("DegreeStep");
-		persistentTG.TagGroupCreateNewLabeledTag("ShadowDistance");
-		persistentTG.TagGroupCreateNewLabeledTag("ShadowValue");
-		persistentTG.TagGroupCreateNewLabeledTag("DSpacingAng");
-		persistentTG.TagGroupCreateNewLabeledTag("ExposureTime");
-		
-		persistentTG.TagGroupSetTagAsNumber("RingMode", ringMode);
-		persistentTG.TagGroupSetTagAsNumber("IntegratedImage", integratedImage);
-		persistentTG.TagGroupSetTagAsNumber("NumberOfIntegrations", NumberOfIntegrations);
-		persistentTG.TagGroupSetTagAsNumber("DegreeStep", DegreeStep);
-		persistentTG.TagGroupSetTagAsNumber("ShadowDistance", ShadowDistance);
-		persistentTG.TagGroupSetTagAsNumber("ShadowValue", shadowValue);
-		persistentTG.TagGroupSetTagAsNumber("DSpacingAng", DSpacingAng);
-		persistentTG.TagGroupSetTagAsNumber("ExposureTime", ExposureTime);
-		
-		return persistentTG;
-	}
-	
-	/* Function to check if an image has the toolkit tags */
-	number checkImageTags(object self, image &theImage){
-		TagGroup persistentTG = theImage.ImageGetTagGroup();
-		if(TagGroupIsValid(persistentTG) == 0){
-				if(debugMode==1){result("\nNo Persistent image tags detected.");}
-				return -1;
-		}
-		string tagPath = "Darkfield360";
-		number doesExist = TagGroupDoesTagExist(persistentTG, tagPath);
-		if(doesExist == 0){
-			if(debugMode==1){result("\nDarkfield image tag group not found.");}
-			return 0;
-		}
-		if(debugMode==1){result("\nDarkfield image tag group found.");}
-		return 1;
-	}
+
 	
 	// Constructor
 	MyDataObject(object self)
@@ -2665,6 +2540,258 @@ class MyDataObject
 		debugMode = input;
 		if(debugMode == 1){result("\n\tDebug Mode Activated in DataObject");}
 	}
+}
+
+
+// ********************************************************************************
+//  Class containing Functions to create and manipulate Image Sets and Image Tags
+// ********************************************************************************
+// Taking this outside of dataObject because it is a major part of the program now.
+
+class ImageSetTools
+{
+	number ToolkitID;
+	number dataObjectID
+	number ImageSetToolsID
+	number debugMode
+	TagGroup imageSets //tag list of image sets
+	number currentImageSetIndex // index number of the currently open image set
+	
+	void initialise(object self, number theToolkitID, number theDataObjectID){
+		ToolkitID = theToolkitID;
+		dataObjectID = theDataObjectID;
+	}
+	
+	// constructor
+	ImageSetTools(object self){
+		ImageSetToolsID = self.ScriptObjectGetID();
+		imageSets = newTagList();
+		currentImageSetIndex = -1; // no image sets are open yet, so use -1
+	}
+	
+	// destructor
+	~ImageSetTools(object self){
+		if(debugMode == 1){result("\nImageSetTools object deleted.");}
+	}
+
+	void setDebugMode(object self, number input)
+	{
+		debugMode = input;
+		if(debugMode == 1){result("\n\tDebug Mode Activated in Alignment Dialog");}
+	}
+
+	/* Function used to generate a 10 digit random number string for use in imageSet naming */
+	string getRandomTenDigits(object self){
+		string randomString = "i";
+		number i;
+		for(i=0; i<9; i++){
+			number digit = floor(random() * 10);
+			randomString = randomString + digit;
+		}
+		return randomString;
+	}
+	
+	/* Create a new ImageSet tag group and populate some initial values from the dataObject. */
+	TagGroup createNewImageSet(object self){
+		string imageSetID = self.getRandomTenDigits();
+		TagGroup imageSetData = newTagGroup(); // make blank labels
+		imageSetData.TagGroupCreateNewLabeledTag("ImageSetID");
+		imageSetData.TagGroupSetTagAsString("ImageSetID", imageSetID);
+		
+		imageSetData.TagGroupCreateNewLabeledTag("ImageSetName") // A name for the image set provided by the user
+		imageSetData.TagGroupCreateNewLabeledTag("CreationTime") //<time in milliseconds image set tag was created>
+		imageSetData.TagGroupCreateNewLabeledTag("ImagesTaken") // 0/1; // if the image set has been taken (1) or if it is waiting to be taken.
+		imageSetData.TagGroupCreateNewLabeledTag("DiffractionScale") //<value used>
+		imageSetData.TagGroupCreateNewLabeledTag("CameraLength");
+		imageSetData.TagGroupCreateNewLabeledTag("RingMode");
+		imageSetData.TagGroupCreateNewLabeledTag("IntegratedImage"); // 0/1
+		imageSetData.TagGroupCreateNewLabeledTag("NumberOfIntegrations") // 0/value
+		imageSetData.TagGroupCreateNewLabeledTag("DegreeStep"); // if ring mode is used each 'step' is a certain number of degrees apart.
+		imageSetData.TagGroupCreateNewLabeledTag("ShadowDistance"); // 0/value
+		imageSetData.TagGroupCreateNewLabeledTag("ImageNotes"); // String
+		
+		number time = GetCurrentTime();
+		number dateFormat = 2
+		number timeFormat = 2
+		number format = dateFormat + 16 * timeFormat
+		string theTime = FormatTimeString( time, format );
+		imageSetData.TagGroupSetTagAsString("CreationTime", theTime );
+		
+		imageSetData.TagGroupSetTagAsNumber("ImagesTaken", 0 );
+		imageSetData.TagGroupSetTagAsNumber("DiffractionScale", GetScriptObjectFromID(dataObjectID).getRefScale() );
+		imageSetData.TagGroupSetTagAsString("CameraLength", GetScriptObjectFromID(dataObjectID).getCameraLength() );
+		imageSetData.TagGroupSetTagAsNumber("RingMode", 0 );
+		imageSetData.TagGroupSetTagAsNumber("IntegratedImage", 0 );
+		imageSetData.TagGroupSetTagAsNumber("NumberOfIntegrations", 0 );
+		imageSetData.TagGroupSetTagAsNumber("DegreeStep", 0 );
+		imageSetData.TagGroupSetTagAsNumber("ShadowDistance", 0 );
+		
+		imageSetData.TagGroupCreateNewLabeledTag("TiltXCenter");
+		imageSetData.TagGroupSetTagAsNumber("TiltXCenter", GetScriptObjectFromID(dataObjectID).getCentreXTilt() );
+		imageSetData.TagGroupCreateNewLabeledTag("TiltYCenter");
+		imageSetData.TagGroupSetTagAsNumber("TiltYCenter", GetScriptObjectFromID(dataObjectID).getCentreYTilt() );
+		imageSetData.TagGroupCreateNewLabeledTag("TiltCalibration");
+		number xTVx, xTVy, yTVx, yTVy;
+		GetScriptObjectFromID(dataObjectID).getTiltVectors(xTVx, xTVy, yTVx, yTVy);
+		TagGroup tiltVectors = NewTagGroup();
+		tiltVectors.TagGroupCreateNewLabeledTag("xTiltx");
+		tiltVectors.TagGroupSetTagAsNumber("xTiltx", xTVx);
+		tiltVectors.TagGroupCreateNewLabeledTag("xTilty");
+		tiltVectors.TagGroupSetTagAsNumber("xTilty", xTVy);
+		tiltVectors.TagGroupCreateNewLabeledTag("yTiltx");
+		tiltVectors.TagGroupSetTagAsNumber("yTiltx", yTVx);
+		tiltVectors.TagGroupCreateNewLabeledTag("yTilty");
+		tiltVectors.TagGroupSetTagAsNumber("yTilty", yTVy);
+		imageSetData.TagGroupSetTagAsTagGroup("TiltCalibration", tiltVectors);
+		
+		TagGroup imageTagList = NewTagList()
+		imageSetData.TagGroupSetTagAsTagGroup("Images", imageTagList);
+
+		return imageSetData;
+	}
+	
+	/* Add an imageSet to the ImageSets list and select it as the current open imageSet */
+	void addImageSet(object self, TagGroup imageSet){
+		imageSets.TagGroupAddTagGroupAtEnd(imageSet)
+		currentImageSetIndex = (imageSets.TagGroupCountTags() - 1);
+	}
+	
+	/* Function to create a new set of image tags for the imageSet records
+		These are made when the image set is being created to record what images will be created.
+		Not used yet, since tilt etc. are recorded in the dataArray object at the moment.
+	*/
+	TagGroup createNewImageForImageSet(object self){
+		TagGroup imageData = newTagGroup(); // make blank labels
+		imageData.TagGroupCreateNewLabeledTag("ImageID") // Unique imageID number
+		imageData.TagGroupCreateNewLabeledTag("FileName") // Name of saved file if present.
+		imageData.TagGroupCreateNewLabeledTag("ImageMode")
+		imageData.TagGroupCreateNewLabeledTag("ImageType") // Options are DP, DF, BF, Bin
+		imageData.TagGroupCreateNewLabeledTag("ExposureTime")
+		imageData.TagGroupCreateNewLabeledTag("xTiltValue")
+		imageData.TagGroupCreateNewLabeledTag("yTiltValue")
+		imageData.TagGroupCreateNewLabeledTag("xTiltRelative")
+		imageData.TagGroupCreateNewLabeledTag("yTiltRelative")
+		imageData.TagGroupCreateNewLabeledTag("DSpacingAng")
+		imageData.TagGroupCreateNewLabeledTag("ShadowValue")
+		imageData.TagGroupCreateNewLabeledTag("ShadowDistance")
+		imageData.TagGroupCreateNewLabeledTag("ImageSpotNumber")
+		
+		
+		imageData.TagGroupCreateNewLabeledTag("SavedAsFile") //<Has image been saved as a file? 0/1>
+		imageData.TagGroupSetTagAsNumber("SavedAsFile", 0 );
+
+		imageData.TagGroupCreateNewLabeledTag("CreationTime") //<time image was created>
+		number time = GetCurrentTime();
+		number dateFormat = 2
+		number timeFormat = 2
+		number format = dateFormat + 16 * timeFormat
+		string theTime = FormatTimeString( time, format );
+		imageData.TagGroupSetTagAsString("CreationTime", theTime );
+		
+		return imageData;
+	}
+	
+	void addImageDataToCurrentImageSet(object self, TagGroup imageData){
+		TagGroup targetImageSet
+		ImageSets.TagGroupGetIndexedTagAsTagGroup(currentImageSetIndex, targetImageSet);
+		TagGroup targetImageList
+		targetImageSet.TagGroupGetTagAsTagGroup("Images", targetImageList)
+		targetImageList.TagGroupAddTagGroupAtEnd(imageData);
+	}
+	
+	number updateImageDataNumber(object self, string imageSetID, number imageIndex, number dataValue){
+	
+	}
+	
+	number updateImageDataString(object self, string imageSetID, number imageIndex, string dataValue){
+	
+	}
+	
+	
+	/* Function to check if an image has the toolkit tags */
+	number doImageTagsExist (object self, image &theImage){
+		TagGroup persistentTG = theImage.ImageGetTagGroup();
+		if(persistentTG.TagGroupCountTags() == 0){
+				if(debugMode==1){result("\nNo Persistent image tags detected.");}
+				return -1;
+		}
+		string tagPath = "Darkfield360";
+		number doesExist = TagGroupDoesTagExist(persistentTG, tagPath);
+		if(doesExist == 0){
+			if(debugMode==1){result("\nDarkfield image tag group not found.");}
+			return 0;
+		}
+		if(debugMode==1){result("\nDarkfield image tag group found.");}
+		return 1;
+	}
+	
+	
+	/* Function to create the persistent image tags to store information. Requires a lot of inputs.
+		createImageTags( imageSetID, imageSpotID, ImageType, ImageMode,	ringMode, integratedImage, NumberOfIntegrations,\
+		DegreeStep, shadowDistance,	shadowValue, DSpacingAng, xTilt, yTilt, exposureTime )
+	*/
+	/*
+	TagGroup createImageTags(object self, number imageSetID, number imageSpotID, string ImageType, string ImageMode,\
+	number ringMode, number integratedImage, number NumberOfIntegrations, number DegreeStep, number shadowDistance,\
+	number shadowValue, number DSpacingAng, number xTilt, number yTilt, number exposureTime ){
+		if(debugMode==1){result("\nGenerating an image tag group...");}
+		TagGroup persistentTG = NewTagGroup();
+		persistentTG.TagGroupCreateNewLabeledTag("Toolkit Version");
+		persistentTG.TagGroupSetTagAsNumber("Toolkit Version", versionNumber);
+		
+		TagGroup tiltCalibrationData = NewTagGroup();
+		tiltCalibrationData.TagGroupCreateNewLabeledTag("xTiltx");
+		tiltCalibrationData.TagGroupSetTagAsNumber("xTiltx", xTiltVectorX);
+		tiltCalibrationData.TagGroupCreateNewLabeledTag("xTilty");
+		tiltCalibrationData.TagGroupSetTagAsNumber("xTilty", xTiltVectorY);
+		tiltCalibrationData.TagGroupCreateNewLabeledTag("yTiltx");
+		tiltCalibrationData.TagGroupSetTagAsNumber("yTiltx", yTiltVectorX);
+		tiltCalibrationData.TagGroupCreateNewLabeledTag("yTilty");
+		tiltCalibrationData.TagGroupSetTagAsNumber("yTilty", yTiltVectorX);
+		persistentTG.taggroupaddlabeledtaggroup("TiltCalibration", tiltCalibrationData);
+		
+		persistentTG.TagGroupCreateNewLabeledTag("CameraLength");
+		persistentTG.TagGroupSetTagAsString("CameraLength", cameraLength);
+				
+		persistentTG.TagGroupCreateNewLabeledTag("XTiltValue");
+		persistentTG.TagGroupCreateNewLabeledTag("YTiltValue");
+		persistentTG.TagGroupSetTagAsNumber("XTiltValue", xTilt);
+		persistentTG.TagGroupSetTagAsNumber("YTiltValue", yTilt);
+		
+		persistentTG.TagGroupCreateNewLabeledTag("ImageSetID");
+		persistentTG.TagGroupCreateNewLabeledTag("ImageSpotID");
+		persistentTG.TagGroupCreateNewLabeledTag("ImageType");
+		persistentTG.TagGroupCreateNewLabeledTag("ImageMode");
+		persistentTG.TagGroupSetTagAsNumber("ImageSetID", imageSetID);
+		persistentTG.TagGroupSetTagAsNumber("ImageSpotID", imageSpotID);
+		persistentTG.TagGroupSetTagAsString("ImageType", imageType);
+		persistentTG.TagGroupSetTagAsString("ImageMode", imageMode);
+		
+		persistentTG.TagGroupCreateNewLabeledTag("RingMode");
+		persistentTG.TagGroupCreateNewLabeledTag("IntegratedImage");
+		persistentTG.TagGroupCreateNewLabeledTag("NumberOfIntegrations");
+		persistentTG.TagGroupCreateNewLabeledTag("DegreeStep");
+		persistentTG.TagGroupCreateNewLabeledTag("ShadowDistance");
+		persistentTG.TagGroupCreateNewLabeledTag("ShadowValue");
+		persistentTG.TagGroupCreateNewLabeledTag("DSpacingAng");
+		persistentTG.TagGroupCreateNewLabeledTag("ExposureTime");
+		
+		persistentTG.TagGroupSetTagAsNumber("RingMode", ringMode);
+		persistentTG.TagGroupSetTagAsNumber("IntegratedImage", integratedImage);
+		persistentTG.TagGroupSetTagAsNumber("NumberOfIntegrations", NumberOfIntegrations);
+		persistentTG.TagGroupSetTagAsNumber("DegreeStep", DegreeStep);
+		persistentTG.TagGroupSetTagAsNumber("ShadowDistance", ShadowDistance);
+		persistentTG.TagGroupSetTagAsNumber("ShadowValue", shadowValue);
+		persistentTG.TagGroupSetTagAsNumber("DSpacingAng", DSpacingAng);
+		persistentTG.TagGroupSetTagAsNumber("ExposureTime", ExposureTime);
+		
+		return persistentTG;
+	}
+	*/
+
+	
+	
+	
 }
 
 
@@ -3319,6 +3446,8 @@ class CreateDF360DialogClass : uiframe
 	number AllowControl; // Only allow control of the microscope if there is a live view image.
 	object dataObject;
 	number dataObjectID;
+	object imageSetTools;
+	number imageSetToolsID;
 	number debugMode;
 	object KeyListener;
 	number KeyListenerID;
@@ -3381,7 +3510,20 @@ class CreateDF360DialogClass : uiframe
 	{
 		return dataObjectID;
 	}
-		
+	
+	/* The Toolkit will store the ImageSetTools object for future use. */
+	number storeImageSetTools(object self, object &theImageSetTools)
+	{
+		imageSetTools = theImageSetTools;
+		imageSetToolsID = imageSetTools.ScriptObjectGetID();
+		imageSetTools.initialise(ToolkitID, dataObjectID);
+		imageSetTools.setDebugMode(debugMode);
+		return imageSetToolsID;
+	}
+	number getImageSetToolsID(object self){
+		return imageSetToolsID;
+	}
+	
 	/* The Toolkit will store the KeyListener for future use. */
 	number storeKeyListener(object self, object &theKeyListener)
 	{
@@ -3979,6 +4121,7 @@ class CreateDF360DialogClass : uiframe
 	/* Function to change the visibility of the marker ring and any attached text.
 		Select the component to make it easy to see and work with.
 	*/
+	
 	void toggleMarkerRing (object self)
 	{
 		if(!markerRing.ComponentIsValid()){
@@ -4124,17 +4267,31 @@ class CreateDF360DialogClass : uiframe
 		setpixel(dataArray, tracker, 3, xTiltRelative);
 		setpixel(dataArray, tracker, 4, yTiltRelative);
 		
+		TagGroup image1Data = imageSetTools.createNewImageForImageSet();
+		image1Data.TagGroupSetTagAsString("ImageType", "DP");
+		image1Data.TagGroupSetTagAsNumber("ExposureTime", dataObject.getDPExposure());
+		image1Data.TagGroupSetTagAsNumber("xTiltRelative", xTiltRelative);
+		image1Data.TagGroupSetTagAsNumber("yTiltRelative", yTiltRelative);
+		image1Data.TagGroupSetTagAsNumber("xTiltValue", xTilt);
+		image1Data.TagGroupSetTagAsNumber("yTiltValue", yTilt);
+		image1Data.TagGroupSetTagAsNumber("ShadowDistance", shadowDistance);
+		
+		image1Data.TagGroupSetTagAsNumber("ImageSpotNumber", 0);// Needs work to get right numbers
+		
+		
 		string fileName, spotID, filePath, timeString;
 		if(shadowDistance==0){ // SpotID just increases by one each time
 			spotID = PadWithZeroes(tracker,4);
+			image1Data.TagGroupSetTagAsNumber("ShadowValue", 0);
 		} else {
 			number SpotIDNumber;
 			SpotIDNumber = ceil(tracker / 3)
 			spotID = PadWithZeroes(SpotIDNumber,4);
+			image1Data.TagGroupSetTagAsNumber("ShadowValue", 1);
 		}
 		timeString = constructTimeStamp();
 		
-		if(storeTiltOnly != true) // The image creation + storage parts can be ignored if parameter is set to true.
+		if(storeTiltOnly == false) // The image creation + storage parts can be ignored if parameter is set to true.
 		{
 			// Take new exposure for comparison of pixel movement.
 			number cameraWidth, cameraHeight;
@@ -4149,6 +4306,8 @@ class CreateDF360DialogClass : uiframe
 			}
 			image newDPImage := sscUnprocessedAcquire(DPExposure,0,0,cameraWidth,cameraHeight);
 
+			// image1Data.TagGroupSetTagAsNumber("UniqueImageID", ); Not sure how unique image ID works.
+			
 			// Compare to reference image
 			//findImageShift(image refIm, image newIm, number &XShift, number &YShift)
 			number XShift, YShift;
@@ -4159,6 +4318,8 @@ class CreateDF360DialogClass : uiframe
 			number pixelDistance = distance(XShift, YShift);
 			number scaleX = dataObject.getRefScale();
 			number realDistance = pixelDistance * scaleX;
+			image1Data.TagGroupSetTagAsNumber("DSpacingAng", realDistance);
+			
 			if(debugMode==true){Result( "\nPattern Distance Shift (1/nm): " + realDistance);}
 			// Make a name for the file based on spotID.
 			// An image is saved each time a coordinate is taken for later reference.
@@ -4205,7 +4366,7 @@ class CreateDF360DialogClass : uiframe
 					positionDebugWindow(debugMode); // Return the View window to the front
 				}
 		}
-		
+		imageSetTools.addImageDataToCurrentImageSet(image1Data);
 		if(shadowDistance!=0)
 		{
 			//void tiltToPixel(dataObject, number xTilt, number yTilt, number &xPixelShift, number &yPixelShift, number isViewWindow)
@@ -5602,10 +5763,7 @@ class CreateDF360DialogClass : uiframe
 		string returnname;
 		dlggetnthlabel(tg, returnno, returnname) // convert option # to label
 		if(debugMode==true){result("\nSelection is " + returnname);}
-		
-		number returnCL = val(returnname.left(2));
-		if(debugMode==true){result("\nCL is " + returnCL);}
-		dataObject.setCameraLength(returnCL);
+		dataObject.setCameraLength(returnname);
 		
 		// Update the scales
 		number newScale = dataObject.getScaleCalibration(returnname);
@@ -5723,6 +5881,10 @@ class CreateDF360DialogClass : uiframe
 		if(!returnViewImageDisplay(debugMode, viewDisplay)){
 			throw("No Live View window found");
 		}
+		/* Create the ImageSet Tag Group. The values will be filled out as the function goes on and uploaded to the dataObject before the storeROIButtonPress function ends. */
+		TagGroup imageSet = imageSetTools.createNewImageSet();
+		imageSetTools.addImageSet(imageSet);
+				
 		number totalROI = viewDisplay.ImageDisplayCountROIs(); // Count ROIs
 		if(debugMode==true){result("\nThere are " + totalROI + " ROI highlighted on the View Window before any shadowing.");}
 		if(totalROI < 1)
@@ -5743,7 +5905,22 @@ class CreateDF360DialogClass : uiframe
 		number shadowDistanceNM;
 		shadowDistanceNM = dataObject.getShadowDistanceNM();
 		getNumber("Shadow points by (1/nm): ", shadowDistanceNM, shadowDistanceNM);
+		
 		dataObject.setShadowDistanceNM(shadowDistanceNM)
+		imageSet.TagGroupSetTagAsNumber("ShadowDistance", shadowDistanceNM); // store in imageSet Tags
+		
+		// Create the information for the image of the diffraction pattern. This makes sure BF and DP are paired up later.
+		TagGroup CentralImage = imageSetTools.createNewImageForImageSet();
+		CentralImage.TagGroupSetTagAsNumber("ImageSpotNumber", 0);
+		CentralImage.TagGroupSetTagAsString("ImageType", "DP");
+		CentralImage.TagGroupSetTagAsNumber("ExposureTime", dataObject.getDPExposure());
+		CentralImage.TagGroupSetTagAsNumber("xTiltRelative", 0);
+		CentralImage.TagGroupSetTagAsNumber("yTiltRelative", 0);
+		CentralImage.TagGroupSetTagAsNumber("xTiltValue", dataObject.getCentreXTilt());
+		CentralImage.TagGroupSetTagAsNumber("yTiltValue", dataObject.getCentreYTilt());
+		imageSetTools.addImageDataToCurrentImageSet(CentralImage);
+		
+				
 		if(debugMode==true){result("\nCreating ROI List...");}
 		if(debugMode==true){result("\n\tROIs present: " + totalROI);}
 		image ROIData := IntegerImage("ROI ID List", 4, 0, totalROI, 2);
@@ -6140,6 +6317,9 @@ object startToolkit () {
 	dataArray := RealImage( "Data Array", 4, 5000, 10 ); // 5000 x 10 sized
 	dataObject.setDataArray(dataArray);
 	
+	result("\nLoading Image Set Tools...")
+	object theImageSetTools = alloc(ImageSetTools);
+	
 	result("\nCreating KeyListener for shortcut commands...")
 	// Create objects that will be used later but must be created now before the class drops from scope
 	object KeyListener=alloc(MyKeyHandler) // Key handler for the view Window for shortcut key presses. Not attached yet.
@@ -6164,6 +6344,7 @@ object startToolkit () {
 	// Toolkit.ToggleDebugMode() // comment out to deactivate debugMode on startup. Can be toggled on toolkit manually
 	result("\nAttaching data store to Toolkit...")
 	Toolkit.storeDataObject(dataObject);
+	Toolkit.storeImageSetTools(theImageSetTools);
 	Toolkit.storeKeyListener(KeyListener); 	// Insert it into toolkit. To make it listen for key presses on a display use Toolkit.startListening(ImageDisplay);
 	Toolkit.storeAlignmentDialog(alignmentDialog); // Stored in toolkit object.
 	Toolkit.storeCalibrationDialog(calibrationDialog);

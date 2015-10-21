@@ -1,9 +1,6 @@
 Required Features
 -----------------
-Interface to change calibration values
-	- Tag group to save them
-	- Save/Load to persistant tags
-		- See the Taggroup_formatting.txt file
+Update image gathering functions to update imageSet values and image tags
 
 Save file tag instead of debug assuming no
 
@@ -12,6 +9,8 @@ Popup interface with option radio buttons for image processing
 Tag group save methods
 	- Save image information for processing
 	- See the Taggroup_formatting.txt file for information
+	
+
 
 Bug Fixes
 ---------
