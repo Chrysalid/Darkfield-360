@@ -2,6 +2,8 @@ Required Features
 -----------------
 Update image gathering functions to update imageSet values and image tags
 
+
+
 Save file tag instead of debug assuming no
 
 Popup interface with option radio buttons for image processing
@@ -10,11 +12,11 @@ Tag group save methods
 	- Save image information for processing
 	- See the Taggroup_formatting.txt file for information
 	
-
+Put image acquisition in its own thread that can be stopped.
 
 Bug Fixes
 ---------
-
+D-Spacing tag record is always 0
 
 
 

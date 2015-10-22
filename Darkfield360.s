@@ -2070,8 +2070,7 @@ class MyDataObject
 		0 = TagGroup cameraLengths;
 		1 = TagGroup DiffractionScale;
 		2 = TagGroup tiltVectorCalibrations;
-		3 = TagGroup imageSets;
-		4 = all
+		3 = all
 	*/
 	void showDataTagGroup(object self, number selectedGroup){
 		if(selectedGroup==0){
@@ -2084,13 +2083,9 @@ class MyDataObject
 			TagGroupOpenBrowserWindow( tiltVectorCalibrations , 0 );
 		}
 		if(selectedGroup==3){
-			TagGroupOpenBrowserWindow( imageSets , 0 );
-		}
-		if(selectedGroup==4){
 			TagGroupOpenBrowserWindow( cameraLengths , 0 );
 			TagGroupOpenBrowserWindow( DiffractionScale , 0 );
 			TagGroupOpenBrowserWindow( tiltVectorCalibrations , 0 );
-			TagGroupOpenBrowserWindow( imageSets , 0 );
 		}
 	}
 
@@ -2145,14 +2140,22 @@ class MyDataObject
 		DiffractionScale = NULL;
 		DiffractionScale = newTags;
 	}
+	
 	/* Function to change just the image sets from a tag group */
 	void setTiltVectorCalibrations(object self, TagGroup newTags){
 		tiltVectorCalibrations = NULL;
 		tiltVectorCalibrations = newTags;
 	}
+	void setTiltVectorCalibrations(object self, string atCameraLength, TagGroup newTags){
+		tiltVectorCalibrations.TagGroupDeleteTagWithLabel(atCameraLength);
+		tiltVectorCalibrations.TagGroupCreateNewLabeledTag(atCameraLength);
+		tiltVectorCalibrations.TagGroupSetTagAsTagGroup(atCameraLength, newTags);
+	}
+	
 	string getCurrentImageSet(object self){
 		return currentImageSet;
 	}
+	
 	void setCurrentImageSet(object self, string input){
 		currentImageSet = input;
 	}
@@ -2556,6 +2559,8 @@ class ImageSetTools
 	number debugMode
 	TagGroup imageSets //tag list of image sets
 	number currentImageSetIndex // index number of the currently open image set
+	number currentSpotIndex; //index number of currently open spot number
+	string currentImageTagName; // Middle, Lower or Higher, to show which image we are working on.
 	
 	void initialise(object self, number theToolkitID, number theDataObjectID){
 		ToolkitID = theToolkitID;
@@ -2567,6 +2572,8 @@ class ImageSetTools
 		ImageSetToolsID = self.ScriptObjectGetID();
 		imageSets = newTagList();
 		currentImageSetIndex = -1; // no image sets are open yet, so use -1
+		currentSpotIndex = -1; // no image sets are open yet, so use -1
+		currentImageTagName = "None"; // no image sets are open yet, so use -None
 	}
 	
 	// destructor
@@ -2580,6 +2587,11 @@ class ImageSetTools
 		if(debugMode == 1){result("\n\tDebug Mode Activated in Alignment Dialog");}
 	}
 
+	/* Opens the ImageSets tag list in a window in DM. Used for debugging. */
+	void showImageSets(object self){
+		TagGroupOpenBrowserWindow(imageSets, 0);
+	}
+	
 	/* Function used to generate a 10 digit random number string for use in imageSet naming */
 	string getRandomTenDigits(object self){
 		string randomString = "i";
@@ -2591,9 +2603,10 @@ class ImageSetTools
 		return randomString;
 	}
 	
-	/* Create a new ImageSet tag group and populate some initial values from the dataObject. */
+	/* Create a new ImageSet tag group and populate some initial values from the dataObject. Returns the created ImageSet */
 	TagGroup createNewImageSet(object self){
 		string imageSetID = self.getRandomTenDigits();
+		if(debugMode == true){result("\nCreating Image Set Tag Group for set " + imageSetID + "... ");}
 		TagGroup imageSetData = newTagGroup(); // make blank labels
 		imageSetData.TagGroupCreateNewLabeledTag("ImageSetID");
 		imageSetData.TagGroupSetTagAsString("ImageSetID", imageSetID);
@@ -2644,22 +2657,50 @@ class ImageSetTools
 		tiltVectors.TagGroupSetTagAsNumber("yTilty", yTVy);
 		imageSetData.TagGroupSetTagAsTagGroup("TiltCalibration", tiltVectors);
 		
-		TagGroup imageTagList = NewTagList()
-		imageSetData.TagGroupSetTagAsTagGroup("Images", imageTagList);
+		TagGroup Spots = NewTagList()
+		imageSetData.TagGroupSetTagAsTagGroup("Spots", Spots);
 
+		if(debugMode == true){result("\nImage Set " + imageSetID + " created.");}
 		return imageSetData;
+	}
+	
+	number getCurrentSpotIndex(object self){
+		return currentSpotIndex;
+	}
+	
+	void setCurrentSpotIndex(object self, number value){
+		currentSpotIndex = value;
 	}
 	
 	/* Add an imageSet to the ImageSets list and select it as the current open imageSet */
 	void addImageSet(object self, TagGroup imageSet){
+		if(debugMode == true){result("\nAdding an image set to the imageSet store.");}
 		imageSets.TagGroupAddTagGroupAtEnd(imageSet)
 		currentImageSetIndex = (imageSets.TagGroupCountTags() - 1);
+		if(debugMode == true){result("\ncurrentImageSetIndex is now " + currentImageSetIndex);}
 	}
 	
-	/* Function to create a new set of image tags for the imageSet records
-		These are made when the image set is being created to record what images will be created.
-		Not used yet, since tilt etc. are recorded in the dataArray object at the moment.
-	*/
+	/* Adds a new spot to the current image set at the end of the Spots taglist and returns the Spot Tag group. */
+	TagGroup addSpotToCurrentImageSet(object self){		
+		if(debugMode == true){result("\nAdding a spot set to the current image set.");}
+		TagGroup CurrentImageSet;
+		imageSets.TagGroupGetIndexedTagAsTagGroup(currentImageSetIndex, CurrentImageSet);
+		
+		TagGroup SpotsList;
+		CurrentImageSet.TagGroupGetTagAsTagGroup("Spots", SpotsList);
+		
+		TagGroup Spot = NewTagGroup();
+		Spot.TagGroupCreateNewLabeledTag("Middle");
+		Spot.TagGroupCreateNewLabeledTag("Higher");
+		Spot.TagGroupCreateNewLabeledTag("Lower");
+		SpotsList.TagGroupAddTagGroupAtEnd(Spot);
+		currentSpotIndex = (SpotsList.TagGroupCountTags() - 1); // update the spot index number in memory
+		if(debugMode == true){result("\nNew spot index is " + currentSpotIndex);}
+		
+		return Spot;
+	}
+	
+	/* Function to create a new set of image tags for the imageSet records */
 	TagGroup createNewImageForImageSet(object self){
 		TagGroup imageData = newTagGroup(); // make blank labels
 		imageData.TagGroupCreateNewLabeledTag("ImageID") // Unique imageID number
@@ -2673,9 +2714,7 @@ class ImageSetTools
 		imageData.TagGroupCreateNewLabeledTag("yTiltRelative")
 		imageData.TagGroupCreateNewLabeledTag("DSpacingAng")
 		imageData.TagGroupCreateNewLabeledTag("ShadowValue")
-		imageData.TagGroupCreateNewLabeledTag("ShadowDistance")
-		imageData.TagGroupCreateNewLabeledTag("ImageSpotNumber")
-		
+		imageData.TagGroupCreateNewLabeledTag("ShadowDistance")		
 		
 		imageData.TagGroupCreateNewLabeledTag("SavedAsFile") //<Has image been saved as a file? 0/1>
 		imageData.TagGroupSetTagAsNumber("SavedAsFile", 0 );
@@ -2691,20 +2730,117 @@ class ImageSetTools
 		return imageData;
 	}
 	
-	void addImageDataToCurrentImageSet(object self, TagGroup imageData){
-		TagGroup targetImageSet
-		ImageSets.TagGroupGetIndexedTagAsTagGroup(currentImageSetIndex, targetImageSet);
-		TagGroup targetImageList
-		targetImageSet.TagGroupGetTagAsTagGroup("Images", targetImageList)
-		targetImageList.TagGroupAddTagGroupAtEnd(imageData);
+	/* Get the currently open imageSet Taggroup. Returns 1/0 for success/fail */
+	number getCurrentImageSet(object self, TagGroup &targetImageSet){
+		TagGroup currentImageSet = NewTagGroup();
+		if(currentImageSetIndex < 0){
+			result("\nThe current image set has been requested but currentImageSetIndex < 0");
+			return 0;
+		}
+		number gotImageSet = ImageSets.TagGroupGetIndexedTagAsTagGroup(currentImageSetIndex, currentImageSet);
+		if(gotImageSet==0){
+			result("\nThe current image set has been requested but an error occured when attempting to retrive currentImageSetIndex = " + currentImageSetIndex);
+			return 0;
+		}
+		targetImageSet = currentImageSet;
+		return 1;	
 	}
 	
-	number updateImageDataNumber(object self, string imageSetID, number imageIndex, number dataValue){
-	
+	/* Get the current spot tag group. Returns 1/0 for success/fail */
+	number getCurrentSpot(object self, TagGroup &targetSpotSet){
+		TagGroup currentSpotSet = NewTagGroup();
+		if(currentSpotIndex < 0){
+			result("\nThe current spot group has been requested but currentSpotIndex < 0");
+			return 0;
+		}
+		TagGroup currentImageSet;
+		if(self.getCurrentImageSet(currentImageSet) == 0){
+			result("\nThe current spot group has been requested but there was a problem returning the current image set");
+			return 0;
+		}
+		TagGroup currentSpotList;
+		if(currentImageSet.TagGroupGetTagAsTagGroup("Spots", currentSpotList) == 0){
+			result("\nThe current spot set has been requested but an error occured when attempting to retrive the Spot List from currentImageSetIndex = " + currentImageSetIndex);
+			return 0;
+		}
+		
+		number gotSpotSet = currentSpotList.TagGroupGetIndexedTagAsTagGroup(currentSpotIndex, currentSpotSet);
+		if(gotSpotSet==0){
+			result("\nThe current spot set has been requested but an error occured when attempting to retrive currentSpotIndex = " + currentSpotIndex + " from currentImageSetIndex = " + currentImageSetIndex);
+			return 0;
+		}
+		targetSpotSet = currentSpotSet;
+		return 1;
 	}
 	
-	number updateImageDataString(object self, string imageSetID, number imageIndex, string dataValue){
+	/* Add a given image data set to the current spot group in the given image slot. */
+	number addImageDataToCurrentSpot(object self, TagGroup imageData, string higherOrLowerOrMiddle){
+		if((higherOrLowerOrMiddle != "Higher") && (higherOrLowerOrMiddle != "Lower") && (higherOrLowerOrMiddle != "Middle") ){
+			result("\nWhen adding an image to the current spot the higherOrLowerOrMiddle value was not higherOrLowerOrMiddle.\n\tImage not added.");
+			return 0;
+		}
+		currentImageTagName = higherOrLowerOrMiddle;
+		TagGroup targetSpot
+		if(self.getCurrentSpot(targetSpot) == 0){
+			result("\nThere was an error when retrieving the Current Spot Tag group when attempting to add an image to it.")
+			return 0;
+		}
+		targetSpot.TagGroupSetTagAsTagGroup(currentImageTagName, imageData);
+		return 1;
+	}	
 	
+	/* Get ImageSet tag group based on the ID of the set. Returns 1/0 for success/fail */
+	number getImageSetByID(object self, string theImageSetID, TagGroup &targetImageSet){
+		number totalImageSets = imageSets.TagGroupCountTags();
+		if(totalImageSets <= 0){
+			result("\nWhen attempting to get Image Set " + theImageSetID + " no image sets were found at all.")
+			return 0;
+		}
+		number i
+		for(i=0; i < totalImageSets; i++){
+			TagGroup ThisImageSet;
+			if (ImageSets.TagGroupGetIndexedTagAsTagGroup(i, ThisImageSet) == 0){
+				result("\nWhen attempting to get Image Set " + theImageSetID + " there was an error returning Image Set index " + i);
+				return 0;
+			}
+			string ThisImageSetID;
+			if(ThisImageSet.TagGroupGetTagAsString("ImageSetID", ThisImageSetID) == 0){
+				result("\nWhen attempting to get Image Set " + theImageSetID + " there was an error returning the Image Set index " + i + " ID string");
+				return 0;
+			}
+			if(ThisImageSetID == theImageSetID){ // match found
+				targetImageSet = ThisImageSet;
+				return 1;
+			}
+		}
+		result("\nWhen attempting to get Image Set " + theImageSetID + " no matching IDs were found.");
+		return 0;
+	}
+	
+	/* Get a TagList containing all of the stored ImageSets ID strings */
+	number getImageSetIDList(object self, TagGroup &targetList){
+		TagGroup imageSetIDList = NewTagList();
+		number totalImageSets = imageSets.TagGroupCountTags();
+		if(totalImageSets <= 0){
+			result("\nWhen attempting to create a list of ImageSet IDs no image sets were found at all.")
+			return 0;
+		}
+		number i
+		for(i=0; i < totalImageSets; i++){
+			TagGroup ThisImageSet;
+			if (ImageSets.TagGroupGetIndexedTagAsTagGroup(i, ThisImageSet) == 0){
+				result("\nWhen attempting to create an imageSet ID list there was an error returning Image Set index " + i);
+				return 0;
+			}
+			string ThisImageSetID;
+			if(ThisImageSet.TagGroupGetTagAsString("ImageSetID", ThisImageSetID) == 0){
+				result("\nWhen attempting to create an imageSet ID list there was an error returning the Image Set index " + i + " ID string");
+				return 0;
+			}
+			imageSetIDList.TagGroupInsertTagAsString( infinity(), ThisImageSetID );
+		}
+		targetList = imageSetIDList;
+		return 1;
 	}
 	
 	
@@ -3270,6 +3406,7 @@ class MyKeyHandler
 	number KeyToken // the numerical id of the listener - global to the object. Do we use this anyway?
 	number dataObjectID; // numerical ID of the dataObject script object.
 	number ToolkitID; // ID of the object this keyhandler will be stored inside of
+	number ImageSetToolsID; // ID of the imageset tools object
 	number toggle; // Variable
 	/* Global Values for the object to reference in function calls */
 	image targetArrayImage, referenceDP;
@@ -3317,10 +3454,11 @@ class MyKeyHandler
 	}
 	
 	/* Function stores the dataObject's ID so it can reference itself later. */
-	image initialise(object self, number theToolkitID, number theDataObjectID)
+	image initialise(object self, number theToolkitID, number theDataObjectID, number theImageSetToolsID)
 	{
 			ToolkitID = theToolkitID;  // the ID of the Object which this entire handler is contained inside.
 			dataObjectID = theDataObjectID;
+			ImageSetToolsID = theImageSetToolsID;
 	}
 	/* Function stores the ID of a key listener and loads the dataObject's values into itself */
 	image startListening(object self, number KeyTok)
@@ -3382,6 +3520,8 @@ class MyKeyHandler
 						dataObject.printSpotIDArray (100);
 						result(dataObject.printAllValues());
 						self.printAllValues();
+						dataObject.showDataTagGroup(3);
+						GetScriptObjectFromID(ImageSetToolsID).showImageSets();
 					}
 					return 0;
 				}
@@ -3529,7 +3669,7 @@ class CreateDF360DialogClass : uiframe
 	{
 		KeyListener = theKeyListener;
 		KeyListenerID = KeyListener.ScriptObjectGetID();
-		KeyListener.initialise(ToolkitID, dataObjectID);
+		KeyListener.initialise(ToolkitID, dataObjectID, imageSetToolsID);
 		KeyListener.setDebugMode(debugMode);
 		return KeyListenerID;
 	}
@@ -4267,6 +4407,8 @@ class CreateDF360DialogClass : uiframe
 		setpixel(dataArray, tracker, 3, xTiltRelative);
 		setpixel(dataArray, tracker, 4, yTiltRelative);
 		
+		TagGroup spot = ImageSetTools.addSpotToCurrentImageSet(); // The 1-3 images here will be placed inside the spot group
+		
 		TagGroup image1Data = imageSetTools.createNewImageForImageSet();
 		image1Data.TagGroupSetTagAsString("ImageType", "DP");
 		image1Data.TagGroupSetTagAsNumber("ExposureTime", dataObject.getDPExposure());
@@ -4275,19 +4417,22 @@ class CreateDF360DialogClass : uiframe
 		image1Data.TagGroupSetTagAsNumber("xTiltValue", xTilt);
 		image1Data.TagGroupSetTagAsNumber("yTiltValue", yTilt);
 		image1Data.TagGroupSetTagAsNumber("ShadowDistance", shadowDistance);
+		if(shadowDistance==0){ // SpotID just increases by one each time
+			image1Data.TagGroupSetTagAsNumber("ShadowValue", 0);
+		} else {
+			image1Data.TagGroupSetTagAsNumber("ShadowValue", 1);
+		}
+		imageSetTools.addImageDataToCurrentSpot(image1Data, "Middle"); // this is the middle image and is added to that tag in the spot taggroup
 		
-		image1Data.TagGroupSetTagAsNumber("ImageSpotNumber", 0);// Needs work to get right numbers
 		
-		
+		/* old file name generation system is old. adapt it to use the tag lists */
 		string fileName, spotID, filePath, timeString;
 		if(shadowDistance==0){ // SpotID just increases by one each time
 			spotID = PadWithZeroes(tracker,4);
-			image1Data.TagGroupSetTagAsNumber("ShadowValue", 0);
 		} else {
 			number SpotIDNumber;
 			SpotIDNumber = ceil(tracker / 3)
 			spotID = PadWithZeroes(SpotIDNumber,4);
-			image1Data.TagGroupSetTagAsNumber("ShadowValue", 1);
 		}
 		timeString = constructTimeStamp();
 		
@@ -4318,7 +4463,7 @@ class CreateDF360DialogClass : uiframe
 			number pixelDistance = distance(XShift, YShift);
 			number scaleX = dataObject.getRefScale();
 			number realDistance = pixelDistance * scaleX;
-			image1Data.TagGroupSetTagAsNumber("DSpacingAng", realDistance);
+			image1Data.TagGroupSetTagAsNumber("DSpacingAng", convertInverseNMToAngstrom(realDistance));
 			
 			if(debugMode==true){Result( "\nPattern Distance Shift (1/nm): " + realDistance);}
 			// Make a name for the file based on spotID.
@@ -4348,6 +4493,8 @@ class CreateDF360DialogClass : uiframe
 				{
 					string fileDirectory = GetApplicationDirectory("auto_save", 0);
 					filePath = PathConcatenate(fileDirectory, fileName);
+					image1Data.TagGroupSetTagAsString("FileName", fileName);
+					image1Data.TagGroupSetTagAsNumber("SavedAsFile", 1);
 					self.drawReticle(newDPImage, 0);
 					self.cleanReticle(newDPImage);
 					SaveAsGatan( newDPImage, filePath );
@@ -4358,6 +4505,7 @@ class CreateDF360DialogClass : uiframe
 				} 
 				else
 				{
+					image1Data.TagGroupSetTagAsNumber("SavedAsFile", 0);
 					ImageDocumentClean(thisImageDocument); // So the window can be closed without asking to be saved
 					ImageDocumentShow(thisImageDocument); // Display the image document.
 					result("\nStore Tilt Function run for " + fileName + ". Tilt value stored (" + xTilt + ", " + yTilt + ")");
@@ -4366,7 +4514,7 @@ class CreateDF360DialogClass : uiframe
 					positionDebugWindow(debugMode); // Return the View window to the front
 				}
 		}
-		imageSetTools.addImageDataToCurrentImageSet(image1Data);
+
 		if(shadowDistance!=0)
 		{
 			//void tiltToPixel(dataObject, number xTilt, number yTilt, number &xPixelShift, number &yPixelShift, number isViewWindow)
@@ -4397,11 +4545,24 @@ class CreateDF360DialogClass : uiframe
 			// Store new beam tilt.
 			EMGetBeamTilt(xTilt, yTilt)
 			tracker = tracker + 1
+			xTiltRelative = xTilt - xTiltCenter;
+			yTiltRelative = yTilt - yTiltCenter;
 			setpixel(dataArray, tracker, 0, tracker); // spotID
 			setpixel(dataArray, tracker, 1, xTilt); // xTilt value
 			setpixel(dataArray, tracker, 2, yTilt); // yTilt value
-			setpixel(dataArray, tracker, 3, xTilt-dataObject.getCentreXTilt()); // xTilt value
-			setpixel(dataArray, tracker, 4, yTilt-dataObject.getCentreYTilt()); // yTilt value
+			setpixel(dataArray, tracker, 3, xTiltRelative); // relative xTilt value
+			setpixel(dataArray, tracker, 4, yTiltRelative); // relative yTilt value
+			
+			TagGroup image2Data = imageSetTools.createNewImageForImageSet();
+			image2Data.TagGroupSetTagAsString("ImageType", "DP");
+			image2Data.TagGroupSetTagAsNumber("ExposureTime", dataObject.getDPExposure());
+			image2Data.TagGroupSetTagAsNumber("xTiltRelative", xTiltRelative);
+			image2Data.TagGroupSetTagAsNumber("yTiltRelative", yTiltRelative);
+			image2Data.TagGroupSetTagAsNumber("xTiltValue", xTilt);
+			image2Data.TagGroupSetTagAsNumber("yTiltValue", yTilt);
+			image2Data.TagGroupSetTagAsNumber("ShadowDistance", shadowDistance);
+			image2Data.TagGroupSetTagAsNumber("ShadowValue", 2);
+			imageSetTools.addImageDataToCurrentSpot(image2Data, "Higher");
 			
 			if(debugMode==true){result("\n\tStored as Tracker value " + tracker);}
 			
@@ -4436,6 +4597,10 @@ class CreateDF360DialogClass : uiframe
 					filePath = PathConcatenate(fileDirectory, fileNameHigher);
 					ImageDocumentSaveToFile( higherDPView, "Gatan Format", filePath);
 					higherDPView.imageDocumentClose(0);
+					image2Data.TagGroupSetTagAsString("FileName", fileNameHigher);
+					image2Data.TagGroupSetTagAsNumber("SavedAsFile", 1);
+				} else {
+					image2Data.TagGroupSetTagAsNumber("SavedAsFile", 0);
 				}
 			}
 			
@@ -4444,11 +4609,25 @@ class CreateDF360DialogClass : uiframe
 			// Store new beam tilt
 			EMGetBeamTilt(xTilt, yTilt)
 			tracker = tracker + 1
+			xTiltRelative = xTilt - xTiltCenter;
+			yTiltRelative = yTilt - yTiltCenter;
 			setpixel(dataArray, tracker, 0, tracker); // spotID
 			setpixel(dataArray, tracker, 1, xTilt); // xTilt value
 			setpixel(dataArray, tracker, 2, yTilt); // yTilt value
-			setpixel(dataArray, tracker, 3, xTilt-dataObject.getCentreXTilt()); // xTilt value
-			setpixel(dataArray, tracker, 4, yTilt-dataObject.getCentreYTilt()); // yTilt value
+			setpixel(dataArray, tracker, 3, xTiltRelative); // relative xTilt value
+			setpixel(dataArray, tracker, 4, yTiltRelative); // relative yTilt value
+			
+			TagGroup image3Data = imageSetTools.createNewImageForImageSet();
+			image3Data.TagGroupSetTagAsString("ImageType", "DP");
+			image3Data.TagGroupSetTagAsNumber("ExposureTime", dataObject.getDPExposure());
+			image3Data.TagGroupSetTagAsNumber("xTiltRelative", xTiltRelative);
+			image3Data.TagGroupSetTagAsNumber("yTiltRelative", yTiltRelative);
+			image3Data.TagGroupSetTagAsNumber("xTiltValue", xTilt);
+			image3Data.TagGroupSetTagAsNumber("yTiltValue", yTilt);
+			image3Data.TagGroupSetTagAsNumber("ShadowDistance", shadowDistance);
+			image3Data.TagGroupSetTagAsNumber("ShadowValue", 3);
+			imageSetTools.addImageDataToCurrentSpot(image3Data, "Lower");
+			
 			if(debugMode==1){result("\n\tStored as Tracker value " + tracker);}
 			if(storeTiltOnly != 1)
 			{
@@ -4477,6 +4656,10 @@ class CreateDF360DialogClass : uiframe
 					filePath = PathConcatenate(fileDirectory, fileNameLower);
 					ImageDocumentSaveToFile( lowerDPView, "Gatan Format", filePath );
 					lowerDPView.imageDocumentClose(0);
+					image3Data.TagGroupSetTagAsString("FileName", fileNameLower);
+					image3Data.TagGroupSetTagAsNumber("SavedAsFile", 1);
+				} else {
+					image3Data.TagGroupSetTagAsNumber("SavedAsFile", 0);
 				}
 			}
 			dataObject.setTracker(tracker + 1);
@@ -4788,7 +4971,7 @@ class CreateDF360DialogClass : uiframe
 		refScaleX = dataObject.getRefScale();
 		if(debugMode==true){result("\nrefScaleX: " + refScaleX);}
 		if(refScaleX == 0){
-			throw("Please set Camera Length or enter a Scale");
+			throw("Please set Camera Length");
 		}
 		ImageSetDimensionScale(ReferenceDP, 0, refScaleX)
 		ImageSetDimensionUnitString(ReferenceDP, 0, "1/nm" )
@@ -4813,8 +4996,19 @@ class CreateDF360DialogClass : uiframe
 		dataObject.setTracker(0);
 		
 		// Store the tilt etc. as the 0 value in the array image.
-		if(debugMode==1){result("\nNow Storing Centre Tilt Coords");}
-		self.storeTiltCoord(0, 0);
+		if(debugMode==1){result("\nNow Storing Centre Tilt Coords... ");}
+		// self.storeTiltCoord(0, 0); // This is the old code, but for calibration we need to do things differently and fill out the correct tag groups.
+		number xTilt, yTilt;
+		EMGetBeamTilt(xTilt, yTilt);
+		number xTiltRelative = 0;
+		number yTiltRelative = 0;
+		setpixel(dataArray, 0, 0, 0);
+		setpixel(dataArray, 0, 1, xTilt); // xTilt value
+		setpixel(dataArray, 0, 2, yTilt); // yTilt value
+		setpixel(dataArray, 0, 3, xTiltRelative); // relative xTilt value
+		setpixel(dataArray, 0, 4, yTiltRelative); // relative yTilt value
+		dataObject.setTracker( 1 );
+		if(debugMode==1){result(" Done");}
 		
 		if(oldTracker != 0){ // reset tracker so stored spots are accessible
 			dataObject.setTracker( oldTracker ); 
@@ -4891,7 +5085,17 @@ class CreateDF360DialogClass : uiframe
 		}
 		closeImage(yTiltDP);
 		self.beamCentre();
+		TagGroup vectors = NewTagGroup();
+		vectors.TagGroupCreateNewLabeledTag("xTiltx");
+		vectors.TagGroupCreateNewLabeledTag("xTilty");
+		vectors.TagGroupCreateNewLabeledTag("yTiltx");
+		vectors.TagGroupCreateNewLabeledTag("yTilty");
+		vectors.TagGroupSetTagAsNumber("xTiltx", xTiltVectorX);
+		vectors.TagGroupSetTagAsNumber("xTilty", xTiltVectorY);
+		vectors.TagGroupSetTagAsNumber("yTiltx", yTiltVectorX);
+		vectors.TagGroupSetTagAsNumber("yTilty", yTiltVectorY);
 		dataObject.setTiltVectors(xTiltVectorX, xTiltVectorY, yTiltVectorX, yTiltVectorY);
+		dataObject.setTiltVectorCalibrations(dataObject.getCameraLength(), vectors);
 		result("\nCalibration Complete.");
 		printCommands();
 	}
@@ -5771,6 +5975,19 @@ class CreateDF360DialogClass : uiframe
 
 		dataObject.setRefScale(newScale);
 		
+		// update the Tilt vectors from the stored table.
+		TagGroup vectors
+		if (TagGroupGetTagAsTagGroup (dataObject.getTiltVectorCalibrations(), returnname, vectors) == 0){
+			result("\nError changing the tilt calibration. Camera length not found in calibration tables.")
+		}
+		number xTVx, xTVy, yTVx, yTVy;
+		vectors.TagGroupGetTagAsNumber("xTiltx", xTVx);
+		vectors.TagGroupGetTagAsNumber("xTilty", xTVy);
+		vectors.TagGroupGetTagAsNumber("yTiltx", yTVx);
+		vectors.TagGroupGetTagAsNumber("yTilty", yTVy);
+		dataObject.setTiltVectors(xTVx, xTVy, yTVx, yTVy);
+		
+		
 		image viewImage;
 		if(!returnViewImage(debugMode, viewImage)){
 			if(debugMode==true){result("\nNo View Window detected.");}
@@ -5892,16 +6109,16 @@ class CreateDF360DialogClass : uiframe
 			Throw("No ROI are present.")
 		}
 		image dataArray := dataObject.getDataArray();
-		if(dataObject.getTracker() > 1){ // All ready results stored?
-			if(TwoButtonDialog("Delete previous stored points?", "Yes", "No")){
+		//if(dataObject.getTracker() > 1){ // All ready results stored?
+			//if(TwoButtonDialog("Delete previous stored points?", "Yes", "No")){
 				dataObject.setTracker(1);
 				number height, width;
 				getSize(dataArray, width, height)
 				//realsubarea operator[( realimage img, number top, number left, number bottom, number right )
 				dataArray[0, 1, height, width] = 0; // Set all values except first to 0
 				result("\nStored points have been cleared. Calibration data are still in memory.")			
-			}
-		}
+			//}
+		//}
 		number shadowDistanceNM;
 		shadowDistanceNM = dataObject.getShadowDistanceNM();
 		getNumber("Shadow points by (1/nm): ", shadowDistanceNM, shadowDistanceNM);
@@ -5911,16 +6128,18 @@ class CreateDF360DialogClass : uiframe
 		
 		// Create the information for the image of the diffraction pattern. This makes sure BF and DP are paired up later.
 		TagGroup CentralImage = imageSetTools.createNewImageForImageSet();
-		CentralImage.TagGroupSetTagAsNumber("ImageSpotNumber", 0);
 		CentralImage.TagGroupSetTagAsString("ImageType", "DP");
 		CentralImage.TagGroupSetTagAsNumber("ExposureTime", dataObject.getDPExposure());
 		CentralImage.TagGroupSetTagAsNumber("xTiltRelative", 0);
 		CentralImage.TagGroupSetTagAsNumber("yTiltRelative", 0);
 		CentralImage.TagGroupSetTagAsNumber("xTiltValue", dataObject.getCentreXTilt());
 		CentralImage.TagGroupSetTagAsNumber("yTiltValue", dataObject.getCentreYTilt());
-		imageSetTools.addImageDataToCurrentImageSet(CentralImage);
+		CentralImage.TagGroupSetTagAsNumber("ShadowValue", 0);
+		CentralImage.TagGroupSetTagAsNumber("DSpacingAng", 0);
 		
-				
+		imageSetTools.addSpotToCurrentImageSet();
+		imageSetTools.addImageDataToCurrentSpot(CentralImage, "Middle");
+		
 		if(debugMode==true){result("\nCreating ROI List...");}
 		if(debugMode==true){result("\n\tROIs present: " + totalROI);}
 		image ROIData := IntegerImage("ROI ID List", 4, 0, totalROI, 2);
@@ -5953,6 +6172,7 @@ class CreateDF360DialogClass : uiframe
 		if(debugMode==true){result("\nAll ROIs stored.");}
 		OkDialog("All ROI have been stored. You may now begin imaging.");
 		self.beamCentre();
+		imageSetTools.showImageSets();
 	}
 
 	void storeRingButtonPress (object self)
@@ -6351,7 +6571,6 @@ object startToolkit () {
 	Toolkit.storeTiltDialog(tiltDialog);
 	
 	Toolkit.updateDialog();
-	
 	return Toolkit;
 }
 
