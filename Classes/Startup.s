@@ -3,7 +3,7 @@
 //****************************************************
 
 // This function is called when the toolkit starts.
-// It creates, configures and stores the dialogs and tag groups.
+// It creates, configures and stores the dialogs and tag groups found in the other sections.
 
 object startToolkit () {
 	
@@ -23,6 +23,9 @@ object startToolkit () {
 	result("\nLoading Image Set Tools...")
 	object theImageSetTools = alloc(ImageSetTools);
 	
+	result("\nLoading Camera Controls...")
+	object theCameraControlObject = alloc(CameraControl);
+	
 	result("\nCreating KeyListener for shortcut commands...")
 	// Create objects that will be used later but must be created now before the class drops from scope
 	object KeyListener=alloc(MyKeyHandler) // Key handler for the view Window for shortcut key presses. Not attached yet.
@@ -35,6 +38,9 @@ object startToolkit () {
 	
 	result("\nCreating Tilt Calibration Input Dialog...")
 	object tiltDialog = alloc(TiltValueDialog);
+	
+	result("\nLoading Image Processing Functions...")
+	object ImageProcessingObject = alloc(ImageProcessing);
 	
 	if(dataObject.checkPersistent()==false){
 		TagGroup persistentSave = dataObject.createDefaultPersistent(); // make a blank set of data
@@ -52,7 +58,8 @@ object startToolkit () {
 	Toolkit.storeAlignmentDialog(alignmentDialog); // Stored in toolkit object.
 	Toolkit.storeCalibrationDialog(calibrationDialog);
 	Toolkit.storeTiltDialog(tiltDialog);
-	
+	Toolkit.storeCameraControlObject(theCameraControlObject);
+	Toolkit.storeImageProcessingObject(ImageProcessingObject);
 	Toolkit.updateDialog();
 	return Toolkit;
 }
@@ -64,7 +71,7 @@ void main()
 	result("\n-----------------------");
 	result("\nDarkField360 Toolkit");
 	result("\n-----------------------");
-	result("\nLoading Toolbar ...");
+	result("\nLoading Toolkit ...");
 
 	object ToolKit = startToolkit();		
 	

@@ -2,6 +2,12 @@
 //   Data Object Class
 // **********************
 
+// The dataObject contains variables that are used by other objects.
+// Holds the toolkit settings.
+// This is always available, even in offline systems, so it does not rely on the Camera module for resolution information.
+// Performs a variety of calculations for tilt control and image processing.
+// Loads and saves persistent tags, but not for the individual image sets or images.
+
 class MyDataObject	
 {
 	number dataObjectID;
@@ -14,12 +20,10 @@ class MyDataObject
 	image referenceDP; // A Diff. Pattern taken with the beam centred.
 	image ROIList; // A list of ROI IDs (Row 0) and ROI index numbers (Row 1) so I can keep their order and name them properly.
 	number tracker; // A variable to keep track of the number of stored data points
+	number spotTracker; // A variable to keep track of the spot number. A spot can have several images making it up through shadowing and integration.
 	number ROITracker; // A variable to keep track of which ROI a user looked at last.
 	number ringMarkerColourTracker; // Variable to remember which colour marker rings have all ready been used.
 	number debugMode; // Set to 1 to prevent image saving and provide robust feedback.
-	number DFExposure; // # of seconds to expose the camera for taking DarkField images.
-	number DPExposure; // # of seconds to expose the camera for taking Diffraction Pattern images.
-	number BFExposure; // # of seconds to expose the camera for taking BrightField images.
 	number xTiltVectorX; // number of pixels moved in the (pixel) X axis per tiltX unit
 	number xTiltVectorY; // number of pixels moved in the (pixel) Y axis per tiltX unit
 	number yTiltVectorX; // number of pixels moved in the (pixel) X axis per tiltY unit
@@ -72,6 +76,14 @@ class MyDataObject
 		tracker = newValue;
 		return tracker;
 	}
+	
+	number getSpotTracker(object self) {
+		return spotTracker;
+	}
+	void setSpotTracker(object self, number newValue) {
+		spotTracker = newValue;
+	}
+	
 	number getROITracker(object self) {
 		return ROITracker;
 	}
@@ -91,30 +103,6 @@ class MyDataObject
 		return ringMarkerColourTracker;
 	}
 
-	number getDFExposure(object self) {
-		return DFExposure;
-	}
-	number setDFExposure(object self, number newValue) {
-		DFExposure = newValue;
-		return DFExposure;
-	}
-
-	number getBFExposure(object self) {
-		return BFExposure;
-	}
-	number setBFExposure(object self, number newValue) {
-		BFExposure = newValue;
-		return BFExposure;
-	}
-
-	number getDPExposure(object self) {
-		return DPExposure;
-	}
-	number setDPExposure(object self, number newValue) {
-		DPExposure = newValue;
-		return DPExposure;
-	}
-
 	number setMaxDeviation(object self, number newValue){
 		maxDeviation = newValue;
 		return maxDeviation;
@@ -122,31 +110,6 @@ class MyDataObject
 	number getMaxDeviation(object self){
 		return maxDeviation;
 	}
-	
-	number setBinningMultiplier(object self, number newValue){
-		binningMultiplier = newValue;
-		return binningMultiplier;
-	}
-	number getBinningMultiplier(object self){
-
-		return binningMultiplier;
-	}
-
-	number getCameraWidth(object self) {
-		return cameraWidth;
-	}
-	number setCameraWidth(object self, number newValue) {
-		cameraWidth = newValue;
-		return cameraWidth;
-	}
-	number getCameraHeight(object self) {
-		return cameraHeight;
-	}
-	number setCameraHeight(object self, number newValue) {
-		cameraHeight = newValue;
-		return cameraHeight;
-	}
-
 
 	number getkeyListenerKeyToken(object self) {
 		return keyListenerKeyToken;
@@ -292,6 +255,7 @@ class MyDataObject
 		textString = "\nPreparing Dump of all Data Variables..." +\
 		"\ntoggle: " + toggle +\
 		"\ntracker: " + tracker +\
+		"\nspotTracker: " + spotTracker +\
 		"\nROITracker: " + ROITracker +\
 		"\ndebugMode: " + debugMode +\
 		"\nDFExposure: " + DFExposure +\
@@ -372,11 +336,13 @@ class MyDataObject
 			DataArray = 0;
 			ReferenceDP = 0; 
 			self.setTracker(0);
+			self.setSpotTracker(0);
 			self.setTiltVectors(0,0,0,0);
 			result("\nAll stored points and calibration data deleted. Please centre the beam and run the calibrate tilt function again");
 			// Note: NEVER set centreXTilt or centreYTilt to 0, or anything other than real values.
 		} else {
 			self.setTracker(1);
+			self.setSpotTracker(0);
 			number height, width;
 			getSize(dataArray, width, height)
 			//realsubarea operator[( realimage img, number top, number left, number bottom, number right )

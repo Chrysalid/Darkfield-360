@@ -1,7 +1,10 @@
 // ********************************************************************************
 //  Class containing Functions to create and manipulate Image Sets and Image Tags
 // ********************************************************************************
-// Taking this outside of dataObject because it is a major part of the program now.
+
+// Tools to create image & image set configuration tag groups.
+// Tools to parse the tag groups it creates.
+// Store tag groups as text files and data files.
 
 class ImageSetTools
 {
@@ -36,7 +39,7 @@ class ImageSetTools
 	void setDebugMode(object self, number input)
 	{
 		debugMode = input;
-		if(debugMode == 1){result("\n\tDebug Mode Activated in Alignment Dialog");}
+		if(debugMode == 1){result("\n\tDebug Mode Activated in ImageSetTools object");}
 	}
 
 	/* Opens the ImageSets tag list in a window in DM. Used for debugging. */
