@@ -1,12 +1,3 @@
-// Updates to make
-// Allow colour selection in createMap()
-// on exposure updates. Remove buttons if possible.
-
-// Bugs to test:
-// Save images sometimes makes tiffs instead of gatan?
-// Check integrated images are functional.
-
-
 //*******************************
 // 	TOOLKIT BUTTON ICONS
 //*******************************
@@ -779,7 +770,6 @@ TagGroup createDFList (number tracker, number shadowing, number integration, num
 	return DFList;
 }
 
-
 // ********************************
 //	Image Alignment Dialog Class
 // ********************************
@@ -1483,9 +1473,7 @@ class AlignmentDialog : uiframe
 		self.startAligning();
 	}
 	
-}
-
-// **********************
+}// **********************
 //   Data Object Class
 // **********************
 
@@ -2547,7 +2535,6 @@ class MyDataObject
 	}
 }
 
-
 // ********************************************************************************
 //  Class containing Functions to create and manipulate Image Sets and Image Tags
 // ********************************************************************************
@@ -2992,12 +2979,7 @@ class ImageSetTools
 		return persistentTG;
 	}
 	*/
-
-	
-	
-	
 }
-
 
 // ********************************
 //	Scale Calibration Dialog Class
@@ -3221,7 +3203,6 @@ class ScaleValueDialog : uiframe
 		self.uploadFields();
 	}
 }
-
 // ********************************
 //	Tilt Calibration Dialog Class
 // ********************************
@@ -3457,10 +3438,7 @@ class TiltValueDialog : uiframe
 	void changedValue(object self, tagGroup tg){ //Change method detects when a calibration factor is changed. tg is the source of the call
 		self.uploadFields();
 	}
-}
-
-
-// *******************************
+}// *******************************
 // SHORTCUT KEYS
 // *******************************
 
@@ -3641,8 +3619,6 @@ class MyKeyHandler
 		if(debugMode == 1){result("\n\tDebug Mode Activated in KeyListener");}
 	}
 }
-
-
 //****************************************************
 // TOOLKIT FUNCTIONS & CLASS
 //****************************************************
@@ -6587,10 +6563,7 @@ class CreateDF360DialogClass : uiframe
 	void saveVariablesToMemoryPress(object self){
 		dataObject.updatePersistent(dataObject.createPersistent(1));
 	}
-}
-
-
-//****************************************************
+}//****************************************************
 // STARTUP FUNCTIONS
 //****************************************************
 
@@ -6679,4 +6652,4 @@ void main()
 	printCommands(); // Shortcut keys
 }
 
-main();
+main();

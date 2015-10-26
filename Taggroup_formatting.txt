@@ -55,7 +55,7 @@ ImageSets
 		TiltXCenter
 		TiltYCenter
 		
-		Spots
+		Spots (diffraction patterns)
 			[0]
 			[1]
 			...
@@ -77,8 +77,31 @@ ImageSets
 					xTiltRealtive: <value>
 					yTiltRelative: <value>
 					DSpacingAng: <value in Angstroms>
-					ShadowValue: <0/1/2/3> (0=no shadowing, 1= middle, 2= higher or low, 3= lower or high)
+					ShadowValue: <1/2/3> (0=no shadowing, 1= middle, 2= higher or low, 3= lower or high)
 					ShadowDistance: <0/value in (1/nm)>
+		Images (darkfield images)
+			[0] (spot numbers)
+			[1] 
+			...
+			Middle (only entry if no shadowing)
+				<image data>
+			Lower (only used for shadowed spots)
+				<image data>
+			Higher (only used for shadowed spots)
+				CreationTime
+				UniqueImageID ?
+				SavedAsFile: 0/1
+				FileName: <value. Does not include path>
+				ImageMode:<value reported by scope>
+				ImageType:<value recorded by toolkit> // Options are DP, DF, BF, Bin
+				ExposureTime: <value>
+				xTiltValue: <value>
+				yTiltValue: <value>
+				xTiltRealtive: <value>
+				yTiltRelative: <value>
+				DSpacingAng: <value in Angstroms>
+				ShadowValue: <1/2/3> (0=no shadowing, 1= middle, 2= higher or low, 3= lower or high)
+				ShadowDistance: <0/value in (1/nm)>	
 			
 Image Tags
 ----------
