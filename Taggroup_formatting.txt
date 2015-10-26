@@ -79,6 +79,8 @@ ImageSets
 					DSpacingAng: <value in Angstroms>
 					ShadowValue: <1/2/3> (0=no shadowing, 1= middle, 2= higher or low, 3= lower or high)
 					ShadowDistance: <0/value in (1/nm)>
+					xShift: <value of shift in pixels>
+					yShift: <value of shift in pixels>
 		Images (darkfield images)
 			[0] (spot numbers)
 			[1] 

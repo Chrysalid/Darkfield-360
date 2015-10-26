@@ -181,18 +181,20 @@ class ImageSetTools
 	/* Function to create a new set of image tags for the imageSet records */
 	TagGroup createNewImageForImageSet(object self){
 		TagGroup imageData = newTagGroup(); // make blank labels
-		imageData.TagGroupCreateNewLabeledTag("ImageID") // Unique imageID number
-		imageData.TagGroupCreateNewLabeledTag("FileName") // Name of saved file if present.
-		imageData.TagGroupCreateNewLabeledTag("ImageMode")
-		imageData.TagGroupCreateNewLabeledTag("ImageType") // Options are DP, DF, BF, Bin
-		imageData.TagGroupCreateNewLabeledTag("ExposureTime")
-		imageData.TagGroupCreateNewLabeledTag("xTiltValue")
-		imageData.TagGroupCreateNewLabeledTag("yTiltValue")
-		imageData.TagGroupCreateNewLabeledTag("xTiltRelative")
-		imageData.TagGroupCreateNewLabeledTag("yTiltRelative")
-		imageData.TagGroupCreateNewLabeledTag("DSpacingAng")
-		imageData.TagGroupCreateNewLabeledTag("ShadowValue")
-		imageData.TagGroupCreateNewLabeledTag("ShadowDistance")		
+		imageData.TagGroupCreateNewLabeledTag("ImageID"); // Unique imageID number
+		imageData.TagGroupCreateNewLabeledTag("FileName"); // Name of saved file if present.
+		imageData.TagGroupCreateNewLabeledTag("ImageMode");
+		imageData.TagGroupCreateNewLabeledTag("ImageType"); // Options are DP, DF, BF, Bin
+		imageData.TagGroupCreateNewLabeledTag("ExposureTime");
+		imageData.TagGroupCreateNewLabeledTag("xTiltValue");
+		imageData.TagGroupCreateNewLabeledTag("yTiltValue");
+		imageData.TagGroupCreateNewLabeledTag("xTiltRelative");
+		imageData.TagGroupCreateNewLabeledTag("yTiltRelative");
+		imageData.TagGroupCreateNewLabeledTag("xShift");
+		imageData.TagGroupCreateNewLabeledTag("yShift");
+		imageData.TagGroupCreateNewLabeledTag("DSpacingAng");
+		imageData.TagGroupCreateNewLabeledTag("ShadowValue");
+		imageData.TagGroupCreateNewLabeledTag("ShadowDistance");
 		
 		imageData.TagGroupCreateNewLabeledTag("SavedAsFile") //<Has image been saved as a file? 0/1>
 		imageData.TagGroupSetTagAsNumber("SavedAsFile", 0 );
