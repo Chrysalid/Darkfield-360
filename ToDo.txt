@@ -28,3 +28,8 @@ Allow colour selection in createMap()
 
 Cycle through saved tilt settings
 
+
+
+Currently
+----------
+Updating darkFieldImage() to use tags

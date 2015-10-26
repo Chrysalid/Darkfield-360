@@ -178,7 +178,9 @@ class ImageSetTools
 		return Spot;
 	}
 	
-	/* Function to create a new set of image tags for the imageSet records */
+	/* Function to create a new set of image tags for the imageSet records
+		This version is for blank images.
+	*/
 	TagGroup createNewImageForImageSet(object self){
 		TagGroup imageData = newTagGroup(); // make blank labels
 		imageData.TagGroupCreateNewLabeledTag("ImageID"); // Unique imageID number
@@ -208,7 +210,7 @@ class ImageSetTools
 		imageData.TagGroupSetTagAsString("CreationTime", theTime );
 		
 		return imageData;
-	}
+	}	
 	
 	/* Get the currently open imageSet Taggroup. Returns 1/0 for success/fail */
 	number getCurrentImageSet(object self, TagGroup &targetImageSet){

@@ -1201,15 +1201,27 @@ class CreateDF360DialogClass : uiframe
 		return;
 	}
 
-	/* Function to take a DF image by reading from the Data Array */
-	image takeDFImage (object self, number tracker, image dataArray, number xTiltCenter, number yTiltCenter,\
-			number DFExposure, number cameraWidth, number cameraHeight, number im ){
+	/* Function to take a DF image by reading from the ImageSet Tag group
+		imageSet - the image set Tag group to take data from
+		spotID - the spot number of the desired image
+		imageLabel - the label of the image to be taken. Usually "Higher/Lower/Middle"
+	*/
+	
+	image takeDFImage (object self, TagGroup imageSet, number spotID, string imageLabel, TagGroup &ImageTags ){
 
-		number xTiltTarget, yTiltTarget;
+		TagGroup DPImageTags;
+		// arguments: (TagGroup tagGroup, String tagPath, TagGroup subGroup )
+		string tagPath = "Spots:" + spotID + ":" + imageLabel;
+		imageSet.TagGroupGetTagAsTagGroup(tagPath, DPImageTags); // Loads the DP image information into this variable for reference.
+	
+		number xTiltTarget, yTiltTarget, relativeXTilt, relativeYTilt;
 		
-		// Read xTilt and yTilt from array
-		xTiltTarget = xTiltCenter + getpixel(dataArray, im, 3);
-		yTiltTarget = yTiltCenter + getpixel(dataArray, im, 4);
+		// Read relative xTilt and yTilt from array
+		relativeXTilt = DPImageTags.TagGroupGetTagAsNumber("xTiltRealtive");
+		relativeYTilt = DPImageTags.TagGroupGetTagAsNumber("yTiltRealtive");
+		
+		xTiltTarget = dataObject.getCentreXTilt() + relativeXTilt;
+		yTiltTarget = dataObject.getCentreYTilt() + relativeYTilt;
 		
 		// Move the beam tilt to this value.
 		moveBeamTilt(xTiltTarget,yTiltTarget);
@@ -1225,9 +1237,38 @@ class CreateDF360DialogClass : uiframe
 			}
 		}
 		
-		// Take the Dark field Image
+		// Take the  Image
+		number Exposure = CameraControl.getDFExposure();
 		image DFImage;
-		DFImage := sscUnprocessedAcquire(DFExposure,0,0,cameraWidth,cameraHeight);
+		DFImage := sscUnprocessedAcquire(Exposure,0,0,cameraWidth,cameraHeight);
+		
+		// Retrive values for image tags...
+		number shadowValue
+		number shadowDistance
+		number DSpacingAng
+		ImageSet.TagGroupGetTagAsNumber("ShadowValue", shadowValue);
+		ImageSet.TagGroupGetTagAsNumber("shadowDistance", shadowDistance);
+		ImageSet.TagGroupGetTagAsNumber("DSpacingAng", DSpacingAng);
+
+		// Create Image Tags...
+		ImageTags = ImageSetTools.createNewImageForImageSet();
+		// ImageTags.TagGroupSetTagAsNumber("ImageID"); // Unique imageID number
+		ImageTags.TagGroupSetTagAsString("ImageType", "DF");
+		ImageTags.TagGroupSetTagAsNumber("ExposureTime", Exposure);
+		ImageTags.TagGroupSetTagAsNumber("xTiltRelative", relativeXTilt);
+		ImageTags.TagGroupSetTagAsNumber("yTiltRelative", relativeYTilt);		
+		ImageTags.TagGroupSetTagAsNumber("xTiltValue", xTiltTarget);
+		ImageTags.TagGroupSetTagAsNumber("yTiltValue", yTiltTarget);		
+		ImageTags.TagGroupSetTagAsNumber("ShadowValue", shadowValue);
+		ImageTags.TagGroupSetTagAsNumber("ShadowDistance", shadowDistance);
+		ImageTags.TagGroupSetTagAsNumber("DSpacingAng", DSpacingAng);
+		
+		/* Still left to figure out...
+			SavedAsFile: 0/1
+			BFImageTags.TagGroupSetTagAsString("FileName"); // Name of saved file if present.
+			BFImageTags.TagGroupSetTagAsNumber("ImageMode");
+		*/
+
 		return DFImage;
 	}
 
@@ -1294,92 +1335,221 @@ class CreateDF360DialogClass : uiframe
 	}
 
 	/* Function will use the stored Tilt values to take darkfield images. 1st Image (0000) will be Bright Field of site.
-		shadowing = 0 / 1 for the shadowing mode.
-		integration = 0 / 1 for if the images should be integrated together
-		integrationDistance = number of DP to be integrated together before image is produced
+		ImageSet = the image set tag group
+		saveNonIntegrated = 0/1 for if non-integrated images should be saved as well as teh integrated images. Will take a lot more disk space.
+		displayNonIntegrated = 0/1 for if non-integrated images should be displayed. Will take a hell of a lot of RAM
+		saveImages = 0/1 for if images should be automatically saved
+		displayImages = 0/1 for if images should be displayed on screen or closed after use.
 	*/
-	void darkFieldImage (object self, number shadowing, number integration, number integrationDistance){
-		number tracker = dataObject.getTracker();
-		number DPExposure = dataObject.getDPExposure();
-		number DFExposure = dataObject.getDFExposure();
-		number BFExposure = dataObject.getBFExposure();
-		image dataArray = dataObject.getDataArray();
-		image ReferenceDP = dataObject.getReferenceDP();
-		image ROIList = dataObject.getROIList();
-		image startBFImage;
-		image integratedImage;
-		image sumImage;
-
-		number cameraWidth = dataObject.getCameraWidth();
-		number cameraHeight = dataObject.getCameraHeight();
+	number darkFieldImage (object self, TagGroup ImageSet, number saveNonIntegrated, number saveImages, number displayNonIntegrated, number displayImages){
+		if(saveImages == 0 && displayImages == 0){
+			throw("Images must be shown, saved or both.");
+		}
+		
+		number DPExposure = CameraControlObject.getDPExposure();
+		number DFExposure = CameraControlObject.getDFExposure();
+		number BFExposure = CameraControlObject.getBFExposure();
+		number cameraWidth = CameraControlObject.getCameraWidth();
+		number cameraHeight = CameraControlObject.getCameraHeight();
+		
 		number xTiltCenter = dataObject.getCentreXTilt();
 		number yTiltCenter = dataObject.getCentreYTilt();
 		
-		if(integration){
+		image ReferenceDP = dataObject.getReferenceDP();
+
+		image startBFImage;
+		image integratedImage;
+		image sumImage;
+		
+		if(debugMode==true){result("\nLoading the variables for this image set for DF imaging..");}
+		// Load values from the imageSet data
+		number integration
+		ImageSet.TagGroupGetTagAsNumber("IntegratedImage", integration);
+		if(debugMode==true){result("\n\t integration is " + integration);}
+		
+		number ringMode
+		ImageSet.TagGroupGetTagAsNumber("RingMode", ringMode);
+		if(debugMode==true){result("\n\t RingMode is " + RingMode);}
+		
+		number numberOfIntegrations
+		ImageSet.TagGroupGetTagAsNumber("NumberOfIntegrations", NumberOfIntegrations);
+		if(debugMode==true){result("\n\t NumberOfIntegrations is " + NumberOfIntegrations);}
+		
+		number degreeStep
+		ImageSet.TagGroupGetTagAsNumber("DegreeStep", DegreeStep);
+		if(debugMode==true){result("\n\t DegreeStep is " + DegreeStep);}
+		
+		number shadowDistance
+		ImageSet.TagGroupGetTagAsNumber("ShadowDistance", ShadowDistance);
+		if(debugMode==true){result("\n\t shadowDistance is " + shadowDistance);}
+		
+		if(integration == 1){
 			if(debugMode==true){result("\nCreating Integrated Images to populate...");}
-			integratedImage = RealImage( "Integrated Image 01", 4, cameraWidth, cameraHeight );
-			integratedImage = integratedImage * 0;
-			sumImage = RealImage( "Sum of all Integrals", 4, cameraWidth, cameraHeight );
-			sumImage = sumImage * 0;
+			middleIntegratedImage = RealImage( "Integrated Image Middle", 4, cameraWidth, cameraHeight );
+			middleIntegratedImage = middleIntegratedImage * 0;
+			higherIntegratedImage = RealImage( "Integrated Image Higher", 4, cameraWidth, cameraHeight );
+			higherIntegratedImage = higherIntegratedImage * 0;
+			lowerIntegratedImage = RealImage( "Integrated Image Lower", 4, cameraWidth, cameraHeight );
+			lowerIntegratedImage = lowerIntegratedImage * 0;
+			
+			middleSumImage = RealImage( "Sum of all middle", 4, cameraWidth, cameraHeight );
+			middleSumImage = middleSumImage * 0;
+			higherSumImage = RealImage( "Sum of all top", 4, cameraWidth, cameraHeight );
+			higherSumImage = higherSumImage * 0;
+			lowerSumImage = RealImage( "Sum of all lower", 4, cameraWidth, cameraHeight );
+			lowerSumImage = lowerSumImage * 0;
 		}
-		
-		if(debugMode==true){result("\nWorking on TagGroup...");}
-		TagGroup DFList = createDFList(tracker, shadowing, integration, integrationDistance);
-		/* Tag group format:
-		DFList	:	UseImageID
-					BaseImage
-					Directory
-					Spot#### : 	HIGHER
-								MIDDLE
-								LOWER
-		*/
-		
-		// Set the tag values
-		string Directory = GetApplicationDirectory("auto_save", 0);
-		DFList.TagGroupSetTagAsString( "Directory" , Directory ); // sets the directory	
-		if(debugMode==1){result("\n\tSave directory set.");}
-		DFList.TagGroupSetTagAsNumber( "UseImageID" , 1 ); // Is 1 since the images are being created now.
-		if(debugMode==1){result("\n\tUseImageID set to 1.");}
+
 		
 		Result("\n------------- Starting Dark Field Imaging Process ---------------\n");
-		result("\n" + tracker + " images to create, taking " + (DFExposure * tracker / 60) + " minutes.");
-		if(debugMode==1){dataObject.printSpotIDArray();}
+		result("\n" + tracker + " exposures to take, taking " + (DFExposure * tracker / 60) + " minutes.");
 		
 		if (!ContinueCancelDialog( "Insert the Objective Aperture and center it. Switch to Imaging Mode and check the Brightfield image before continuing." )){
 			throw("Aborted by User. No data changed.")
 		}
 		
-		// For each targetArrayImage point move the beam there and take an image.
-		number im, spotID, imageID;
-		for(im=0; im<tracker ;im++){
-			// Take the image
-			image DFImage := self.takeDFImage ( tracker, dataArray, xTiltCenter, yTiltCenter, DFExposure, cameraWidth, cameraHeight, im );
-			if(im==0){
-				startBFImage = DFImage;
+		// Create the first image, which will always be a bright field image of the region
+		number BFExposure = CameraControlObject.getBFExposure();
+		moveBeamTilt(xTiltCenter, yTiltCenter); // Move to the tilt coords
+		startBFImage := sscUnprocessedAcquire(BFExposure,0,0,cameraWidth,cameraHeight); // Image
+		
+		// Create image tags
+		TagGroup BFImageTags = ImageSetTools.createNewImageForImageSet();
+		if(ImageSetTools.addImageDataToCurrentImageSet(BFImageTags, "Middle") == 0){
+			result("\nSomething has gone wrong creating the image data for the BF image.")
+			return 0;
+		}
+		BFImageTags.TagGroupSetTagAsString("ImageType", "BF");
+		BFImageTags.TagGroupSetTagAsNumber("ExposureTime", BFExposure);
+		BFImageTags.TagGroupSetTagAsNumber("xTiltRelative", 0);
+		BFImageTags.TagGroupSetTagAsNumber("yTiltRelative", 0);		
+		BFImageTags.TagGroupSetTagAsNumber("xTiltValue", xTiltCenter);
+		BFImageTags.TagGroupSetTagAsNumber("yTiltValue", yTiltCenter);
+		BFImageTags.TagGroupSetTagAsNumber("ShadowValue", 1);
+		BFImageTags.TagGroupSetTagAsNumber("ShadowDistance", 0);
+		BFImageTags.TagGroupSetTagAsNumber("DSpacingAng", 0);
+		
+		/* Still left to figure out...
+		BFImageTags.TagGroupSetTagAsNumber("ImageID"); // Unique imageID number
+		BFImageTags.TagGroupSetTagAsString("FileName"); // Name of saved file if present.
+		BFImageTags.TagGroupSetTagAsString("ImageMode");
+		*/
+		
+		string fileName = "Brightfield_" + constructTimeStamp();
+		
+		if(saveImages == 1){
+			string fileDirectory = GetApplicationDirectory("auto_save", 0);
+			filePath = PathConcatenate(fileDirectory, fileName);
+			BFImageTags.TagGroupSetTagAsString("FileName", fileName);
+			BFImageTags.TagGroupSetTagAsNumber("SavedAsFile", 1);
+			SaveAsGatan( startBFImage, filePath );
+			result("\nSaved Brightfield image as " + filePath);
+		} else { // If not saving the image...
+			BFImageTags.TagGroupSetTagAsNumber("SavedAsFile", 0);
+		}
+		
+		if(displayImages == true) // If displaying the image...
+		{
+			showImage(startBFImage);
+		}
+		
+		TagGroup spots;
+		ImageSet.TagGroupGetTagAsTagGroup("Spots", spots);
+		number spotTotal = spots.TagGroupCountTags();
+		
+		number im
+		for(im=1; im < spotTotal ; im++){
+			TagGroup MiddleImageTags, HigherImageTags, LowerImageTags;			
+			// Take the middle image
+			image MiddleDFImage := self.takeDFImage (ImageSet, im, "Middle", MiddleImageTags);
+			image TopDFImage;
+			image BottomDFImage;
+			string TopTagPath = "Spots:" + im + ":Higher";
+			string BottomTagPath = "Spots:" + im + ":Lower";
+			if(ImageSet.TagGroupDoesTagExist(TopTagPath)){
+				TopDFImage := self.takeDFImage (ImageSet, im, "Higher", HigherImageTags);
 			}
-			// Get image data
-			imageID = DFImage.ImageGetID();
-			spotID = getpixel(dataArray, im, 0);
+			if(ImageSet.TagGroupDoesTagExist(BottomTagPath)){
+				BottomDFImage: = self.takeDFImage (ImageSet, im, "Lower", LowerImageTags);
+			}
 			
-			// Generate the filename to save the image with.
-			string fileName, filePath, longSpotID;
-			fileName = self.generateDFFileName(im, imageID, dataArray, DFList, shadowing, debugMode );
+			if(saveImages == true){
+				if((integration == 0) || (saveNonIntegrated == 1)){ // Does not save the integrated images. These must be done seperately.
+					fileName = ("DF_Spot_" + im + "_" + constructTimeStamp()) + "_MIDDLE"
+					string fileDirectory = GetApplicationDirectory("auto_save", 0);
+					filePath = PathConcatenate(fileDirectory, fileName);
+					MiddleImageTags.TagGroupSetTagAsString("FileName", fileName);
+					MiddleImageTags.TagGroupSetTagAsNumber("SavedAsFile", 1);
+					SaveAsGatan( MiddleDFImage, filePath );
+					
+					if(ImageSet.TagGroupDoesTagExist(TopTagPath)){
+						fileName = ("DF_Spot_" + im + "_" + constructTimeStamp()) + "_HIGHER"
+						string fileDirectory = GetApplicationDirectory("auto_save", 0);
+						filePath = PathConcatenate(fileDirectory, fileName);
+						HigherImageTags.TagGroupSetTagAsString("FileName", fileName);
+						HigherImageTags.TagGroupSetTagAsNumber("SavedAsFile", 1);
+						SaveAsGatan( TopDFImage, filePath );
+					}
+					if(ImageSet.TagGroupDoesTagExist(BottomTagPath)){
+						fileName = ("DF_Spot_" + im + "_" + constructTimeStamp()) + "_LOWER"
+						string fileDirectory = GetApplicationDirectory("auto_save", 0);
+						filePath = PathConcatenate(fileDirectory, fileName);
+						LowerImageTags.TagGroupSetTagAsString("FileName", fileName);
+						LowerImageTags.TagGroupSetTagAsNumber("SavedAsFile", 1);
+						SaveAsGatan( BottomDFImage, filePath );
+					}
+				}
+			} else { // If not saving the image...
+				MiddleImageTags.TagGroupSetTagAsNumber("SavedAsFile", 0);
+				if(ImageSet.TagGroupDoesTagExist(BottomTagPath)){
+					HigherImageTags.TagGroupSetTagAsNumber("SavedAsFile", 0);
+				}
+				if(ImageSet.TagGroupDoesTagExist(BottomTagPath)){
+					LowerImageTags.TagGroupSetTagAsNumber("SavedAsFile", 0);
+				}
+			}
+			
+			if(displayImages == true) // If displaying the images...
+			{
+				if((integration == 0) || (displayNonIntegrated == 1)){ // Does not show the integrated images. These must be done seperately.
+					showImage(MiddleDFImage);
+					if(ImageSet.TagGroupDoesTagExist(TopTagPath)){
+						showImage(TopDFImage);
+					}
+					if(ImageSet.TagGroupDoesTagExist(BottomTagPath)){
+						showImage(BottomDFImage);
+					}
+			}
 			
 			// If in Integrated image mode add it to the current integration image and display any completed integrated images.
 			if(integration==true){
-				integratedImage = integratedImage + DFImage;
-				result("\nIntegrating Exposure " + (im + 1) +" of " + tracker);
-				if((remainder(im, integrationDistance)==0) || (im == 0)){ // save this integrated image and start a new one.
-					sumImage = sumImage + integratedImage;
-					image newImage = integratedImage.ImageClone();
-					integratedImage.ImageSetName( "Integrated Image " + im );
+				middleIntegratedImage = middleIntegratedImage + MiddleDFImage;
+				higherIntegratedImage = higherIntegratedImage + TopDFImage;
+				lowerIntegratedImage = lowerIntegratedImage + BottomDFImage;
+				result("\nIntegrating Exposures " + im +" of " + spotTotal);
+				if(remainder(im, NumberOfIntegrations) == 0){ // save this integrated image and start a new one.
+					middleSumImage = middleSumImage + middleIntegratedImage;
+					middleIntegratedImage.ImageSetName( "Integrated Image " + im + " Middle" );
 					string fileDirectory = GetApplicationDirectory("auto_save", 0);
 					fileName = "Integrated Image " + im;
 					filePath = PathConcatenate(fileDirectory, fileName); // Construct the full file path for the save command.
 					SaveAsGatan(integratedImage, filePath);
-					result("\nIntegrated " + integrationDistance + " exposures into Integrated Image " + im);
+					result("\nIntegrated " + NumberOfIntegrations + " exposures into Integrated Image " + im);
 					integratedImage = integratedImage * 0; // Set old image to 0 for next integration sequence.
 					if(debugMode==true){OpenImage(filePath + ".dm3");} // Display the image as well if in debug mode.
+					
+					if(ImageSet.TagGroupDoesTagExist(TopTagPath)){
+						higherSumImage = higherSumImage + higherIntegratedImage;
+						
+						
+					}
+					if(ImageSet.TagGroupDoesTagExist(BottomTagPath)){
+						lowerSumImage = lowerSumImage + lowerIntegratedImage;
+						
+						
+					}
+					
+					
 				}
 			}
 			else { // Save the image as a Gatan file or display it if in debug mode.

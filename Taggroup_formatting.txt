@@ -82,7 +82,7 @@ ImageSets
 					xShift: <value of shift in pixels>
 					yShift: <value of shift in pixels>
 		Images (darkfield images)
-			[0] (spot numbers)
+			[0] (spot numbers) 0 = BF image.
 			[1] 
 			...
 			Middle (only entry if no shadowing)
