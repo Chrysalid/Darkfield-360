@@ -32,4 +32,4 @@ Cycle through saved tilt settings
 
 Currently
 ----------
-Updating darkFieldImage() to use tags
+update generating ring coords

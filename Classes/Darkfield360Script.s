@@ -1,3 +1,9 @@
+/*
+	This file goes at the very start of the DF360 script. It contains functions and variables that can be used globally.
+	The toolkit buttons are also defined here.
+*/
+
+
 //*******************************
 // 	TOOLKIT BUTTON ICONS
 //*******************************
@@ -1473,9 +1479,18 @@ class AlignmentDialog : uiframe
 		self.startAligning();
 	}
 	
-}// **********************
+}
+
+
+// **********************
 //   Data Object Class
 // **********************
+
+// The dataObject contains variables that are used by other objects.
+// Holds the toolkit settings.
+// This is always available, even in offline systems, so it does not rely on the Camera module for resolution information.
+// Performs a variety of calculations for tilt control and image processing.
+// Loads and saves persistent tags, but not for the individual image sets or images.
 
 class MyDataObject	
 {
@@ -1489,12 +1504,10 @@ class MyDataObject
 	image referenceDP; // A Diff. Pattern taken with the beam centred.
 	image ROIList; // A list of ROI IDs (Row 0) and ROI index numbers (Row 1) so I can keep their order and name them properly.
 	number tracker; // A variable to keep track of the number of stored data points
+	number spotTracker; // A variable to keep track of the spot number. A spot can have several images making it up through shadowing and integration.
 	number ROITracker; // A variable to keep track of which ROI a user looked at last.
 	number ringMarkerColourTracker; // Variable to remember which colour marker rings have all ready been used.
 	number debugMode; // Set to 1 to prevent image saving and provide robust feedback.
-	number DFExposure; // # of seconds to expose the camera for taking DarkField images.
-	number DPExposure; // # of seconds to expose the camera for taking Diffraction Pattern images.
-	number BFExposure; // # of seconds to expose the camera for taking BrightField images.
 	number xTiltVectorX; // number of pixels moved in the (pixel) X axis per tiltX unit
 	number xTiltVectorY; // number of pixels moved in the (pixel) Y axis per tiltX unit
 	number yTiltVectorX; // number of pixels moved in the (pixel) X axis per tiltY unit
@@ -1547,6 +1560,14 @@ class MyDataObject
 		tracker = newValue;
 		return tracker;
 	}
+	
+	number getSpotTracker(object self) {
+		return spotTracker;
+	}
+	void setSpotTracker(object self, number newValue) {
+		spotTracker = newValue;
+	}
+	
 	number getROITracker(object self) {
 		return ROITracker;
 	}
@@ -1566,30 +1587,6 @@ class MyDataObject
 		return ringMarkerColourTracker;
 	}
 
-	number getDFExposure(object self) {
-		return DFExposure;
-	}
-	number setDFExposure(object self, number newValue) {
-		DFExposure = newValue;
-		return DFExposure;
-	}
-
-	number getBFExposure(object self) {
-		return BFExposure;
-	}
-	number setBFExposure(object self, number newValue) {
-		BFExposure = newValue;
-		return BFExposure;
-	}
-
-	number getDPExposure(object self) {
-		return DPExposure;
-	}
-	number setDPExposure(object self, number newValue) {
-		DPExposure = newValue;
-		return DPExposure;
-	}
-
 	number setMaxDeviation(object self, number newValue){
 		maxDeviation = newValue;
 		return maxDeviation;
@@ -1597,31 +1594,6 @@ class MyDataObject
 	number getMaxDeviation(object self){
 		return maxDeviation;
 	}
-	
-	number setBinningMultiplier(object self, number newValue){
-		binningMultiplier = newValue;
-		return binningMultiplier;
-	}
-	number getBinningMultiplier(object self){
-
-		return binningMultiplier;
-	}
-
-	number getCameraWidth(object self) {
-		return cameraWidth;
-	}
-	number setCameraWidth(object self, number newValue) {
-		cameraWidth = newValue;
-		return cameraWidth;
-	}
-	number getCameraHeight(object self) {
-		return cameraHeight;
-	}
-	number setCameraHeight(object self, number newValue) {
-		cameraHeight = newValue;
-		return cameraHeight;
-	}
-
 
 	number getkeyListenerKeyToken(object self) {
 		return keyListenerKeyToken;
@@ -1767,6 +1739,7 @@ class MyDataObject
 		textString = "\nPreparing Dump of all Data Variables..." +\
 		"\ntoggle: " + toggle +\
 		"\ntracker: " + tracker +\
+		"\nspotTracker: " + spotTracker +\
 		"\nROITracker: " + ROITracker +\
 		"\ndebugMode: " + debugMode +\
 		"\nDFExposure: " + DFExposure +\
@@ -1847,11 +1820,13 @@ class MyDataObject
 			DataArray = 0;
 			ReferenceDP = 0; 
 			self.setTracker(0);
+			self.setSpotTracker(0);
 			self.setTiltVectors(0,0,0,0);
 			result("\nAll stored points and calibration data deleted. Please centre the beam and run the calibrate tilt function again");
 			// Note: NEVER set centreXTilt or centreYTilt to 0, or anything other than real values.
 		} else {
 			self.setTracker(1);
+			self.setSpotTracker(0);
 			number height, width;
 			getSize(dataArray, width, height)
 			//realsubarea operator[( realimage img, number top, number left, number bottom, number right )
@@ -2538,7 +2513,10 @@ class MyDataObject
 // ********************************************************************************
 //  Class containing Functions to create and manipulate Image Sets and Image Tags
 // ********************************************************************************
-// Taking this outside of dataObject because it is a major part of the program now.
+
+// Tools to create image & image set configuration tag groups.
+// Tools to parse the tag groups it creates.
+// Store tag groups as text files and data files.
 
 class ImageSetTools
 {
@@ -2573,7 +2551,7 @@ class ImageSetTools
 	void setDebugMode(object self, number input)
 	{
 		debugMode = input;
-		if(debugMode == 1){result("\n\tDebug Mode Activated in Alignment Dialog");}
+		if(debugMode == 1){result("\n\tDebug Mode Activated in ImageSetTools object");}
 	}
 
 	/* Opens the ImageSets tag list in a window in DM. Used for debugging. */
@@ -2712,21 +2690,25 @@ class ImageSetTools
 		return Spot;
 	}
 	
-	/* Function to create a new set of image tags for the imageSet records */
+	/* Function to create a new set of image tags for the imageSet records
+		This version is for blank images.
+	*/
 	TagGroup createNewImageForImageSet(object self){
 		TagGroup imageData = newTagGroup(); // make blank labels
-		imageData.TagGroupCreateNewLabeledTag("ImageID") // Unique imageID number
-		imageData.TagGroupCreateNewLabeledTag("FileName") // Name of saved file if present.
-		imageData.TagGroupCreateNewLabeledTag("ImageMode")
-		imageData.TagGroupCreateNewLabeledTag("ImageType") // Options are DP, DF, BF, Bin
-		imageData.TagGroupCreateNewLabeledTag("ExposureTime")
-		imageData.TagGroupCreateNewLabeledTag("xTiltValue")
-		imageData.TagGroupCreateNewLabeledTag("yTiltValue")
-		imageData.TagGroupCreateNewLabeledTag("xTiltRelative")
-		imageData.TagGroupCreateNewLabeledTag("yTiltRelative")
-		imageData.TagGroupCreateNewLabeledTag("DSpacingAng")
-		imageData.TagGroupCreateNewLabeledTag("ShadowValue")
-		imageData.TagGroupCreateNewLabeledTag("ShadowDistance")		
+		imageData.TagGroupCreateNewLabeledTag("ImageID"); // Unique imageID number
+		imageData.TagGroupCreateNewLabeledTag("FileName"); // Name of saved file if present.
+		imageData.TagGroupCreateNewLabeledTag("ImageMode");
+		imageData.TagGroupCreateNewLabeledTag("ImageType"); // Options are DP, DF, BF, Bin
+		imageData.TagGroupCreateNewLabeledTag("ExposureTime");
+		imageData.TagGroupCreateNewLabeledTag("xTiltValue");
+		imageData.TagGroupCreateNewLabeledTag("yTiltValue");
+		imageData.TagGroupCreateNewLabeledTag("xTiltRelative");
+		imageData.TagGroupCreateNewLabeledTag("yTiltRelative");
+		imageData.TagGroupCreateNewLabeledTag("xShift");
+		imageData.TagGroupCreateNewLabeledTag("yShift");
+		imageData.TagGroupCreateNewLabeledTag("DSpacingAng");
+		imageData.TagGroupCreateNewLabeledTag("ShadowValue");
+		imageData.TagGroupCreateNewLabeledTag("ShadowDistance");
 		
 		imageData.TagGroupCreateNewLabeledTag("SavedAsFile") //<Has image been saved as a file? 0/1>
 		imageData.TagGroupSetTagAsNumber("SavedAsFile", 0 );
@@ -2740,7 +2722,7 @@ class ImageSetTools
 		imageData.TagGroupSetTagAsString("CreationTime", theTime );
 		
 		return imageData;
-	}
+	}	
 	
 	/* Get the currently open imageSet Taggroup. Returns 1/0 for success/fail */
 	number getCurrentImageSet(object self, TagGroup &targetImageSet){
@@ -3438,7 +3420,837 @@ class TiltValueDialog : uiframe
 	void changedValue(object self, tagGroup tg){ //Change method detects when a calibration factor is changed. tg is the source of the call
 		self.uploadFields();
 	}
-}// *******************************
+}
+
+
+// ********************************************************************************
+//  Class with Imaging controls.
+// ********************************************************************************
+// Taking this outside of Toolkit because it is getting crowded.
+// Insert this class before the toolkit.
+// Does NOT include image processing and offline functions.
+// This class is only for online camera use, and should not be called by offline functions.
+
+class CameraControl
+{
+	number CameraControlID; // the ID of this object
+	number ToolkitID; // the ID of the toolkit
+	number dataObjectID;
+	number imageSetToolsID;
+
+	number EMOnline; // Stores 1 if there is a microscope ready for use. 0 if not.
+	number AllowControl; // Only allow control of the microscope if there is a live view image. Is 0 or 1.
+	number debugMode;
+	
+	number cameraWidth, cameraHeight;
+	number binningMultiplier;
+	number DFExposure; // # of seconds to expose the camera for taking DarkField images.
+	number DPExposure; // # of seconds to expose the camera for taking Diffraction Pattern images.
+	number BFExposure; // # of seconds to expose the camera for taking BrightField images.
+	
+
+	void initialise(object self, number theToolkitID, number theDataObjectID, number theImageSetToolsID){
+		ToolkitID = theToolkitID;
+		dataObjectID = theDataObjectID;
+		imageSetToolsID = theImageSetToolsID;
+		
+		self.updateEMstatus(); // set the AllowControl variable asap.
+	}
+
+	void setDebugMode(object self, number input)
+	{
+		debugMode = input;
+		if(debugMode == 1){result("\n\tDebug Mode Activated in Camera Control Object");}
+	}
+	
+	
+	// Check if the microscope is online and if there is a Live View Image
+	void updateEMstatus(object self)
+	{
+		EMOnline = EMIsReady();
+		if(!EMOnline){
+			AllowControl = 0;
+		} else {
+			image viewImage
+			if(!returnViewImage(debugMode, viewImage)){
+				AllowControl = 0; //No View image, so no live camera control yet.
+			} else {
+				AllowControl = 1; // View window and microscope detected.
+			}
+		}
+	}
+	
+	// External functions can call this to see if they can use the microscope.
+	number getAllowControl(object self)
+	{
+		return AllowControl;
+	}
+
+	// Finds the camera width, height and binning multiplier. Should only run if camera is confirmed to exist.
+	// Returns 1/0 on success/failure
+	number storeCameraDetails(object self)
+	{
+		self.updateEMstatus();
+		if(AllowControl == 0){
+			result("\nLive Image not found. Camera details not stored.")
+			return 0;
+		}
+		
+		sscgetsize(cameraWidth, cameraHeight); // Get camera resolution
+		if(debugMode==1){result("\nCamera Resolution set to " + cameraWidth + " x " + cameraHeight);}
+		image ReferenceDP := sscUnprocessedAcquire(0.1,0,0,cameraWidth,cameraHeight);
+		if(debugMode){result("\n\tReference exposure created");}
+		GetScriptObjectFromID(dataObjectID).setReferenceDP(ReferenceDP);
+		if(debugMode){result("\n\tReference exposure added to toolkit data store.");}
+		
+		// Find binning by comparing raw camera width with view window width
+		image viewImage;
+		if(!returnViewImage(debugMode, viewImage)){
+			result("\nNo View Image detected when capturing Live View Window.")
+			return 0;
+		}
+		number viewWidth, viewHeight;
+		getSize(viewImage, viewWidth, viewHeight);
+		binningMultiplier = cameraWidth / viewWidth;
+		if(binningMultiplier < 1){
+			result("\nBinning Multiplier found to be out of range (<1). Setting multiplier to 1.")
+			binningMultiplier = 1;
+		}
+		GetScriptObjectFromID(dataObjectID).setBinningMultiplier(binningMultiplier);
+		if(debugMode==true){result("\n\tThe binning multiplier has been set to " + binningMultiplier);}
+		
+		return 1;
+	}
+	
+	number getCameraWidth(object self) {
+		return cameraWidth;
+	}
+	void setCameraWidth(object self, number newValue) {
+		cameraWidth = newValue;
+	}
+	
+	number getCameraHeight(object self) {
+		return cameraHeight;
+	}
+	void setCameraHeight(object self, number newValue) {
+		cameraHeight = newValue;
+	}
+
+	number getDFExposure(object self) {
+		return DFExposure;
+	}
+	void setDFExposure(object self, number newValue) {
+		DFExposure = newValue;
+	}
+
+	number getBFExposure(object self) {
+		return BFExposure;
+	}
+	void setBFExposure(object self, number newValue) {
+		BFExposure = newValue;
+	}
+
+	number getDPExposure(object self) {
+		return DPExposure;
+	}
+	void setDPExposure(object self, number newValue) {
+		DPExposure = newValue;
+	}
+
+	number getBinningMultiplier(object self){
+		return binningMultiplier;
+	}
+
+	
+		// constructor
+	CameraControl(object self){
+		CameraControlID = self.ScriptObjectGetID();
+	}
+	
+	// destructor
+	~CameraControl(object self){
+		if(debugMode == 1){result("\nCameraControl object deleted.");}
+	}
+}
+
+// ********************************************************************************
+//  Image Processing class.
+// ********************************************************************************
+// Taking this outside of Toolkit because it is getting crowded.
+// Insert this class before the toolkit.
+// Do not add any online-only functions. Used for data processing, not live imaging.
+
+// NOT updated to use image tags or image set data.
+
+class ImageProcessing
+{
+	number ImageProcessingID; // the ID of this object
+	number ToolkitID; // the ID of the toolkit
+	number dataObjectID;
+	number imageSetToolsID;
+	number imageAlignmentDialogID;
+
+	number debugMode;
+	
+
+	void initialise(object self, number theToolkitID, number theDataObjectID, number theImageSetToolsID, number theAlignmentDialogID){
+		ToolkitID = theToolkitID;
+		dataObjectID = theDataObjectID;
+		imageSetToolsID = theImageSetToolsID;
+		imageAlignmentDialogID = theAlignmentDialogID;
+	}
+
+	void setDebugMode(object self, number input)
+	{
+		debugMode = input;
+		if(debugMode == 1){result("\n\tDebug Mode Activated in Image Processing Object");}
+	}
+	
+	/* Finds the level of brightness needed to filter out the less bright pixels
+		Values to customize in this function:
+		targetPercentage = The % of total counts at which brightness is declared. e.g. 99 will return the brightness level that includes only the top 1% brightest pixels.
+	*/
+	number findBackgroundBrightness (object self, image thisImage, number targetPercentage)
+	{
+		string imageName = thisImage.ImageGetName()
+		if(debugMode==true){result("\nStarting background brightness search for top " + targetPercentage + "% brightest pixels in " + imageName + "... ");}
+		number imageHeight, imageWidth;
+		getSize(thisImage, imageWidth, imageHeight);
+		number minimum = floor(min(thisImage));
+		number maximum = ceil(max(thisImage));
+		number range = maximum - minimum;
+		minimum = round(minimum);
+		maximum = round(maximum);
+		number n = imageHeight * imageWidth;
+		if(debugMode==true){result("\nThis Image has " + n + " pixels ranging from " + minimum + " to " + maximum + " in brightness.");}
+		number justBlack; // do not count pixels if they are simply black because they have been added by the alignment system
+		image processImage = BinaryImage ("Checking for black pixels", imageWidth, imageHeight );
+		processImage = tert ( (thisImage == 0), 1, 0 );
+		justBlack = sum(processImage);
+		if(debugMode==true){result("\nThere are " + justBlack + " black pixels in the image. These will not be counted in the thresholding.");}
+		
+		number targetNumber = ((100 - targetPercentage) / 100) * (n - justBlack)
+		if(debugMode==true){result("\nTarget number of pixels for " + (100 - targetPercentage) + "% is " + targetNumber);}
+		number highLevel = maximum;
+		number lowLevel = minimum;
+		number found = 0;
+		number timeCheck = 0;
+		while( (found==0) && (timeCheck < 50) ){
+			number newLevel = floor(lowLevel + ( (highLevel - lowLevel) / 2 )); // half way between, but still integer
+			image processImage = BinaryImage ("Processing Level " + newLevel, imageWidth, imageHeight );
+			processImage = tert ( (thisImage > newLevel), 1, 0 );
+			number count = sum(processImage);
+			if(count >= targetNumber){
+				lowLevel = newLevel;
+			} else {
+				highLevel = newLevel;
+			}
+			if( (highLevel - lowLevel) <= 2){
+				found = 1;
+			}
+			timeCheck ++
+		}
+		if(debugMode==true){result("\nLevels found are " + lowLevel + " and " + highLevel);}
+		if(debugMode==true){result("\n" + targetPercentage + "% of the pixels are below " + highLevel + " in brightness.");}
+		if(debugMode==true){result(lowLevel);}
+		return lowLevel;
+	}
+	
+	
+	//****************************************************
+	// BINARY IMAGE PROCESSING FUNCTIONS
+	//****************************************************
+
+	// Returns a binary image that has been thresholded and despeckled.
+		// thisImage = input image
+		// targetPercentage = The percentage of the pixels that will be ignored, based on their brightness.
+			// e.g. 99 would select only the brightest 1% of pixels to appear on the map.
+	image levelAndDespeckleImage(object self, image thisImage, number targetPercentage)
+	{
+		image originalImage = thisImage; // make copy to avoid affecting original image
+		number xsize, ysize;
+		number xMin, yMin, xMax, yMax, minimum, maximum; // for debug
+		getSize(originalImage, xsize, ysize);
+		number dataType = ImageGetDataType( originalImage );
+		// the image should be the type directly from the microscope. Tthis is integer, 4 bytes, unsigned.
+		if(dataType!=7){
+			ImageChangeDataType(originalImage, 7);
+		}
+
+		// Find the brightness level to isolate the desired data.
+		number Threshold = self.findBackgroundBrightness(originalImage, targetPercentage);
+
+		image binImage = tert( ( originalImage > Threshold), 1 , 0 );
+		
+		ImageChangeDataType(binImage, 2); // change to real image to do median work for despeckle.
+		image despeckledImage = MedianFilter( binImage, 3, 3 );
+		
+		number despecThreshold = 0.34 // The threshold used to remove the speckles. 0.34 = needs 3 adjacent pixels
+		/* The mean of the nearest 9 pixels needs to be:
+			Sum of Pixels	Mean value
+				9				1
+				8				0.888
+				7				0.777
+				6				0.666
+				5				0.555
+				4				0.444
+				3				0.333
+				2				0.222
+				1				0.111
+				0				0
+		*/
+
+		image mapImage = tert( despeckledImage < despecThreshold, 0 , 1 );
+		ImageChangeDataType(mapImage, 14); // change to Binary image
+		return mapImage;
+	}
+
+	/* Function to convert binary image into RGBA image for editting by external software
+		The transparency does not work at the moment but I am using it anyway for possible future solutions.
+		Saves the image as a Gif file which is usually about 6Kb in size. Nice and small, and why I did not use Tiffs.
+	*/
+	void transparencyExport(object self, image &binaryImage, string saveDirectory)
+	{
+		number width, height;
+		GetSize(binaryImage, width, height);
+		string imageName = ImageGetName(binaryImage);
+		image transparencyImage = RGBImage( imageName, 4, width, height );
+		//RGBNumberExpression rgba( RealNumberExpression red, RealNumberExpression green, RealNumberExpression blue, RealNumberExpression alpha )
+		transparencyImage = rgba(binaryImage * 255, binaryImage * 255, binaryImage * 255, binaryImage * 255);
+		string filePath = PathConcatenate (saveDirectory, imageName );
+		SaveAsGif( transparencyImage, filePath );
+	}
+
+	/* Create a map using aligned binaries and an aligned bright field image. List all images by ID in an imageList*/
+	image createMap(object self, Taggroup imageList){
+		image originalBaseImage, image2;
+		if(!GetTwoImagesWithPrompt("Select the Bright Field Image", "Choose Base Image", originalBaseImage, image2 )){
+			exit(0);
+		}
+		number width, height, baseImageID;
+		baseImageID = originalBaseImage.ImageGetID();
+		GetSize(originalBaseImage, width, height);
+		string baseImageName = ImageGetName(originalBaseImage);
+		string mapImageName = baseImageName + " Composite Map";
+		image compositeImage = RGBImage( mapImageName, 4, width, height );
+		// Set thresholds using display settings for base image
+		imageDisplay baseImageDisplay = originalBaseImage.ImageGetImageDisplay(0);
+		number minCon, maxCon;
+		BaseImageDisplay.ImageDisplayGetContrastLimits(minCon, maxCon);
+		number range = maxCon-minCon;
+		number scaleFactor = 255 / range
+		result("\nMinCon = " + minCon + ", MaxCon = " + maxCon);
+		result("\nScale Factor = " + scaleFactor + ", Range = " + range);
+		image baseImage = tert( (originalBaseImage < minCon), minCon, originalBaseImage);
+		baseImage = tert( (originalbaseImage > maxCon), maxCon, baseImage);
+		baseImage = baseImage - minCon;
+		showImage(baseImage);
+		
+		compositeImage = rgb(baseImage*scaleFactor, baseImage*scaleFactor, baseImage*scaleFactor);
+		showImage(compositeImage);
+		result("\nmaking composite image map from a set of images...")
+		number totalImages = taggroupcounttags(imageList);
+		result("\n\tFound " + totalImages + " images.");
+		number i;
+		rgbNumber mapColor = rgb(255,0,0);
+		for(i=0; i < totalImages; i++){
+			number ImageID
+			TagGroupGetIndexedTagAsNumber( imageList, i, imageID );
+			if(ImageID == baseImageID){
+				continue; // It is the base image, ignore it.
+			}
+			image thisImage := GetImageFromID(ImageID);
+			string imageTitle = thisImage.GetName();
+			number dataType = ImageGetDataType( thisImage );
+			// the image should be a binary type. DM will open gifs as an integer image but not set it to binary automatically.
+			if(dataType!=14){
+				ImageChangeDataType(thisImage, 14); // change to Binary image
+			}
+			compositeImage = tert( (thisImage==1), mapColor, compositeImage );
+			compositeImage.SetName(mapImageName);
+			copyTags(compositeImage, originalBaseImage);
+			copyScale(compositeImage, originalBaseImage);
+		}
+		showImage(compositeImage);
+		result("\nComposite map generated.")
+	}
+	
+	/* This function creates a tag group to be processed further by other image processing functions.
+		returns DFList tag group formatted as so
+			DFList	:	UseImageID
+						BaseImage
+						Directory
+						Spot#### : 	HIGHER
+									MIDDLE
+									LOWER	
+	 */
+	TagGroup makeDFFileListGroup(object self)
+	{
+		string newDir;
+		TagGroup DFList = NewTagGroup();
+		if(!SaveAsDialog("","Press Save to select this directory", newDir))
+		{
+			throw("User cancelled operation: No directory selected");
+		}
+		
+		//string PathExtractDirectory( string path, number path_type )
+			// returns the directory portion of the given path according to the path_type parameter. The path_type variable should be 0.
+		newDir = PathExtractDirectory( newDir, 0 ); // newDir is now the directory path
+		if(debugMode==true){result("\nDirectory '" + newDir + "' selected.");}
+		TagGroupCreateNewLabeledTag( DFList, "Directory" ); // Creates the tag for the file directory
+		DFList.TagGroupSetTagAsString( "Directory" , newDir ); // sets the directory
+		TagGroupCreateNewLabeledTag( DFList, "UseImageID" ); // Creates the tag for UseImageID tag.
+		DFList.TagGroupSetTagAsNumber( "UseImageID" , 0 ); // Must be 0 since it is a file list looking in a directory.
+		TagGroupCreateNewLabeledTag( DFList, "ShadowMode" ); // Creates the tag for the shadowing mode. 0 = off, 1 = on.
+		
+		//TagGroup GetFilesInDirectory( string directory_name, number search_flags )
+			// returns a list of string tags with the files in directory_name.
+			// The search_flags parameter can be a 1 to include only files; 2 to include only directories; or 3 to include both files and directories.
+		TagGroup fileList = GetFilesInDirectory(newDir, 1);
+		// The tag list is indexed from 0 and each entry has an entry called "Name"
+		Number fileListLength = taggroupcounttags(fileList)
+		if(debugMode==true){result("\nLength of fileList: " + fileListLength);}
+		number i
+		string fileName
+		TagGroup fileGroup
+		for(i=0; i < fileListLength; i++){
+			if(debugMode==true){result("\nFile " + i + "...");}
+			// Boolean TagGroupGetIndexedTagAsTagGroup( TagGroup tagGroup, Number index, TagGroup subGroup )
+			fileList.TagGroupGetIndexedTagAsTagGroup(i, fileGroup )
+			fileGroup.TagGroupGetTagAsString( "Name", fileName )
+			if(debugMode==true){Result("\n\tFilename: " + fileName );}
+				//File Name format: DarkField_####_[HIGHER/LOWER]_[#######]_[######]_[#####].dm#
+			number stringLength = fileName.len()
+			number namePartOneIndex = fileName.find("_"); // DarkField or BrightField
+			string namePartOne = fileName.left(namePartOneIndex);
+			if(debugMode==true){result("\n\tName part one: " + namePartOne);}
+			namePartOne = namePartOne.StringToLower();
+			if(namePartOne == "brightfield"){
+				if(debugMode==true){result("\n\tBrightfield image detected.");}
+				TagGroupCreateNewLabeledTag( DFList, "BaseImage" );
+				DFList.TagGroupSetTagAsString( "BaseImage" , fileName );
+				continue;
+			}
+			if(namePartOne == "dp"){
+				if(debugMode==true){result("\n\tDiffraction Pattern image detected.");}
+				continue;
+			}
+			if(namePartOne != "darkfield"){
+				if(debugMode==true){result("\n\tUnknown image detected.");}
+				continue;
+			}
+			string namePartTwo = fileName.right(stringLength - namePartOneIndex - 1); // Get rid of first part
+			if(debugMode==true){result("\n\tName part two (first step): " + namePartTwo);}
+			number namePartTwoIndex = namePartTwo.find("_"); // The Spot ID number (should be 4 characters)
+			if(debugMode==true){result("\n\tName part two (index): " + namePartTwoIndex);}
+			if(namePartTwoIndex == -1){
+				namePartTwoIndex = namePartTwo.find(".");
+			}
+			namePartTwo = namePartTwo.left(namePartTwoIndex);
+			if(debugMode==true){result("\n\tSpotID: " + namePartTwo);} // This is the Spot ID
+			string namePartThree	// Could be HIGHER_.../LOWER_... or just "dm3"
+			namePartThree = fileName.right(stringLength - namePartOneIndex - namePartTwoIndex - 2); // Get rid of the other parts
+			if(debugMode==true){result("\n\tName part three (first step): " + namePartThree);}
+			number namePartThreeIndex = namePartThree.find("_");
+			if(debugMode==true){result("\n\tName part three (index): " + namePartThreeIndex);}
+			if(namePartThreeIndex == -1){ //No '_' detected.
+				namePartThreeIndex = namePartThree.find(".");
+				if(namePartThreeIndex == -1){ //No '.' detected.
+					// namePartThreeIndex = ""; // is blank
+				} else {
+					namePartThree = namePartThree.left(namePartThreeIndex);
+				}
+			}
+			if(debugMode==true){result("\n\tPart 3: " + namePartThree);}
+			
+			// Record the information in a tag group of the format:
+			// 	DFList:Spot####:Higher/Lower/Middle (#### is spot ID)
+			string tagPath = "Spot" + namePartTwo
+			if(!TagGroupDoesTagExist( DFList, tagPath )){
+				// Is higher or lower, so add to list to multiply.
+				TagGroup SpotGroup = NewTagGroup(); // the tagGroup that will hold this data and then be attached to the DFList.
+				TagGroupCreateNewLabeledTag( SpotGroup, "LOWER" ); // Creates the tag for LOWER data
+				TagGroupCreateNewLabeledTag( SpotGroup, "HIGHER" ); // Creates the tag for HIGHER data
+				TagGroupCreateNewLabeledTag( SpotGroup, "MIDDLE" ); // Creates the tag for MIDDLE data
+				TagGroupAddLabeledTagGroup( DFList, tagPath, SpotGroup );
+			}
+			
+			if(namePartThree.left(1).StringToLower() == "h"){
+				DFList.TagGroupSetTagAsString( (tagPath + ":HIGHER") , fileName ); // sets the filename within the HIGHER/LOWER tag
+			}
+			else if(namePartThree.left(1).StringToLower() == "l")
+			{
+				DFList.TagGroupSetTagAsString( (tagPath + ":LOWER") , fileName ); // sets the filename within the HIGHER/LOWER tag
+			}
+			else
+			{
+				DFList.TagGroupSetTagAsString( (tagPath + ":MIDDLE") , fileName ); // sets the MIDDLE tag
+			}
+		}
+		// Set the shadowing mode by looking for Higher / Lower images
+		number shadowMode = 0;
+		number shadowCount = taggroupcounttags(DFList)
+		for(i=0; i < shadowCount; i++){
+			string tagPath
+			string filePath
+			string shadowLabel = DFList.TagGroupGetTagLabel( i )
+			if(shadowLabel.left(4) == "Spot"){
+				tagPath = shadowLabel + ":LOWER"
+				DFList.TagGroupGetTagAsString(tagPath, filePath);
+				if(filePath != "0"){
+					result("\nShadow Images Confirmed.")
+					shadowMode = 1;
+					break;
+				}
+			}
+		}
+		DFList.TagGroupSetTagAsNumber( "ShadowMode" , shadowMode );
+		if(debugMode==true){DocumentWindow tagViewWindow = TagGroupOpenBrowserWindow( DFList, 0 );} // Used to check on the Tag group when debugging
+		// The taggroup DFList now contains the files that need to be multiplied together.
+		return DFList;
+	}
+
+	/* This function will take a TagGroup of stored images and then process them based on the input arguments.
+		The input TagGroup is the output of makeDFFileListGroup()
+		useShadowImages 0/1 - use the shadowing method. This will only use the higher/lower images of a darkfield set. If 0 it will only use the Middle images.
+		makeBinaries 0/1 - Run the levelAndDespeckleImage() function on the images before addition or multiplication. If set to 0 it assumes the input images are all ready binaries.
+		targetPercentage - number. The % of the dimmest pixels to be removed. 99 is generally used. Is the input for levelAndDespeckleImage function.
+		DisplayImages 0/1 - show binary images on screen after processing
+		SaveImages 0/1/2 - 	2 = Will automatically save binary images, shadow images and summed images to a directory.
+							1 = Will save binaries and summed images (not individual shadowed binaries)
+							0 = Will not save anything
+			If DisplayImages and SaveImages are both 0 then only the sum total image will be returned and the others will be lost.
+		ExportImages 0/1/2 - 	0 = no additional action
+								1 = save any binary images that are saved in gatan format in gif format as well.
+								2 = save ALL binary images produced as gif format as well.
+		debugMode 0/1 - Lots of feedback.
+		
+	*/
+	image processDarkFieldImages(object self, TagGroup DFList, number useShadowImages, number makeBinaries, number targetPercentage,\
+			number DisplayImages, number SaveImages, number ExportImages ){
+		if( ( DisplayImages != 1) && ( DisplayImages != 0 ) ){
+			throw("DisplayImages parameter not set correctly");
+		}
+		if( ( SaveImages != 1) && ( SaveImages != 0 ) && ( SaveImages != 2) ){
+			throw("SaveImages parameter not set correctly");
+		}
+		if( ( makeBinaries != 1) && ( makeBinaries != 0 ) ){
+			throw("makeBinaries parameter not set correctly");
+		}
+		if( ( useShadowImages != 1) && ( useShadowImages != 0 ) ){
+			throw("useShadowImages parameter not set correctly");
+		}
+		if( ( targetPercentage < 0) || ( targetPercentage > 100 ) ){
+			throw("targetPercentage parameter not set correctly");
+		}
+		result("\nProcessing a set of Darkfield Images.");
+		if(debugMode==true){
+			result("Parameters set as:" + \
+			"\n\tuseShadowImages: " + useShadowImages + \
+			"\n\tmakeBinaries: "+ makeBinaries + \
+			"\n\ttargetPercentage: "+ targetPercentage + \
+			"\n\tDisplayImages: " + DisplayImages + \
+			"\n\tSaveImages: " + SaveImages);
+		}
+
+		number UseImageID; // 0/1 for if the images are referenced with file paths or imageID numbers.
+		DFList.TagGroupGetTagAsNumber("UseImageID", UseImageID);
+		if(debugMode==true){result("\n\tUseImageID: " + UseImageID);}
+		string directory;
+		DFList.TagGroupGetTagAsString("Directory", directory);
+		if(debugMode==true){result("\n\tDirectory selected: " + directory);} // Directory can be used for just saving if not loading
+		string saveDirectory; // directory to save the images in.
+		string subdirectoryName; // subdirectory to save processed images inside.
+		subdirectoryName = (useShadowImages == 1) ? ("shadowed_" + constructTimeStamp()) : ("Not_shadowed_" + constructTimeStamp());
+		if((SaveImages != 0) || (ExportImages != 0)){ // will need to make a subdirectory
+			saveDirectory = PathConcatenate ( directory, subdirectoryName )
+			createDirectory(saveDirectory);
+		}	
+		
+		/* This part needs fixing to not use the raw camera size. */
+		
+		number cameraWidth, cameraHeight;
+		sscgetsize(cameraWidth, cameraHeight);
+		
+		image binarySum; // image that each binary image will be added to.
+		binarySum = IntegerImage( "Binary Sum", 1, 0, cameraWidth, cameraHeight );
+		binarySum.ImageSetName("Binary Sum " + constructTimeStamp());
+		string binarySumFileName, binarySumFilePath
+
+		number totalSpots, i;
+		totalSpots = taggroupcounttags(DFList);
+		
+		image RefIm;
+		number RefImStored = 0; // save an image for later use.
+		
+		// Go to each 'Spot' set.
+		for(i=0;i<totalSpots;i++)
+		{
+			image binaryImage;
+			String label = DFList.TagGroupGetTagLabel( i ); // Will be of format Spot#### if a spot set.
+			if(label.left(4) != "Spot"){
+				if(debugMode==true){result("\n" + label + " is not a spot set");}
+				continue;
+			}
+			string tagPathToLower = label + ":LOWER"; // will be of format: ID or file path
+			string tagPathToHigher = label + ":HIGHER";
+			string tagPathToMiddle = label + ":MIDDLE";
+			
+			if(debugMode==true){
+				result("\ntagPathToLower: " + tagPathToLower);
+				result("\ntagPathToHigher: " + tagPathToHigher);
+				result("\ntagPathToMiddle: " + tagPathToMiddle);
+			}
+			
+			if(useShadowImages==1){
+				// Reference the two images to multiply together.
+				image higherImage, lowerImage;
+				if(UseImageID){
+					number imageIDLower, imageIDHigher;
+					imageIDLower = DFList.TagGroupGetTagAsNumber(tagPathToLower, imageIDLower);
+					imageIDHigher = DFList.TagGroupGetTagAsNumber(tagPathToHigher, imageIDHigher);
+					
+					lowerImage = GetImageFromID( imageIDLower );
+					higherImage = GetImageFromID( imageIDHigher );
+					if(lowerImage.ImageIsValid() == 0){
+						throw("Lower Image not found by ID");
+					}
+					if(higherImage.ImageIsValid() == 0){
+						throw("Higher Image not found by ID");
+					}
+				}
+				else // Use filepaths
+				{
+					string lowerImagePath, higherImagePath;
+					DFList.TagGroupGetTagAsString(tagPathToLower, lowerImagePath);
+					DFList.TagGroupGetTagAsString(tagPathToHigher, higherImagePath);
+					lowerImagePath = PathConcatenate( directory, lowerImagePath);
+					higherImagePath = PathConcatenate( directory, higherImagePath);
+					if(debugMode==true){result("\nLower File: " + lowerImagePath);}
+					if(debugMode==true){result("\nHigher File: " + higherImagePath);}
+					
+					higherImage := OpenImage ( higherImagePath );
+					lowerImage := OpenImage ( lowerImagePath );
+					if(lowerImage.ImageIsValid() == 0){
+						throw("Lower Image not found by File Path");
+					}
+					if(higherImage.ImageIsValid() == 0){
+						throw("Higher Image not found by File Path");
+					}
+				}
+				// Store an image if needed for referencing later.
+				if(!RefImStored){
+					RefIm = higherImage;
+					RefImStored = 1;
+				}
+				if(makeBinaries){ // Images need making into binaries first.
+					lowerImage := self.levelAndDespeckleImage(lowerImage, targetPercentage);
+					higherImage := self.levelAndDespeckleImage(higherImage, targetPercentage);
+				}
+				lowerImage.ImageSetName(label + "_binary_lower")
+				higherImage.ImageSetName(label + "_binary_higher")
+				binaryImage = tert( ( ( lowerImage == 1 ) && ( higherImage == 1 ) ), 1, 0 );
+				binaryImage.ImageSetName(label + "_binary_shadowed");
+				copyTags(binaryImage, lowerImage);
+				ImageChangeDataType(binaryImage, 14); // change to Binary image
+				if(debugMode==true){
+					result("\n\tImages made into Binaries and shadowed.");
+				}
+				if(DisplayImages==1){ // Show the binary images on the screen. Contrast needs setting to avoid blankness
+					showImage(lowerImage);
+					showImage(higherImage);
+					showImage(binaryImage);
+					ImageDisplay lowerImageDisplay = ImageGetImageDisplay( lowerImage, 0 )
+					ImageDisplay higherImageDisplay = ImageGetImageDisplay( higherImage, 0 )
+					ImageDisplay binaryImageDisplay = ImageGetImageDisplay( binaryImage, 0 )
+					lowerImageDisplay.ImageDisplaySetContrastLimits(0,1);
+					higherImageDisplay.ImageDisplaySetContrastLimits(0,1);
+					binaryImageDisplay.ImageDisplaySetContrastLimits(0,1);
+				}
+				if(SaveImages != 0){ // save the images to the listed subdirectory unless set to 0
+					string binaryFileName, binaryFilePath, lowerFileName, lowerFilePath, higherFileName, higherFilePath;
+					binaryFileName = label + "_binary_shadowed"
+					binaryFilePath = PathConcatenate ( saveDirectory, binaryFileName )
+					SaveAsGatan(binaryImage, binaryFilePath);
+					if(SaveImages == 2){
+						lowerFileName = label + "_binary_lower"
+						lowerFilePath = PathConcatenate ( saveDirectory, lowerFileName )
+						SaveAsGatan(lowerImage, lowerFilePath);
+						higherFileName = label + "_binary_higher"
+						higherFilePath = PathConcatenate ( saveDirectory, higherFileName )
+						SaveAsGatan(higherImage, higherFilePath);
+					}
+				}
+				if(ExportImages != 0){
+					self.transparencyExport(binaryImage, saveDirectory)
+					if(ExportImages == 2){
+						self.transparencyExport(lowerImage, saveDirectory)
+						self.transparencyExport(higherImage, saveDirectory)
+					}
+				}
+			}
+			else 
+			{ // Image is not to use the shadowing feature, so just use the middle image
+				image middleImage;
+				if(UseImageID){
+					number imageID
+					DFList.TagGroupGetTagAsNumber(tagPathToMiddle, imageID);
+					middleImage = GetImageFromID( imageID );
+					if(middleImage.ImageIsValid() == 0){
+						throw("Image not found by ID method");
+					}
+				}
+				else // Use filepaths
+				{
+					string ImagePath;
+					DFList.TagGroupGetTagAsString(tagPathToMiddle, ImagePath);
+					ImagePath = PathConcatenate( directory, ImagePath);
+					if(debugMode==true){result("\nImage File: " + ImagePath);}
+					
+					middleImage := OpenImage ( ImagePath );
+					if(middleImage.ImageIsValid() == 0){
+						throw("Image not found by File Path method");
+					}
+				}
+				// Store an image if needed for referencing later.
+				if(!RefImStored){
+					RefIm = middleImage;
+					RefImStored = 1;
+				}
+				if(makeBinaries){ // Image needs making into binary first.
+					middleImage := self.levelAndDespeckleImage(middleImage, targetPercentage);
+				}
+				binaryImage := middleImage;
+				binaryImage.ImageSetName(label + "_binary_no_shadow");
+				if(DisplayImages){
+					showImage(middleImage);
+					ImageDisplay middleImageDisplay = ImageGetImageDisplay( middleImage, 0 )
+					middleImageDisplay.ImageDisplaySetContrastLimits(0,1);
+				}
+				if(SaveImages){ // save the images to the listed subdirectory unless set to 0
+					string binaryFileName, binaryFilePath;
+					binaryFileName = label + "_binary_no_shadow"
+					binaryFilePath = PathConcatenate ( saveDirectory, binaryFileName );
+					SaveAsGatan(middleImage, binaryFilePath);
+				}
+				if(ExportImages){
+					self.transparencyExport(binaryImage, saveDirectory)
+				}	
+			}
+			// The images will all be added together, regardless of the parameters.
+			binarySum = binarySum + binaryImage;
+		} // end of loop
+		copyTags(binarySum, RefIm);
+		
+		string binarySumTitle = (useShadowImages != 0) ? "Sum_from_Shadows" : "Sum_from_Middle" ;
+		binarySum.ImageSetName(binarySumTitle);
+		if(SaveImages){
+			binarySumFileName = binarySumTitle
+			binarySumFilePath = PathConcatenate ( saveDirectory, binarySumFileName )
+			SaveAsGatan(binarySum, binarySumFilePath);
+		}
+		if(DisplayImages){
+			showImage(binarySum);
+		}
+		if(ExportImages){
+			self.transparencyExport(binarySum, saveDirectory);
+		}
+		return binarySum;
+	}
+
+	/* Function to make binary images out of a generic image list */
+	void binaryAllImages(object self, TagGroup imageList, number targetPercentage, number ExportImages, string saveDirectory){
+		result("\nmaking binaries of a set of images...")
+		number totalImages = taggroupcounttags(imageList);
+		result("\n\tFound " + totalImages + " images.");
+		number i;
+		for(i=0; i < totalImages; i++){
+			number ImageID
+			TagGroupGetIndexedTagAsNumber( imageList, i, imageID );
+			image thisImage := GetImageFromID(ImageID);
+			string imageTitle = thisImage.GetName();
+			image binaryImage :=  self.levelAndDespeckleImage(thisImage, targetPercentage);
+			showImage(binaryImage);
+			binaryImage.ImageSetName(imageTitle + " binary");
+			if(ExportImages){
+				self.transparencyExport(binaryImage , saveDirectory);
+			}
+		}
+		result("\nAll Images processed.");
+	}
+
+	/* Function to align an entire directory */
+	void alignAllImages(object self, TagGroup imageList){
+		result("\nAligning a set of images...")
+		number totalImages = taggroupcounttags(imageList);
+		result("\n\tFound " + totalImages + " images.");
+		number i;
+		number maxXShift, maxYShift, minXShift, minYShift;
+		image xShiftImage := IntegerImage( "xShift Array", 4, 1, totalImages, 1);
+		image yShiftImage := IntegerImage( "yShift Array", 4, 1, totalImages, 1);
+		image image2, baseImage;
+		if(!GetTwoImagesWithPrompt( "Select the Base Image to compare all others to", "Base Image Selection", baseImage, image2) ){
+			exit(0);
+		}
+		string baseImageTitle = baseImage.GetName();
+		
+		for(i=0; i < totalImages; i++){
+			number ImageID
+			TagGroupGetIndexedTagAsNumber( imageList, i, imageID );
+			image thisImage := GetImageFromID(ImageID);
+			string imageTitle = thisImage.GetName();
+			if(imageTitle == baseImageTitle){
+				continue;
+			}
+			number offsetX, offsetY;
+			if(! GetScriptObjectFromID(imageAlignmentDialogID).alignTwoImages(thisImage, baseImage, offsetX, offsetY)){
+				// User pressed Cancel. Stop everything.
+				return;
+			}
+			xShiftImage.setPixel(i, 0, -offsetX);
+			yShiftImage.setPixel(i, 0, -offsetY);
+		}
+		result("\nAll Images aligned. Making aligned image set...");
+		//Find the maximum shift values.
+		ImageCalculateMinMax( xShiftImage, 0, 0, minXShift, maxXShift );
+		if(debugMode==true){result("\n\tmaxXShift = " + maxXShift + "\n\tminXShift = " + minXShift);}
+		ImageCalculateMinMax( yShiftImage, 0, 0, minYShift, maxYShift );
+		if(debugMode==true){result("\n\tmaxYShift = " + maxYShift + "\n\tminYShift = " + minYShift);}
+		
+		// minX/YShifts need to be either 0 or the largest -ve number.
+		// maxX/YShifts need to be either 0 or the largest +ve number
+		maxXShift = tert( (maxXShift >= 0), maxXShift, 0 );
+		minXShift = tert( (minXShift <= 0), minXShift, 0 );
+		maxYShift = tert( (maxYShift >= 0), maxYShift, 0 );
+		minYShift = tert( (minYShift <= 0), minYShift, 0 );
+		
+		for(i=0; i < totalImages; i++){
+			number ImageID, XShift, YShift, xSize, ySize;
+			TagGroupGetIndexedTagAsNumber( imageList, i, imageID );
+			XShift = getPixel( xShiftImage, i, 0 );
+			YShift = getPixel( yShiftImage, i, 0 );
+			image thisImage := GetImageFromID(ImageID);
+			string imageTitle = thisImage.GetName();
+			result("\n\tProcessing " + imageTitle)
+			GetSize(thisImage, xSize, ySize);
+			image alignedImage :=  GetScriptObjectFromID(imageAlignmentDialogID).createAlignedImage (thisImage, minXShift, minYShift, maxXShift, maxYShift, XShift, YShift);
+			showImage(alignedImage);
+		}
+	}
+	
+	
+		// constructor
+	ImageProcessing(object self){
+		ImageProcessingID = self.ScriptObjectGetID();
+	}
+	
+	// destructor
+	~ImageProcessing(object self){
+		if(debugMode == 1){result("\nImageProcessing object deleted.");}
+	}
+}
+
+// *******************************
 // SHORTCUT KEYS
 // *******************************
 
@@ -3623,6 +4435,11 @@ class MyKeyHandler
 // TOOLKIT FUNCTIONS & CLASS
 //****************************************************
 
+// Contains the dialog that acts as the main control interface for the toolkit.
+// This is the highest level object, with the other objects contained inside it. When this one closes, they all go out of scope.
+// Currently has a lot of functions that make use of the child objects, rather than putting them in their own classes.
+// The Image-taking functions in particular need to be seperated out for ease of management.
+
 class CreateDF360DialogClass : uiframe
 {
 	number ToolkitID; // the ID of this object
@@ -3641,6 +4458,10 @@ class CreateDF360DialogClass : uiframe
 	number scaleCalibrationDialogID;
 	object tiltCalibrationDialog;
 	number tiltCalibrationDialogID;
+	object CameraControlObject;
+	number CameraControlObjectID;
+	object ImageProcessingObject;
+	number ImageProcessingObjectID;
 	component markerRing;
 	component ringRadiusText;
 	
@@ -3659,26 +4480,6 @@ class CreateDF360DialogClass : uiframe
 			"\nimageAlignmentDialogID: " + imageAlignmentDialogID + " and " + (imageAlignmentDialog.ScriptObjectIsValid() ? "is" : "is not") + " valid";
 		result(textstring);
 		result("\n-------End----------------")
-	}
-	
-	// Check if the microscope is online or not. Do not allow control of the microscope if not.
-	void updateEMstatus(object self)
-	{
-		EMOnline = EMIsReady();
-		if(!EMOnline){
-			AllowControl = 0;
-		}
-	}
-	
-	// External functions can call this to see if they can use the microscope.
-	number getAllowControl(object self)
-	{
-		return AllowControl;
-	}
-	
-	number getToolkitID(object self)
-	{
-		return ToolkitID;
 	}
 	
 	/* Stores the dataObject */
@@ -3770,10 +4571,38 @@ class CreateDF360DialogClass : uiframe
 		return tiltCalibrationDialogID;
 	}
 	
+	/* Store the Camera Control object */
+	void storeCameraControlObject(object self, object theCameraControlObject)
+	{
+		CameraControlObject = theCameraControlObject;
+		CameraControlObjectID = CameraControlObject.ScriptObjectGetID();
+		CameraControlObject.initialise(ToolkitID, dataObjectID, imageSetToolsID); // Tell the object who it belongs to
+		CameraControlObject.setDebugMode(debugMode);
+	}
+	number getCameraControlObjectID(object self)
+	{
+		return CameraControlObjectID;
+	}
+	
+	/* Store the Image Processing object */
+	void storeImageProcessingObject(object self, object theImageProcessingObject)
+	{
+		ImageProcessingObject = theImageProcessingObject;
+		ImageProcessingObjectID = ImageProcessingObject.ScriptObjectGetID();
+		ImageProcessingObject.initialise(ToolkitID, dataObjectID, imageSetToolsID, imageAlignmentDialogID); // Tell the object who it belongs to
+		ImageProcessingObject.setDebugMode(debugMode);
+	}
+	number getImageProcessingObjectID(object self)
+	{
+		return ImageProcessingObjectID;
+	}
+	
+	
 	/* Function to draw the lines on the View Window used to centre the beam and pick spots.
 		If updateToolkit = 1, Adds the ring marker and stores it in the toolkit.
 		Also creates a text component to update with ring diameter.
 	*/
+	
 	void drawReticle(object self, image targetImage, number updateToolkit)
 	{
 		number centrex, centreY, radius, width, height;
@@ -3880,29 +4709,23 @@ class CreateDF360DialogClass : uiframe
 	/* Code run to link an active View image / window to the Toolkit and set up short cut keys and things. */
 	void captureViewScreen (object self)
 	{
-		self.updateEMstatus();
-		if(!EMOnline){
-			result("\n-------------No Microscope Detected.-----------------")
+		CameraControlObject.updateEMstatus();
+		if(CameraControlObject.getAllowControl() == 0){
+			result("\nNo Control Permitted. Ensure a live view window is active.")
 			exit(0);
 		}
-		dataObject.setCentreTiltHere();
+		dataObject.setCentreTiltHere(); // set this here to avoid false tilt values.
 		if(debugMode){result("\nCapturing View Window...");}
-		number cameraWidth, cameraHeight;
-		sscgetsize(cameraWidth, cameraHeight); // Get camera resolution
-		dataObject.setCameraHeight(cameraHeight);
-		dataObject.setCameraWidth(cameraWidth);
-		if(debugMode==1){result("\nCamera Resolution set to " + dataObject.getCameraWidth() + " x " + dataObject.getCameraHeight());}
-		image ReferenceDP := sscUnprocessedAcquire(0.1,0,0,cameraWidth,cameraHeight);
-		if(debugMode){result("\n\tReference exposure created");}
-		dataObject.setReferenceDP(ReferenceDP);
-		if(debugMode){result("\n\tReference exposure added to toolkit data store.");}
+		if(CameraControlObject.storeCameraDetails() == 0){  // Stores camera width, height and binning multiplier.
+			result("\nError finding camera information.");
+			exit(0);		
+		}
 		
 		image viewImage;
 		if(!returnViewImage(debugMode, viewImage)){
-			result("\nNo View Image detected in capture code.")
+			result("\nNo View Image detected when capturing Live View Window.")
 			exit(0);
 		}
-		AllowControl = 1;
 		self.drawReticle(viewImage, 1);
 		if(debugMode==1){result("\n\tReticle added to View window.");}
 		
@@ -3920,12 +4743,8 @@ class CreateDF360DialogClass : uiframe
 		string scaleString = ImageGetDimensionUnitString( viewImage, 0 )
 		dataObject.setOriginalScaleString(scaleString);
 		if(debugMode==1){result("\n\tThe View window scale was initially set to " + dataObject.getOriginalScale() + " " + dataObject.getOriginalScaleString());}
-		number viewWidth, viewHeight;
-		getSize(viewImage, viewWidth, viewHeight);
-		number binning = cameraWidth / viewWidth;
-		dataObject.setBinningMultiplier(binning);
-		if(debugMode==1){result("\n\tThe binning multiplier has been set to " + dataObject.getBinningMultiplier());}
-		if(debugMode){result("\nView Window Capture complete");}
+		
+		if(debugMode==true){result("\nView Window Capture complete");}
 		return;
 	}
 		
@@ -3946,6 +4765,15 @@ class CreateDF360DialogClass : uiframe
 		if(imageAlignmentDialog.ScriptObjectIsValid()){
 			imageAlignmentDialog.setDebugMode(debugMode);
 		}
+		if(scaleCalibrationDialog.ScriptObjectIsValid()){
+			scaleCalibrationDialog.setDebugMode(debugMode);
+		}
+		if(tiltCalibrationDialog.ScriptObjectIsValid()){
+			tiltCalibrationDialog.setDebugMode(debugMode);
+		}
+		if(ImageSetTools.ScriptObjectIsValid()){
+			ImageSetTools.setDebugMode(debugMode);
+		}
 	}
 	
 	/* Function to centre beam */
@@ -3954,7 +4782,7 @@ class CreateDF360DialogClass : uiframe
 			number centreXTilt = dataObject.getCentreXTilt();
 			number centreYTilt = dataObject.getCentreYTilt();
 			moveBeamTilt ( centreXTilt, centreYTilt );
-			}
+		}
 	}	
 	
 	/* Function to change the Tilt to centre on a marked ROI point */
@@ -4415,22 +5243,29 @@ class CreateDF360DialogClass : uiframe
 	 
 	/* Function to store tilt values and record the spot for later recall
 		shadowDistance = distance from the central point (in 1/nm) to perform shadowing. 0 = no shadowing.
-		storeTiltOnly (0 or 1) if 1, the function will store the tilt values and then stop without any imaging.
+		saveImages (0/1) will auto-save the images to the auto-save directory
+		displayImages(0/1) will show the images created on the screen.
+			If saveImages and displayImages are set to 0 then storeTiltOnly variable will switch to 0
 	*/
-	void storeTiltCoord (object self, number shadowDistance, number storeTiltOnly) {
+	void storeTiltCoord (object self, number shadowDistance, number saveImages, number displayImages) {
 		// Check to see if the EM is in diffraction mode.
 		if ( (EMGetImagingOpticsMode() == "SAMAG") || (EMGetImagingOpticsMode() == "IMAGING")  || (EMGetImagingOpticsMode() == "MAG1") || (EMGetImagingOpticsMode() == "MAG2")) {
 			if (!ContinueCancelDialog( "Switch to diffraction mode before continuing." )){
 				Throw( "User aborted process." );
 			}
-		}			
+		}
+		number storeTiltOnly = 0;
+		if(saveImages == 0 && displayImages == 0){
+			storeTiltOnly = 1;
+		}
 		Number xTilt, yTilt;
 		EMGetBeamTilt(xTilt, yTilt); //Get the current tilt values.
 		
 		number xTiltCenter = dataObject.getCentreXTilt();
 		number yTiltCenter = dataObject.getCentreYTilt();
+		number spotTracker = dataObject.getSpotTracker();
 		number tracker = dataObject.getTracker();
-		number DPExposure = dataObject.getDPExposure();
+		number DPExposure = CameraControlObject.getDPExposure();
 		image dataArray := dataObject.getDataArray();
 		image ReferenceDP = dataObject.getReferenceDP();
 		
@@ -4441,19 +5276,15 @@ class CreateDF360DialogClass : uiframe
 			positionDebugWindow(debugMode);
 		}
 		
-		setpixel(dataArray, tracker, 0, tracker); // spotID
-		setpixel(dataArray, tracker, 1, xTilt); // xTilt value
-		setpixel(dataArray, tracker, 2, yTilt); // yTilt value
-		
 		number xTiltRelative, yTiltRelative; // tilt values relative to centre tilt
 		xTiltRelative = xTilt - xTiltCenter;
 		yTiltRelative = yTilt - yTiltCenter;
-		setpixel(dataArray, tracker, 3, xTiltRelative);
-		setpixel(dataArray, tracker, 4, yTiltRelative);
 		
 		TagGroup spot = ImageSetTools.addSpotToCurrentImageSet(); // The 1-3 images here will be placed inside the spot group
+		spotTracker = spotTracker + 1;
 		
 		TagGroup image1Data = imageSetTools.createNewImageForImageSet();
+		tracker = tracker + 1
 		image1Data.TagGroupSetTagAsString("ImageType", "DP");
 		image1Data.TagGroupSetTagAsNumber("ExposureTime", dataObject.getDPExposure());
 		image1Data.TagGroupSetTagAsNumber("xTiltRelative", xTiltRelative);
@@ -4467,21 +5298,16 @@ class CreateDF360DialogClass : uiframe
 		
 		/* old file name generation system is old. adapt it to use the tag lists */
 		string fileName, spotID, filePath, timeString;
-		if(shadowDistance==0){ // SpotID just increases by one each time
-			spotID = PadWithZeroes(tracker,4);
-		} else {
-			number SpotIDNumber;
-			SpotIDNumber = ceil(tracker / 3)
-			spotID = PadWithZeroes(SpotIDNumber,4);
-		}
 		timeString = constructTimeStamp();
+		fileName = "DP_" + spotTracker + "_" + timeString + "_MIDDLE";
 		
-		if(storeTiltOnly == false) // The image creation + storage parts can be ignored if parameter is set to true.
+		
+		if(storeTiltOnly == false) // The image creation + storage parts can be ignored if storeTiltOnly parameter is set to true.
 		{
 			// Take new exposure for comparison of pixel movement.
 			number cameraWidth, cameraHeight;
-			cameraWidth = dataObject.getCameraWidth();
-			cameraHeight = dataObject.getCameraHeight();
+			cameraWidth = CameraControlObject.getCameraWidth();
+			cameraHeight = CameraControlObject.getCameraHeight();
 			
 			// Wait for the image to stabilize after moving.
 			number OSTickCount = GetOSTickCount();
@@ -4491,14 +5317,13 @@ class CreateDF360DialogClass : uiframe
 			}
 			image newDPImage := sscUnprocessedAcquire(DPExposure,0,0,cameraWidth,cameraHeight);
 
-			// image1Data.TagGroupSetTagAsNumber("UniqueImageID", ); Not sure how unique image ID works.
-			
 			// Compare to reference image
 			//findImageShift(image refIm, image newIm, number &XShift, number &YShift)
 			number XShift, YShift;
 			findImageShift(referenceDP, newDPImage, XShift, YShift, debugMode);
-			setpixel(dataArray, tracker, 5, XShift);
-			setpixel(dataArray, tracker, 6, YShift);
+			image1Data.TagGroupSetTagAsNumber("xShift", xShift);
+			image1Data.TagGroupSetTagAsNumber("yShift", yShift);
+			
 			// Convert the distance travelled to 1/nm
 			number pixelDistance = distance(XShift, YShift);
 			number scaleX = dataObject.getRefScale();
@@ -4506,12 +5331,7 @@ class CreateDF360DialogClass : uiframe
 			image1Data.TagGroupSetTagAsNumber("DSpacingAng", convertInverseNMToAngstrom(realDistance));
 			
 			if(debugMode==true){Result( "\nPattern Distance Shift (1/nm): " + realDistance);}
-			// Make a name for the file based on spotID.
-			// An image is saved each time a coordinate is taken for later reference.
-			// The spotID will link across scripts and references.
-			// The format DP_SpotID_NNNN_timestamp is to be used to make auto-save directories read nicely and not write over previous images accidentally.
-
-			fileName = "DP_" + spotID + "_" + timeString;
+			if(debugMode==true){Result( "\nPattern Distance Shift (Angstroms): " + convertInverseNMToAngstrom(realDistance));}
 			
 			// Add the real distance as text in the image
 			// Add the pixel shift as text in the image
@@ -4528,33 +5348,37 @@ class CreateDF360DialogClass : uiframe
 			ImageDisplay imgDisplay = newDPImage.ImageGetImageDisplay(0)
 			imgDisplay.componentaddchildatend(textannot);
 			ImageDocument thisImageDocument = ImageGetOrCreateImageDocument( newDPImage );
-			// Save or show the copied image.
-			if(debugMode==false)
-				{
-					string fileDirectory = GetApplicationDirectory("auto_save", 0);
-					filePath = PathConcatenate(fileDirectory, fileName);
-					image1Data.TagGroupSetTagAsString("FileName", fileName);
-					image1Data.TagGroupSetTagAsNumber("SavedAsFile", 1);
-					self.drawReticle(newDPImage, 0);
-					self.cleanReticle(newDPImage);
-					SaveAsGatan( newDPImage, filePath );
+			
+			self.drawReticle(newDPImage, 0);
+			self.cleanReticle(newDPImage);
+			
+			if(saveImages == true) // If saving the image to hard disk...
+			{
+				string fileDirectory = GetApplicationDirectory("auto_save", 0);
+				filePath = PathConcatenate(fileDirectory, fileName);
+				image1Data.TagGroupSetTagAsString("FileName", fileName);
+				image1Data.TagGroupSetTagAsNumber("SavedAsFile", 1);
+				SaveAsGatan( newDPImage, filePath );
+				result("\nSaved tilt DP as " + fileName);
+			} else { // If not saving the image...
+				image1Data.TagGroupSetTagAsNumber("SavedAsFile", 0);
+			}
+			if(displayImages == true) // If displaying the image...
+			{
+				if(debugMode==true){
 					ImageDocumentClean(thisImageDocument); // So the window can be closed without asking to be saved
-					closeImage(newDPImage);
-					positionDebugWindow(debugMode);
-					result("\nStored Tilt " + fileName);
-				} 
-				else
-				{
-					image1Data.TagGroupSetTagAsNumber("SavedAsFile", 0);
-					ImageDocumentClean(thisImageDocument); // So the window can be closed without asking to be saved
-					ImageDocumentShow(thisImageDocument); // Display the image document.
-					result("\nStore Tilt Function run for " + fileName + ". Tilt value stored (" + xTilt + ", " + yTilt + ")");
-					self.drawReticle(newDPImage, 0);
-					self.cleanReticle(newDPImage); // Makes it editable.
-					positionDebugWindow(debugMode); // Return the View window to the front
+					// Not set by default to avoid accidentally closing the images.
 				}
+				result("\nDiffraction Pattern recorded for " + fileName + ". Tilt value stored (" + xTilt + ", " + yTilt + ")");
+				positionDebugWindow(debugMode); // Return the View window to the front
+			} else { // If not displaying the image, close it.
+				ImageDocumentClean(thisImageDocument); // So the window can be closed without asking to be saved
+				CloseImage(newDPImage);
+			}
 		}
 
+		// For images with Shadowing activated...
+		
 		if(shadowDistance!=0)
 		{
 			//void tiltToPixel(dataObject, number xTilt, number yTilt, number &xPixelShift, number &yPixelShift, number isViewWindow)
@@ -4577,25 +5401,20 @@ class CreateDF360DialogClass : uiframe
 			if(debugMode==true){result("\n\tShadowYShift (tilt) = " + shadowYshift);}
 			
 			string fileNameHigher, fileNameLower
-			fileNameHigher = "DP_" + spotID + "_" + timeString + "_HIGHER";
-			fileNameLower = "DP_" + spotID + "_" + timeString + "_LOWER";
+			fileNameHigher = "DP_" + spotTracker + "_" + timeString + "_HIGHER";
+			fileNameLower = "DP_" + spotTracker + "_" + timeString + "_LOWER";
 			
 			EMChangeTilt(shadowXshift, shadowYshift);
 			if(debugMode==1){result("\n\tBeam tilt moved to 1st shadow point.");}
 			// Store new beam tilt.
 			EMGetBeamTilt(xTilt, yTilt)
-			tracker = tracker + 1
 			xTiltRelative = xTilt - xTiltCenter;
 			yTiltRelative = yTilt - yTiltCenter;
-			setpixel(dataArray, tracker, 0, tracker); // spotID
-			setpixel(dataArray, tracker, 1, xTilt); // xTilt value
-			setpixel(dataArray, tracker, 2, yTilt); // yTilt value
-			setpixel(dataArray, tracker, 3, xTiltRelative); // relative xTilt value
-			setpixel(dataArray, tracker, 4, yTiltRelative); // relative yTilt value
 			
 			TagGroup image2Data = imageSetTools.createNewImageForImageSet();
+			tracker = tracker + 1
 			image2Data.TagGroupSetTagAsString("ImageType", "DP");
-			image2Data.TagGroupSetTagAsNumber("ExposureTime", dataObject.getDPExposure());
+			image2Data.TagGroupSetTagAsNumber("ExposureTime", DPExposure);
 			image2Data.TagGroupSetTagAsNumber("xTiltRelative", xTiltRelative);
 			image2Data.TagGroupSetTagAsNumber("yTiltRelative", yTiltRelative);
 			image2Data.TagGroupSetTagAsNumber("xTiltValue", xTilt);
@@ -4604,46 +5423,86 @@ class CreateDF360DialogClass : uiframe
 			image2Data.TagGroupSetTagAsNumber("ShadowValue", 2);
 			imageSetTools.addImageDataToCurrentSpot(image2Data, "Higher");
 			
-			if(debugMode==true){result("\n\tStored as Tracker value " + tracker);}
-			
 			number OSTickCount = GetOSTickCount();
 			number OSTicksPerSecond = GetOSTicksPerSecond();
 			number targetTick = OSTickCount + (OSTicksPerSecond * DPExposure);
 			if(debugMode==true){result("\n\tTickCount = " + OSTickCount + "  TicksperSec = " + OSTicksPerSecond);}
 			ImageDocument higherDPView, lowerDPView
+			
 			if(storeTiltOnly != true)
 			{
 				// Wait for one second to let the ccd be exposed
 				while( targetTick > GetOSTickCount()){	// Do nothing
 				}
-				// Update the view image display
-				image viewImage;
-				if(!returnViewImage(debugMode, viewImage)){
-					result("View Image not found. This error should never happen.")
-					exit(0);
-				}
-				UpdateImage( viewImage );
-				ImageDocument higherDPView, viewImageDocument;
-				if(!returnViewImageDocument(debugMode, viewImageDocument)){
-					result("\nImage Document not detected. This error should not be possible.");
-					exit(0);
-				}
-				higherDPView = ImageDocumentClone( ViewImageDocument, 1 );
-				ImageDocumentSetName( higherDPView, fileNameHigher ); // Label the new image with the point name.
-				ImageDocumentShow(higherDPView)
-				higherDPView.ImageDocumentClean(); // So it can be closed easily
-				if(debugMode != true){
+
+				number cameraWidth, cameraHeight;
+				cameraWidth = CameraControlObject.getCameraWidth();
+				cameraHeight = CameraControlObject.getCameraHeight();
+				image newDPImage := sscUnprocessedAcquire(DPExposure,0,0,cameraWidth,cameraHeight);
+
+				// Compare to reference image
+				//findImageShift(image refIm, image newIm, number &XShift, number &YShift)
+				number XShift, YShift;
+				findImageShift(referenceDP, newDPImage, XShift, YShift, debugMode);
+				image2Data.TagGroupSetTagAsNumber("xShift", xShift);
+				image2Data.TagGroupSetTagAsNumber("yShift", yShift);
+				
+				// Convert the distance travelled to 1/nm
+				number pixelDistance = distance(XShift, YShift);
+				number scaleX = dataObject.getRefScale();
+				number realDistance = pixelDistance * scaleX;
+				image2Data.TagGroupSetTagAsNumber("DSpacingAng", convertInverseNMToAngstrom(realDistance));
+				
+				if(debugMode==true){Result( "\nPattern Distance Shift (1/nm): " + realDistance);}
+				if(debugMode==true){Result( "\nPattern Distance Shift (Angstroms): " + convertInverseNMToAngstrom(realDistance));}
+				
+				// Add the real distance as text in the image
+				// Add the pixel shift as text in the image
+				string textString = "D-Spacing: " + realDistance + " (1/nm)" + "\nPixel Shift: (" + XShift + ", " + YShift + ")";
+				// Add text annotations and set their colour, display mode and font
+				component textannot=newtextannotation(10,10, textString, 64);
+				textannot.componentsetfillmode(2);
+				textannot.componentsetdrawingmode(2);
+				textannot.componentsetforegroundcolor(1,0,0);
+				textannot.componentsetbackgroundcolor(0,0,0);
+				textannot.componentsetfontfacename("Microsoft Sans Serif");
+				
+				showImage(newDPImage) // Images needs to be shown to give it an ImageDisplay, which is needed for attaching components.
+				ImageDisplay imgDisplay = newDPImage.ImageGetImageDisplay(0)
+				imgDisplay.componentaddchildatend(textannot);
+				ImageDocument thisImageDocument = ImageGetOrCreateImageDocument( newDPImage );
+				
+				self.drawReticle(newDPImage, 0);
+				self.cleanReticle(newDPImage);
+				
+				if(saveImages == true) // If saving the image to hard disk...
+				{
 					string fileDirectory = GetApplicationDirectory("auto_save", 0);
 					filePath = PathConcatenate(fileDirectory, fileNameHigher);
-					ImageDocumentSaveToFile( higherDPView, "Gatan Format", filePath);
-					higherDPView.imageDocumentClose(0);
 					image2Data.TagGroupSetTagAsString("FileName", fileNameHigher);
 					image2Data.TagGroupSetTagAsNumber("SavedAsFile", 1);
-				} else {
+					SaveAsGatan( newDPImage, filePath );
+					result("\nSaved tilt DP as " + fileNameHigher);
+				} else { // If not saving the image...
 					image2Data.TagGroupSetTagAsNumber("SavedAsFile", 0);
+				}
+				if(displayImages == true) // If displaying the image...
+				{
+					if(debugMode==true){
+						ImageDocumentClean(thisImageDocument); // So the window can be closed without asking to be saved
+						// Not set by default to avoid accidentally closing the images.
+					}
+					result("\nDiffraction Pattern shown for " + fileNameHigher + ". Tilt value stored (" + xTilt + ", " + yTilt + ")");
+					positionDebugWindow(debugMode); // Return the View window to the front
+				} else { // If not displaying the image, close it.
+					ImageDocumentClean(thisImageDocument); // So the window can be closed without asking to be saved
+					CloseImage(newDPImage);
+					result("\nDiffraction Pattern recorded for " + fileNameHigher + ". Tilt value stored (" + xTilt + ", " + yTilt + ")");
 				}
 			}
 			
+			// Second shadowing point
+		
 			EMChangeTilt((-2 * shadowXshift), (-2 * shadowYshift));
 			if(debugMode==1){result("\n\tBeam tilt moved to 2nd shadow point.");}
 			// Store new beam tilt
@@ -4651,13 +5510,9 @@ class CreateDF360DialogClass : uiframe
 			tracker = tracker + 1
 			xTiltRelative = xTilt - xTiltCenter;
 			yTiltRelative = yTilt - yTiltCenter;
-			setpixel(dataArray, tracker, 0, tracker); // spotID
-			setpixel(dataArray, tracker, 1, xTilt); // xTilt value
-			setpixel(dataArray, tracker, 2, yTilt); // yTilt value
-			setpixel(dataArray, tracker, 3, xTiltRelative); // relative xTilt value
-			setpixel(dataArray, tracker, 4, yTiltRelative); // relative yTilt value
 			
 			TagGroup image3Data = imageSetTools.createNewImageForImageSet();
+			tracker = tracker + 1
 			image3Data.TagGroupSetTagAsString("ImageType", "DP");
 			image3Data.TagGroupSetTagAsNumber("ExposureTime", dataObject.getDPExposure());
 			image3Data.TagGroupSetTagAsNumber("xTiltRelative", xTiltRelative);
@@ -4668,44 +5523,84 @@ class CreateDF360DialogClass : uiframe
 			image3Data.TagGroupSetTagAsNumber("ShadowValue", 3);
 			imageSetTools.addImageDataToCurrentSpot(image3Data, "Lower");
 			
-			if(debugMode==1){result("\n\tStored as Tracker value " + tracker);}
 			if(storeTiltOnly != 1)
 			{
 				OSTickCount = GetOSTickCount();
 				number targetTick = OSTickCount + (OSTicksPerSecond * DPExposure);
 				while( targetTick > GetOSTickCount())	{ // Do nothing
 				}
-				image viewImage;
-				if(!returnViewImage(debugMode, viewImage)){
-					result("View Image not found. This error should never happen.")
-					exit(0);
-				}
-				UpdateImage( ViewImage );
-				ImageDocument lowerDPView, viewImageDocument;
-				if(!returnViewImageDocument(debugMode, viewImageDocument)){
-					result("\nImage Document not detected. This error should not be possible.");
-					exit(0);
-				}
-				lowerDPView = ImageDocumentClone( ViewImageDocument, 1 );
-				ImageDocumentSetName( lowerDPView, fileNameLower ); // Label the new image with the point name.
-				ImageDocumentShow(lowerDPView)
-				lowerDPView.ImageDocumentClean(); // So it can be closed easily
-				if(debugMode==0)
+				number cameraWidth, cameraHeight;
+				cameraWidth = CameraControlObject.getCameraWidth();
+				cameraHeight = CameraControlObject.getCameraHeight();
+				image newDPImage := sscUnprocessedAcquire(DPExposure,0,0,cameraWidth,cameraHeight);
+				
+				// Compare to reference image
+				//findImageShift(image refIm, image newIm, number &XShift, number &YShift)
+				number XShift, YShift;
+				findImageShift(referenceDP, newDPImage, XShift, YShift, debugMode);
+				image3Data.TagGroupSetTagAsNumber("xShift", xShift);
+				image3Data.TagGroupSetTagAsNumber("yShift", yShift);
+				
+				// Convert the distance travelled to 1/nm
+				number pixelDistance = distance(XShift, YShift);
+				number scaleX = dataObject.getRefScale();
+				number realDistance = pixelDistance * scaleX;
+				image3Data.TagGroupSetTagAsNumber("DSpacingAng", convertInverseNMToAngstrom(realDistance));
+				
+				if(debugMode==true){Result( "\nPattern Distance Shift (1/nm): " + realDistance);}
+				if(debugMode==true){Result( "\nPattern Distance Shift (Angstroms): " + convertInverseNMToAngstrom(realDistance));}
+				
+				// Add the real distance as text in the image
+				// Add the pixel shift as text in the image
+				string textString = "D-Spacing: " + realDistance + " (1/nm)" + "\nPixel Shift: (" + XShift + ", " + YShift + ")";
+				// Add text annotations and set their colour, display mode and font
+				component textannot=newtextannotation(10,10, textString, 64);
+				textannot.componentsetfillmode(2);
+				textannot.componentsetdrawingmode(2);
+				textannot.componentsetforegroundcolor(1,0,0);
+				textannot.componentsetbackgroundcolor(0,0,0);
+				textannot.componentsetfontfacename("Microsoft Sans Serif");
+				
+				showImage(newDPImage) // Images needs to be shown to give it an ImageDisplay, which is needed for attaching components.
+				ImageDisplay imgDisplay = newDPImage.ImageGetImageDisplay(0)
+				imgDisplay.componentaddchildatend(textannot);
+				ImageDocument thisImageDocument = ImageGetOrCreateImageDocument( newDPImage );
+				
+				self.drawReticle(newDPImage, 0);
+				self.cleanReticle(newDPImage);
+				
+				if(saveImages == true) // If saving the image to hard disk...
 				{
 					string fileDirectory = GetApplicationDirectory("auto_save", 0);
 					filePath = PathConcatenate(fileDirectory, fileNameLower);
-					ImageDocumentSaveToFile( lowerDPView, "Gatan Format", filePath );
-					lowerDPView.imageDocumentClose(0);
 					image3Data.TagGroupSetTagAsString("FileName", fileNameLower);
 					image3Data.TagGroupSetTagAsNumber("SavedAsFile", 1);
-				} else {
+					SaveAsGatan( newDPImage, filePath );
+					result("\nSaved Diffraction Pattern for " + fileNameLower);
+				} else { // If not saving the image...
 					image3Data.TagGroupSetTagAsNumber("SavedAsFile", 0);
 				}
+				if(displayImages == true) // If displaying the image...
+				{
+					if(debugMode==true){
+						ImageDocumentClean(thisImageDocument); // So the window can be closed without asking to be saved
+						// Not set by default to avoid accidentally closing the images.
+					}
+					result("\nDiffraction Pattern shown for " + fileNameLower + ". Tilt value stored (" + xTilt + ", " + yTilt + ")");
+					positionDebugWindow(debugMode); // Return the View window to the front
+				} else { // If not displaying the image, close it.
+					ImageDocumentClean(thisImageDocument); // So the window can be closed without asking to be saved
+					CloseImage(newDPImage);
+					// No result here since it is not possible to neither saveImages or displayImages
+				}
+				
 			}
-			dataObject.setTracker(tracker + 1);
-		} else {
-			dataObject.setTracker(tracker + 1);
+			// All shadow images are now stored
 		}
+		// All images are now stored
+		dataObject.setTracker(tracker);
+		dataObject.setSpotTracker(spotTracker);
+
 	}
 
 	/* Will take a number of images of the DP moved to values in the list of stored points.
@@ -4739,15 +5634,27 @@ class CreateDF360DialogClass : uiframe
 		return;
 	}
 
-	/* Function to take a DF image by reading from the Data Array */
-	image takeDFImage (object self, number tracker, image dataArray, number xTiltCenter, number yTiltCenter,\
-			number DFExposure, number cameraWidth, number cameraHeight, number im ){
+	/* Function to take a DF image by reading from the ImageSet Tag group
+		imageSet - the image set Tag group to take data from
+		spotID - the spot number of the desired image
+		imageLabel - the label of the image to be taken. Usually "Higher/Lower/Middle"
+	*/
+	
+	image takeDFImage (object self, TagGroup imageSet, number spotID, string imageLabel, TagGroup &ImageTags ){
 
-		number xTiltTarget, yTiltTarget;
+		TagGroup DPImageTags;
+		// arguments: (TagGroup tagGroup, String tagPath, TagGroup subGroup )
+		string tagPath = "Spots:" + spotID + ":" + imageLabel;
+		imageSet.TagGroupGetTagAsTagGroup(tagPath, DPImageTags); // Loads the DP image information into this variable for reference.
+	
+		number xTiltTarget, yTiltTarget, relativeXTilt, relativeYTilt;
 		
-		// Read xTilt and yTilt from array
-		xTiltTarget = xTiltCenter + getpixel(dataArray, im, 3);
-		yTiltTarget = yTiltCenter + getpixel(dataArray, im, 4);
+		// Read relative xTilt and yTilt from array
+		relativeXTilt = DPImageTags.TagGroupGetTagAsNumber("xTiltRealtive");
+		relativeYTilt = DPImageTags.TagGroupGetTagAsNumber("yTiltRealtive");
+		
+		xTiltTarget = dataObject.getCentreXTilt() + relativeXTilt;
+		yTiltTarget = dataObject.getCentreYTilt() + relativeYTilt;
 		
 		// Move the beam tilt to this value.
 		moveBeamTilt(xTiltTarget,yTiltTarget);
@@ -4763,9 +5670,38 @@ class CreateDF360DialogClass : uiframe
 			}
 		}
 		
-		// Take the Dark field Image
+		// Take the  Image
+		number Exposure = CameraControl.getDFExposure();
 		image DFImage;
-		DFImage := sscUnprocessedAcquire(DFExposure,0,0,cameraWidth,cameraHeight);
+		DFImage := sscUnprocessedAcquire(Exposure,0,0,cameraWidth,cameraHeight);
+		
+		// Retrive values for image tags...
+		number shadowValue
+		number shadowDistance
+		number DSpacingAng
+		ImageSet.TagGroupGetTagAsNumber("ShadowValue", shadowValue);
+		ImageSet.TagGroupGetTagAsNumber("shadowDistance", shadowDistance);
+		ImageSet.TagGroupGetTagAsNumber("DSpacingAng", DSpacingAng);
+
+		// Create Image Tags...
+		ImageTags = ImageSetTools.createNewImageForImageSet();
+		// ImageTags.TagGroupSetTagAsNumber("ImageID"); // Unique imageID number
+		ImageTags.TagGroupSetTagAsString("ImageType", "DF");
+		ImageTags.TagGroupSetTagAsNumber("ExposureTime", Exposure);
+		ImageTags.TagGroupSetTagAsNumber("xTiltRelative", relativeXTilt);
+		ImageTags.TagGroupSetTagAsNumber("yTiltRelative", relativeYTilt);		
+		ImageTags.TagGroupSetTagAsNumber("xTiltValue", xTiltTarget);
+		ImageTags.TagGroupSetTagAsNumber("yTiltValue", yTiltTarget);		
+		ImageTags.TagGroupSetTagAsNumber("ShadowValue", shadowValue);
+		ImageTags.TagGroupSetTagAsNumber("ShadowDistance", shadowDistance);
+		ImageTags.TagGroupSetTagAsNumber("DSpacingAng", DSpacingAng);
+		
+		/* Still left to figure out...
+			SavedAsFile: 0/1
+			BFImageTags.TagGroupSetTagAsString("FileName"); // Name of saved file if present.
+			BFImageTags.TagGroupSetTagAsNumber("ImageMode");
+		*/
+
 		return DFImage;
 	}
 
@@ -4832,92 +5768,221 @@ class CreateDF360DialogClass : uiframe
 	}
 
 	/* Function will use the stored Tilt values to take darkfield images. 1st Image (0000) will be Bright Field of site.
-		shadowing = 0 / 1 for the shadowing mode.
-		integration = 0 / 1 for if the images should be integrated together
-		integrationDistance = number of DP to be integrated together before image is produced
+		ImageSet = the image set tag group
+		saveNonIntegrated = 0/1 for if non-integrated images should be saved as well as teh integrated images. Will take a lot more disk space.
+		displayNonIntegrated = 0/1 for if non-integrated images should be displayed. Will take a hell of a lot of RAM
+		saveImages = 0/1 for if images should be automatically saved
+		displayImages = 0/1 for if images should be displayed on screen or closed after use.
 	*/
-	void darkFieldImage (object self, number shadowing, number integration, number integrationDistance){
-		number tracker = dataObject.getTracker();
-		number DPExposure = dataObject.getDPExposure();
-		number DFExposure = dataObject.getDFExposure();
-		number BFExposure = dataObject.getBFExposure();
-		image dataArray = dataObject.getDataArray();
-		image ReferenceDP = dataObject.getReferenceDP();
-		image ROIList = dataObject.getROIList();
-		image startBFImage;
-		image integratedImage;
-		image sumImage;
-
-		number cameraWidth = dataObject.getCameraWidth();
-		number cameraHeight = dataObject.getCameraHeight();
+	number darkFieldImage (object self, TagGroup ImageSet, number saveNonIntegrated, number saveImages, number displayNonIntegrated, number displayImages){
+		if(saveImages == 0 && displayImages == 0){
+			throw("Images must be shown, saved or both.");
+		}
+		
+		number DPExposure = CameraControlObject.getDPExposure();
+		number DFExposure = CameraControlObject.getDFExposure();
+		number BFExposure = CameraControlObject.getBFExposure();
+		number cameraWidth = CameraControlObject.getCameraWidth();
+		number cameraHeight = CameraControlObject.getCameraHeight();
+		
 		number xTiltCenter = dataObject.getCentreXTilt();
 		number yTiltCenter = dataObject.getCentreYTilt();
 		
-		if(integration){
+		image ReferenceDP = dataObject.getReferenceDP();
+
+		image startBFImage;
+		image integratedImage;
+		image sumImage;
+		
+		if(debugMode==true){result("\nLoading the variables for this image set for DF imaging..");}
+		// Load values from the imageSet data
+		number integration
+		ImageSet.TagGroupGetTagAsNumber("IntegratedImage", integration);
+		if(debugMode==true){result("\n\t integration is " + integration);}
+		
+		number ringMode
+		ImageSet.TagGroupGetTagAsNumber("RingMode", ringMode);
+		if(debugMode==true){result("\n\t RingMode is " + RingMode);}
+		
+		number numberOfIntegrations
+		ImageSet.TagGroupGetTagAsNumber("NumberOfIntegrations", NumberOfIntegrations);
+		if(debugMode==true){result("\n\t NumberOfIntegrations is " + NumberOfIntegrations);}
+		
+		number degreeStep
+		ImageSet.TagGroupGetTagAsNumber("DegreeStep", DegreeStep);
+		if(debugMode==true){result("\n\t DegreeStep is " + DegreeStep);}
+		
+		number shadowDistance
+		ImageSet.TagGroupGetTagAsNumber("ShadowDistance", ShadowDistance);
+		if(debugMode==true){result("\n\t shadowDistance is " + shadowDistance);}
+		
+		if(integration == 1){
 			if(debugMode==true){result("\nCreating Integrated Images to populate...");}
-			integratedImage = RealImage( "Integrated Image 01", 4, cameraWidth, cameraHeight );
-			integratedImage = integratedImage * 0;
-			sumImage = RealImage( "Sum of all Integrals", 4, cameraWidth, cameraHeight );
-			sumImage = sumImage * 0;
+			middleIntegratedImage = RealImage( "Integrated Image Middle", 4, cameraWidth, cameraHeight );
+			middleIntegratedImage = middleIntegratedImage * 0;
+			higherIntegratedImage = RealImage( "Integrated Image Higher", 4, cameraWidth, cameraHeight );
+			higherIntegratedImage = higherIntegratedImage * 0;
+			lowerIntegratedImage = RealImage( "Integrated Image Lower", 4, cameraWidth, cameraHeight );
+			lowerIntegratedImage = lowerIntegratedImage * 0;
+			
+			middleSumImage = RealImage( "Sum of all middle", 4, cameraWidth, cameraHeight );
+			middleSumImage = middleSumImage * 0;
+			higherSumImage = RealImage( "Sum of all top", 4, cameraWidth, cameraHeight );
+			higherSumImage = higherSumImage * 0;
+			lowerSumImage = RealImage( "Sum of all lower", 4, cameraWidth, cameraHeight );
+			lowerSumImage = lowerSumImage * 0;
 		}
-		
-		if(debugMode==true){result("\nWorking on TagGroup...");}
-		TagGroup DFList = createDFList(tracker, shadowing, integration, integrationDistance);
-		/* Tag group format:
-		DFList	:	UseImageID
-					BaseImage
-					Directory
-					Spot#### : 	HIGHER
-								MIDDLE
-								LOWER
-		*/
-		
-		// Set the tag values
-		string Directory = GetApplicationDirectory("auto_save", 0);
-		DFList.TagGroupSetTagAsString( "Directory" , Directory ); // sets the directory	
-		if(debugMode==1){result("\n\tSave directory set.");}
-		DFList.TagGroupSetTagAsNumber( "UseImageID" , 1 ); // Is 1 since the images are being created now.
-		if(debugMode==1){result("\n\tUseImageID set to 1.");}
+
 		
 		Result("\n------------- Starting Dark Field Imaging Process ---------------\n");
-		result("\n" + tracker + " images to create, taking " + (DFExposure * tracker / 60) + " minutes.");
-		if(debugMode==1){dataObject.printSpotIDArray();}
+		result("\n" + tracker + " exposures to take, taking " + (DFExposure * tracker / 60) + " minutes.");
 		
 		if (!ContinueCancelDialog( "Insert the Objective Aperture and center it. Switch to Imaging Mode and check the Brightfield image before continuing." )){
 			throw("Aborted by User. No data changed.")
 		}
 		
-		// For each targetArrayImage point move the beam there and take an image.
-		number im, spotID, imageID;
-		for(im=0; im<tracker ;im++){
-			// Take the image
-			image DFImage := self.takeDFImage ( tracker, dataArray, xTiltCenter, yTiltCenter, DFExposure, cameraWidth, cameraHeight, im );
-			if(im==0){
-				startBFImage = DFImage;
+		// Create the first image, which will always be a bright field image of the region
+		number BFExposure = CameraControlObject.getBFExposure();
+		moveBeamTilt(xTiltCenter, yTiltCenter); // Move to the tilt coords
+		startBFImage := sscUnprocessedAcquire(BFExposure,0,0,cameraWidth,cameraHeight); // Image
+		
+		// Create image tags
+		TagGroup BFImageTags = ImageSetTools.createNewImageForImageSet();
+		if(ImageSetTools.addImageDataToCurrentImageSet(BFImageTags, "Middle") == 0){
+			result("\nSomething has gone wrong creating the image data for the BF image.")
+			return 0;
+		}
+		BFImageTags.TagGroupSetTagAsString("ImageType", "BF");
+		BFImageTags.TagGroupSetTagAsNumber("ExposureTime", BFExposure);
+		BFImageTags.TagGroupSetTagAsNumber("xTiltRelative", 0);
+		BFImageTags.TagGroupSetTagAsNumber("yTiltRelative", 0);		
+		BFImageTags.TagGroupSetTagAsNumber("xTiltValue", xTiltCenter);
+		BFImageTags.TagGroupSetTagAsNumber("yTiltValue", yTiltCenter);
+		BFImageTags.TagGroupSetTagAsNumber("ShadowValue", 1);
+		BFImageTags.TagGroupSetTagAsNumber("ShadowDistance", 0);
+		BFImageTags.TagGroupSetTagAsNumber("DSpacingAng", 0);
+		
+		/* Still left to figure out...
+		BFImageTags.TagGroupSetTagAsNumber("ImageID"); // Unique imageID number
+		BFImageTags.TagGroupSetTagAsString("FileName"); // Name of saved file if present.
+		BFImageTags.TagGroupSetTagAsString("ImageMode");
+		*/
+		
+		string fileName = "Brightfield_" + constructTimeStamp();
+		
+		if(saveImages == 1){
+			string fileDirectory = GetApplicationDirectory("auto_save", 0);
+			filePath = PathConcatenate(fileDirectory, fileName);
+			BFImageTags.TagGroupSetTagAsString("FileName", fileName);
+			BFImageTags.TagGroupSetTagAsNumber("SavedAsFile", 1);
+			SaveAsGatan( startBFImage, filePath );
+			result("\nSaved Brightfield image as " + filePath);
+		} else { // If not saving the image...
+			BFImageTags.TagGroupSetTagAsNumber("SavedAsFile", 0);
+		}
+		
+		if(displayImages == true) // If displaying the image...
+		{
+			showImage(startBFImage);
+		}
+		
+		TagGroup spots;
+		ImageSet.TagGroupGetTagAsTagGroup("Spots", spots);
+		number spotTotal = spots.TagGroupCountTags();
+		
+		number im
+		for(im=1; im < spotTotal ; im++){
+			TagGroup MiddleImageTags, HigherImageTags, LowerImageTags;			
+			// Take the middle image
+			image MiddleDFImage := self.takeDFImage (ImageSet, im, "Middle", MiddleImageTags);
+			image TopDFImage;
+			image BottomDFImage;
+			string TopTagPath = "Spots:" + im + ":Higher";
+			string BottomTagPath = "Spots:" + im + ":Lower";
+			if(ImageSet.TagGroupDoesTagExist(TopTagPath)){
+				TopDFImage := self.takeDFImage (ImageSet, im, "Higher", HigherImageTags);
 			}
-			// Get image data
-			imageID = DFImage.ImageGetID();
-			spotID = getpixel(dataArray, im, 0);
+			if(ImageSet.TagGroupDoesTagExist(BottomTagPath)){
+				BottomDFImage: = self.takeDFImage (ImageSet, im, "Lower", LowerImageTags);
+			}
 			
-			// Generate the filename to save the image with.
-			string fileName, filePath, longSpotID;
-			fileName = self.generateDFFileName(im, imageID, dataArray, DFList, shadowing, debugMode );
+			if(saveImages == true){
+				if((integration == 0) || (saveNonIntegrated == 1)){ // Does not save the integrated images. These must be done seperately.
+					fileName = ("DF_Spot_" + im + "_" + constructTimeStamp()) + "_MIDDLE"
+					string fileDirectory = GetApplicationDirectory("auto_save", 0);
+					filePath = PathConcatenate(fileDirectory, fileName);
+					MiddleImageTags.TagGroupSetTagAsString("FileName", fileName);
+					MiddleImageTags.TagGroupSetTagAsNumber("SavedAsFile", 1);
+					SaveAsGatan( MiddleDFImage, filePath );
+					
+					if(ImageSet.TagGroupDoesTagExist(TopTagPath)){
+						fileName = ("DF_Spot_" + im + "_" + constructTimeStamp()) + "_HIGHER"
+						string fileDirectory = GetApplicationDirectory("auto_save", 0);
+						filePath = PathConcatenate(fileDirectory, fileName);
+						HigherImageTags.TagGroupSetTagAsString("FileName", fileName);
+						HigherImageTags.TagGroupSetTagAsNumber("SavedAsFile", 1);
+						SaveAsGatan( TopDFImage, filePath );
+					}
+					if(ImageSet.TagGroupDoesTagExist(BottomTagPath)){
+						fileName = ("DF_Spot_" + im + "_" + constructTimeStamp()) + "_LOWER"
+						string fileDirectory = GetApplicationDirectory("auto_save", 0);
+						filePath = PathConcatenate(fileDirectory, fileName);
+						LowerImageTags.TagGroupSetTagAsString("FileName", fileName);
+						LowerImageTags.TagGroupSetTagAsNumber("SavedAsFile", 1);
+						SaveAsGatan( BottomDFImage, filePath );
+					}
+				}
+			} else { // If not saving the image...
+				MiddleImageTags.TagGroupSetTagAsNumber("SavedAsFile", 0);
+				if(ImageSet.TagGroupDoesTagExist(BottomTagPath)){
+					HigherImageTags.TagGroupSetTagAsNumber("SavedAsFile", 0);
+				}
+				if(ImageSet.TagGroupDoesTagExist(BottomTagPath)){
+					LowerImageTags.TagGroupSetTagAsNumber("SavedAsFile", 0);
+				}
+			}
+			
+			if(displayImages == true) // If displaying the images...
+			{
+				if((integration == 0) || (displayNonIntegrated == 1)){ // Does not show the integrated images. These must be done seperately.
+					showImage(MiddleDFImage);
+					if(ImageSet.TagGroupDoesTagExist(TopTagPath)){
+						showImage(TopDFImage);
+					}
+					if(ImageSet.TagGroupDoesTagExist(BottomTagPath)){
+						showImage(BottomDFImage);
+					}
+			}
 			
 			// If in Integrated image mode add it to the current integration image and display any completed integrated images.
 			if(integration==true){
-				integratedImage = integratedImage + DFImage;
-				result("\nIntegrating Exposure " + (im + 1) +" of " + tracker);
-				if((remainder(im, integrationDistance)==0) || (im == 0)){ // save this integrated image and start a new one.
-					sumImage = sumImage + integratedImage;
-					image newImage = integratedImage.ImageClone();
-					integratedImage.ImageSetName( "Integrated Image " + im );
+				middleIntegratedImage = middleIntegratedImage + MiddleDFImage;
+				higherIntegratedImage = higherIntegratedImage + TopDFImage;
+				lowerIntegratedImage = lowerIntegratedImage + BottomDFImage;
+				result("\nIntegrating Exposures " + im +" of " + spotTotal);
+				if(remainder(im, NumberOfIntegrations) == 0){ // save this integrated image and start a new one.
+					middleSumImage = middleSumImage + middleIntegratedImage;
+					middleIntegratedImage.ImageSetName( "Integrated Image " + im + " Middle" );
 					string fileDirectory = GetApplicationDirectory("auto_save", 0);
 					fileName = "Integrated Image " + im;
 					filePath = PathConcatenate(fileDirectory, fileName); // Construct the full file path for the save command.
 					SaveAsGatan(integratedImage, filePath);
-					result("\nIntegrated " + integrationDistance + " exposures into Integrated Image " + im);
+					result("\nIntegrated " + NumberOfIntegrations + " exposures into Integrated Image " + im);
 					integratedImage = integratedImage * 0; // Set old image to 0 for next integration sequence.
 					if(debugMode==true){OpenImage(filePath + ".dm3");} // Display the image as well if in debug mode.
+					
+					if(ImageSet.TagGroupDoesTagExist(TopTagPath)){
+						higherSumImage = higherSumImage + higherIntegratedImage;
+						
+						
+					}
+					if(ImageSet.TagGroupDoesTagExist(BottomTagPath)){
+						lowerSumImage = lowerSumImage + lowerIntegratedImage;
+						
+						
+					}
+					
+					
 				}
 			}
 			else { // Save the image as a Gatan file or display it if in debug mode.
@@ -5143,56 +6208,6 @@ class CreateDF360DialogClass : uiframe
 	// ENTIRE RING IMAGING FUNCTIONS
 	//****************************************************
 
-	/* Finds the level of brightness needed to filter out the less bright pixels
-		Values to customize in this function:
-		targetPercentage = The % of total counts at which brightness is declared. e.g. 99 will return the brightness level that includes only the top 1% brightest pixels.
-	*/
-	number findBackgroundBrightness (object self, image thisImage, number targetPercentage)
-	{
-		string imageName = thisImage.ImageGetName()
-		if(debugMode==true){result("\nStarting background brightness search for top " + targetPercentage + "% brightest pixels in " + imageName + "... ");}
-		number imageHeight, imageWidth;
-		getSize(thisImage, imageWidth, imageHeight);
-		number minimum = floor(min(thisImage));
-		number maximum = ceil(max(thisImage));
-		number range = maximum - minimum;
-		minimum = round(minimum);
-		maximum = round(maximum);
-		number n = imageHeight * imageWidth;
-		if(debugMode==true){result("\nThis Image has " + n + " pixels ranging from " + minimum + " to " + maximum + " in brightness.");}
-		number justBlack; // do not count pixels if they are simply black because they have been added by the alignment system
-		image processImage = BinaryImage ("Checking for black pixels", imageWidth, imageHeight );
-		processImage = tert ( (thisImage == 0), 1, 0 );
-		justBlack = sum(processImage);
-		if(debugMode==true){result("\nThere are " + justBlack + " black pixels in the image. These will not be counted in the thresholding.");}
-		
-		number targetNumber = ((100 - targetPercentage) / 100) * (n - justBlack)
-		if(debugMode==true){result("\nTarget number of pixels for " + (100 - targetPercentage) + "% is " + targetNumber);}
-		number highLevel = maximum;
-		number lowLevel = minimum;
-		number found = 0;
-		number timeCheck = 0;
-		while( (found==0) && (timeCheck < 50) ){
-			number newLevel = floor(lowLevel + ( (highLevel - lowLevel) / 2 )); // half way between, but still integer
-			image processImage = BinaryImage ("Processing Level " + newLevel, imageWidth, imageHeight );
-			processImage = tert ( (thisImage > newLevel), 1, 0 );
-			number count = sum(processImage);
-			if(count >= targetNumber){
-				lowLevel = newLevel;
-			} else {
-				highLevel = newLevel;
-			}
-			if( (highLevel - lowLevel) <= 2){
-				found = 1;
-			}
-			timeCheck ++
-		}
-		if(debugMode==true){result("\nLevels found are " + lowLevel + " and " + highLevel);}
-		if(debugMode==true){result("\n" + targetPercentage + "% of the pixels are below " + highLevel + " in brightness.");}
-		if(debugMode==true){result(lowLevel);}
-		return lowLevel;
-	}
-
 	 /* Function to return the radius of the marker ring in pixels for unbinned images */
 	 number markerRingRadius(object self)
 	 {
@@ -5376,583 +6391,7 @@ class CreateDF360DialogClass : uiframe
 		self.beamCentre();
 	}
  
-	//****************************************************
-	// BINARY IMAGE PROCESSING FUNCTIONS
-	//****************************************************
-
-	// Returns a binary image that has been thresholded and despeckled.
-		// thisImage = input image
-		// targetPercentage = The percentage of the pixels that will be ignored, based on their brightness.
-			// e.g. 99 would select only the brightest 1% of pixels to appear on the map.
-	image levelAndDespeckleImage(object self, image thisImage, number targetPercentage)
-	{
-		image originalImage = thisImage; // make copy to avoid affecting original image
-		number xsize, ysize;
-		number xMin, yMin, xMax, yMax, minimum, maximum; // for debug
-		getSize(originalImage, xsize, ysize);
-		number dataType = ImageGetDataType( originalImage );
-		// the image should be the type directly from the microscope. Tthis is integer, 4 bytes, unsigned.
-		if(dataType!=7){
-			ImageChangeDataType(originalImage, 7);
-		}
-
-		// Find the brightness level to isolate the desired data.
-		number Threshold = self.findBackgroundBrightness(originalImage, targetPercentage);
-
-		image binImage = tert( ( originalImage > Threshold), 1 , 0 );
-		
-		ImageChangeDataType(binImage, 2); // change to real image to do median work for despeckle.
-		image despeckledImage = MedianFilter( binImage, 3, 3 );
-		
-		number despecThreshold = 0.34 // The threshold used to remove the speckles. 0.34 = needs 3 adjacent pixels
-		/* The mean of the nearest 9 pixels needs to be:
-			Sum of Pixels	Mean value
-				9				1
-				8				0.888
-				7				0.777
-				6				0.666
-				5				0.555
-				4				0.444
-				3				0.333
-				2				0.222
-				1				0.111
-				0				0
-		*/
-
-		image mapImage = tert( despeckledImage < despecThreshold, 0 , 1 );
-		ImageChangeDataType(mapImage, 14); // change to Binary image
-		return mapImage;
-	}
-
-	/* Function to convert binary image into RGBA image for editting by external software
-		The transparency does not work at the moment but I am using it anyway for possible future solutions.
-		Saves the image as a Gif file which is usually about 6Kb in size. Nice and small, and why I did not use Tiffs.
-	*/
-	void transparencyExport(object self, image &binaryImage, string saveDirectory)
-	{
-		number width, height;
-		GetSize(binaryImage, width, height);
-		string imageName = ImageGetName(binaryImage);
-		image transparencyImage = RGBImage( imageName, 4, width, height );
-		//RGBNumberExpression rgba( RealNumberExpression red, RealNumberExpression green, RealNumberExpression blue, RealNumberExpression alpha )
-		transparencyImage = rgba(binaryImage * 255, binaryImage * 255, binaryImage * 255, binaryImage * 255);
-		string filePath = PathConcatenate (saveDirectory, imageName );
-		SaveAsGif( transparencyImage, filePath );
-	}
-
-	/* Create a map using aligned binaries and an aligned bright field image. List all images by ID in an imageList*/
-	image createMap(object self, Taggroup imageList){
-		image originalBaseImage, image2;
-		if(!GetTwoImagesWithPrompt("Select the Bright Field Image", "Choose Base Image", originalBaseImage, image2 )){
-			exit(0);
-		}
-		number width, height, baseImageID;
-		baseImageID = originalBaseImage.ImageGetID();
-		GetSize(originalBaseImage, width, height);
-		string baseImageName = ImageGetName(originalBaseImage);
-		string mapImageName = baseImageName + " Composite Map";
-		image compositeImage = RGBImage( mapImageName, 4, width, height );
-		// Set thresholds using display settings for base image
-		imageDisplay baseImageDisplay = originalBaseImage.ImageGetImageDisplay(0);
-		number minCon, maxCon;
-		BaseImageDisplay.ImageDisplayGetContrastLimits(minCon, maxCon);
-		number range = maxCon-minCon;
-		number scaleFactor = 255 / range
-		result("\nMinCon = " + minCon + ", MaxCon = " + maxCon);
-		result("\nScale Factor = " + scaleFactor + ", Range = " + range);
-		image baseImage = tert( (originalBaseImage < minCon), minCon, originalBaseImage);
-		baseImage = tert( (originalbaseImage > maxCon), maxCon, baseImage);
-		baseImage = baseImage - minCon;
-		showImage(baseImage);
-		
-		compositeImage = rgb(baseImage*scaleFactor, baseImage*scaleFactor, baseImage*scaleFactor);
-		showImage(compositeImage);
-		result("\nmaking composite image map from a set of images...")
-		number totalImages = taggroupcounttags(imageList);
-		result("\n\tFound " + totalImages + " images.");
-		number i;
-		rgbNumber mapColor = rgb(255,0,0);
-		for(i=0; i < totalImages; i++){
-			number ImageID
-			TagGroupGetIndexedTagAsNumber( imageList, i, imageID );
-			if(ImageID == baseImageID){
-				continue; // It is the base image, ignore it.
-			}
-			image thisImage := GetImageFromID(ImageID);
-			string imageTitle = thisImage.GetName();
-			number dataType = ImageGetDataType( thisImage );
-			// the image should be a binary type. DM will open gifs as an integer image but not set it to binary automatically.
-			if(dataType!=14){
-				ImageChangeDataType(thisImage, 14); // change to Binary image
-			}
-			compositeImage = tert( (thisImage==1), mapColor, compositeImage );
-			compositeImage.SetName(mapImageName);
-			copyTags(compositeImage, originalBaseImage);
-			copyScale(compositeImage, originalBaseImage);
-		}
-		showImage(compositeImage);
-		result("\nComposite map generated.")
-	}
 	
-	/* This function creates a tag group to be processed further by other image processing functions.
-		returns DFList tag group formatted as so
-			DFList	:	UseImageID
-						BaseImage
-						Directory
-						Spot#### : 	HIGHER
-									MIDDLE
-									LOWER	
-	 */
-	TagGroup makeDFFileListGroup(object self)
-	{
-		string newDir;
-		TagGroup DFList = NewTagGroup();
-		if(!SaveAsDialog("","Press Save to select this directory", newDir))
-		{
-			throw("User cancelled operation: No directory selected");
-		}
-		
-		//string PathExtractDirectory( string path, number path_type )
-			// returns the directory portion of the given path according to the path_type parameter. The path_type variable should be 0.
-		newDir = PathExtractDirectory( newDir, 0 ); // newDir is now the directory path
-		if(debugMode==true){result("\nDirectory '" + newDir + "' selected.");}
-		TagGroupCreateNewLabeledTag( DFList, "Directory" ); // Creates the tag for the file directory
-		DFList.TagGroupSetTagAsString( "Directory" , newDir ); // sets the directory
-		TagGroupCreateNewLabeledTag( DFList, "UseImageID" ); // Creates the tag for UseImageID tag.
-		DFList.TagGroupSetTagAsNumber( "UseImageID" , 0 ); // Must be 0 since it is a file list looking in a directory.
-		TagGroupCreateNewLabeledTag( DFList, "ShadowMode" ); // Creates the tag for the shadowing mode. 0 = off, 1 = on.
-		
-		//TagGroup GetFilesInDirectory( string directory_name, number search_flags )
-			// returns a list of string tags with the files in directory_name.
-			// The search_flags parameter can be a 1 to include only files; 2 to include only directories; or 3 to include both files and directories.
-		TagGroup fileList = GetFilesInDirectory(newDir, 1);
-		// The tag list is indexed from 0 and each entry has an entry called "Name"
-		Number fileListLength = taggroupcounttags(fileList)
-		if(debugMode==true){result("\nLength of fileList: " + fileListLength);}
-		number i
-		string fileName
-		TagGroup fileGroup
-		for(i=0; i < fileListLength; i++){
-			if(debugMode==true){result("\nFile " + i + "...");}
-			// Boolean TagGroupGetIndexedTagAsTagGroup( TagGroup tagGroup, Number index, TagGroup subGroup )
-			fileList.TagGroupGetIndexedTagAsTagGroup(i, fileGroup )
-			fileGroup.TagGroupGetTagAsString( "Name", fileName )
-			if(debugMode==true){Result("\n\tFilename: " + fileName );}
-				//File Name format: DarkField_####_[HIGHER/LOWER]_[#######]_[######]_[#####].dm#
-			number stringLength = fileName.len()
-			number namePartOneIndex = fileName.find("_"); // DarkField or BrightField
-			string namePartOne = fileName.left(namePartOneIndex);
-			if(debugMode==true){result("\n\tName part one: " + namePartOne);}
-			namePartOne = namePartOne.StringToLower();
-			if(namePartOne == "brightfield"){
-				if(debugMode==true){result("\n\tBrightfield image detected.");}
-				TagGroupCreateNewLabeledTag( DFList, "BaseImage" );
-				DFList.TagGroupSetTagAsString( "BaseImage" , fileName );
-				continue;
-			}
-			if(namePartOne == "dp"){
-				if(debugMode==true){result("\n\tDiffraction Pattern image detected.");}
-				continue;
-			}
-			if(namePartOne != "darkfield"){
-				if(debugMode==true){result("\n\tUnknown image detected.");}
-				continue;
-			}
-			string namePartTwo = fileName.right(stringLength - namePartOneIndex - 1); // Get rid of first part
-			if(debugMode==true){result("\n\tName part two (first step): " + namePartTwo);}
-			number namePartTwoIndex = namePartTwo.find("_"); // The Spot ID number (should be 4 characters)
-			if(debugMode==true){result("\n\tName part two (index): " + namePartTwoIndex);}
-			if(namePartTwoIndex == -1){
-				namePartTwoIndex = namePartTwo.find(".");
-			}
-			namePartTwo = namePartTwo.left(namePartTwoIndex);
-			if(debugMode==true){result("\n\tSpotID: " + namePartTwo);} // This is the Spot ID
-			string namePartThree	// Could be HIGHER_.../LOWER_... or just "dm3"
-			namePartThree = fileName.right(stringLength - namePartOneIndex - namePartTwoIndex - 2); // Get rid of the other parts
-			if(debugMode==true){result("\n\tName part three (first step): " + namePartThree);}
-			number namePartThreeIndex = namePartThree.find("_");
-			if(debugMode==true){result("\n\tName part three (index): " + namePartThreeIndex);}
-			if(namePartThreeIndex == -1){ //No '_' detected.
-				namePartThreeIndex = namePartThree.find(".");
-				if(namePartThreeIndex == -1){ //No '.' detected.
-					// namePartThreeIndex = ""; // is blank
-				} else {
-					namePartThree = namePartThree.left(namePartThreeIndex);
-				}
-			}
-			if(debugMode==true){result("\n\tPart 3: " + namePartThree);}
-			
-			// Record the information in a tag group of the format:
-			// 	DFList:Spot####:Higher/Lower/Middle (#### is spot ID)
-			string tagPath = "Spot" + namePartTwo
-			if(!TagGroupDoesTagExist( DFList, tagPath )){
-				// Is higher or lower, so add to list to multiply.
-				TagGroup SpotGroup = NewTagGroup(); // the tagGroup that will hold this data and then be attached to the DFList.
-				TagGroupCreateNewLabeledTag( SpotGroup, "LOWER" ); // Creates the tag for LOWER data
-				TagGroupCreateNewLabeledTag( SpotGroup, "HIGHER" ); // Creates the tag for HIGHER data
-				TagGroupCreateNewLabeledTag( SpotGroup, "MIDDLE" ); // Creates the tag for MIDDLE data
-				TagGroupAddLabeledTagGroup( DFList, tagPath, SpotGroup );
-			}
-			
-			if(namePartThree.left(1).StringToLower() == "h"){
-				DFList.TagGroupSetTagAsString( (tagPath + ":HIGHER") , fileName ); // sets the filename within the HIGHER/LOWER tag
-			}
-			else if(namePartThree.left(1).StringToLower() == "l")
-			{
-				DFList.TagGroupSetTagAsString( (tagPath + ":LOWER") , fileName ); // sets the filename within the HIGHER/LOWER tag
-			}
-			else
-			{
-				DFList.TagGroupSetTagAsString( (tagPath + ":MIDDLE") , fileName ); // sets the MIDDLE tag
-			}
-		}
-		// Set the shadowing mode by looking for Higher / Lower images
-		number shadowMode = 0;
-		number shadowCount = taggroupcounttags(DFList)
-		for(i=0; i < shadowCount; i++){
-			string tagPath
-			string filePath
-			string shadowLabel = DFList.TagGroupGetTagLabel( i )
-			if(shadowLabel.left(4) == "Spot"){
-				tagPath = shadowLabel + ":LOWER"
-				DFList.TagGroupGetTagAsString(tagPath, filePath);
-				if(filePath != "0"){
-					result("\nShadow Images Confirmed.")
-					shadowMode = 1;
-					break;
-				}
-			}
-		}
-		DFList.TagGroupSetTagAsNumber( "ShadowMode" , shadowMode );
-		if(debugMode==true){DocumentWindow tagViewWindow = TagGroupOpenBrowserWindow( DFList, 0 );} // Used to check on the Tag group when debugging
-		// The taggroup DFList now contains the files that need to be multiplied together.
-		return DFList;
-	}
-
-	/* This function will take a TagGroup of stored images and then process them based on the input arguments.
-		The input TagGroup is the output of makeDFFileListGroup()
-		useShadowImages 0/1 - use the shadowing method. This will only use the higher/lower images of a darkfield set. If 0 it will only use the Middle images.
-		makeBinaries 0/1 - Run the levelAndDespeckleImage() function on the images before addition or multiplication. If set to 0 it assumes the input images are all ready binaries.
-		targetPercentage - number. The % of the dimmest pixels to be removed. 99 is generally used. Is the input for levelAndDespeckleImage function.
-		DisplayImages 0/1 - show binary images on screen after processing
-		SaveImages 0/1/2 - 	2 = Will automatically save binary images, shadow images and summed images to a directory.
-							1 = Will save binaries and summed images (not individual shadowed binaries)
-							0 = Will not save anything
-			If DisplayImages and SaveImages are both 0 then only the sum total image will be returned and the others will be lost.
-		ExportImages 0/1/2 - 	0 = no additional action
-								1 = save any binary images that are saved in gatan format in gif format as well.
-								2 = save ALL binary images produced as gif format as well.
-		debugMode 0/1 - Lots of feedback.
-		
-	*/
-	image processDarkFieldImages(object self, TagGroup DFList, number useShadowImages, number makeBinaries, number targetPercentage,\
-			number DisplayImages, number SaveImages, number ExportImages ){
-		if( ( DisplayImages != 1) && ( DisplayImages != 0 ) ){
-			throw("DisplayImages parameter not set correctly");
-		}
-		if( ( SaveImages != 1) && ( SaveImages != 0 ) && ( SaveImages != 2) ){
-			throw("SaveImages parameter not set correctly");
-		}
-		if( ( makeBinaries != 1) && ( makeBinaries != 0 ) ){
-			throw("makeBinaries parameter not set correctly");
-		}
-		if( ( useShadowImages != 1) && ( useShadowImages != 0 ) ){
-			throw("useShadowImages parameter not set correctly");
-		}
-		if( ( targetPercentage < 0) || ( targetPercentage > 100 ) ){
-			throw("targetPercentage parameter not set correctly");
-		}
-		result("\nProcessing a set of Darkfield Images.");
-		if(debugMode==true){
-			result("Parameters set as:" + \
-			"\n\tuseShadowImages: " + useShadowImages + \
-			"\n\tmakeBinaries: "+ makeBinaries + \
-			"\n\ttargetPercentage: "+ targetPercentage + \
-			"\n\tDisplayImages: " + DisplayImages + \
-			"\n\tSaveImages: " + SaveImages);
-		}
-
-		number UseImageID; // 0/1 for if the images are referenced with file paths or imageID numbers.
-		DFList.TagGroupGetTagAsNumber("UseImageID", UseImageID);
-		if(debugMode==true){result("\n\tUseImageID: " + UseImageID);}
-		string directory;
-		DFList.TagGroupGetTagAsString("Directory", directory);
-		if(debugMode==true){result("\n\tDirectory selected: " + directory);} // Directory can be used for just saving if not loading
-		string saveDirectory; // directory to save the images in.
-		string subdirectoryName; // subdirectory to save processed images inside.
-		subdirectoryName = (useShadowImages == 1) ? ("shadowed_" + constructTimeStamp()) : ("Not_shadowed_" + constructTimeStamp());
-		if((SaveImages != 0) || (ExportImages != 0)){ // will need to make a subdirectory
-			saveDirectory = PathConcatenate ( directory, subdirectoryName )
-			createDirectory(saveDirectory);
-		}	
-		
-		number cameraWidth, cameraHeight;
-		sscgetsize(cameraWidth, cameraHeight);
-		image binarySum; // image that each binary image will be added to.
-		binarySum = IntegerImage( "Binary Sum", 1, 0, cameraWidth, cameraHeight );
-		binarySum.ImageSetName("Binary Sum " + constructTimeStamp());
-		string binarySumFileName, binarySumFilePath
-
-		number totalSpots, i;
-		totalSpots = taggroupcounttags(DFList);
-		
-		image RefIm;
-		number RefImStored = 0; // save an image for later use.
-		
-		// Go to each 'Spot' set.
-		for(i=0;i<totalSpots;i++)
-		{
-			image binaryImage;
-			String label = DFList.TagGroupGetTagLabel( i ); // Will be of format Spot#### if a spot set.
-			if(label.left(4) != "Spot"){
-				if(debugMode==true){result("\n" + label + " is not a spot set");}
-				continue;
-			}
-			string tagPathToLower = label + ":LOWER"; // will be of format: ID or file path
-			string tagPathToHigher = label + ":HIGHER";
-			string tagPathToMiddle = label + ":MIDDLE";
-			
-			if(debugMode==true){
-				result("\ntagPathToLower: " + tagPathToLower);
-				result("\ntagPathToHigher: " + tagPathToHigher);
-				result("\ntagPathToMiddle: " + tagPathToMiddle);
-			}
-			
-			if(useShadowImages==1){
-				// Reference the two images to multiply together.
-				image higherImage, lowerImage;
-				if(UseImageID){
-					number imageIDLower, imageIDHigher;
-					imageIDLower = DFList.TagGroupGetTagAsNumber(tagPathToLower, imageIDLower);
-					imageIDHigher = DFList.TagGroupGetTagAsNumber(tagPathToHigher, imageIDHigher);
-					
-					lowerImage = GetImageFromID( imageIDLower );
-					higherImage = GetImageFromID( imageIDHigher );
-					if(lowerImage.ImageIsValid() == 0){
-						throw("Lower Image not found by ID");
-					}
-					if(higherImage.ImageIsValid() == 0){
-						throw("Higher Image not found by ID");
-					}
-				}
-				else // Use filepaths
-				{
-					string lowerImagePath, higherImagePath;
-					DFList.TagGroupGetTagAsString(tagPathToLower, lowerImagePath);
-					DFList.TagGroupGetTagAsString(tagPathToHigher, higherImagePath);
-					lowerImagePath = PathConcatenate( directory, lowerImagePath);
-					higherImagePath = PathConcatenate( directory, higherImagePath);
-					if(debugMode==true){result("\nLower File: " + lowerImagePath);}
-					if(debugMode==true){result("\nHigher File: " + higherImagePath);}
-					
-					higherImage := OpenImage ( higherImagePath );
-					lowerImage := OpenImage ( lowerImagePath );
-					if(lowerImage.ImageIsValid() == 0){
-						throw("Lower Image not found by File Path");
-					}
-					if(higherImage.ImageIsValid() == 0){
-						throw("Higher Image not found by File Path");
-					}
-				}
-				// Store an image if needed for referencing later.
-				if(!RefImStored){
-					RefIm = higherImage;
-					RefImStored = 1;
-				}
-				if(makeBinaries){ // Images need making into binaries first.
-					lowerImage := self.levelAndDespeckleImage(lowerImage, targetPercentage);
-					higherImage := self.levelAndDespeckleImage(higherImage, targetPercentage);
-				}
-				lowerImage.ImageSetName(label + "_binary_lower")
-				higherImage.ImageSetName(label + "_binary_higher")
-				binaryImage = tert( ( ( lowerImage == 1 ) && ( higherImage == 1 ) ), 1, 0 );
-				binaryImage.ImageSetName(label + "_binary_shadowed");
-				copyTags(binaryImage, lowerImage);
-				ImageChangeDataType(binaryImage, 14); // change to Binary image
-				if(debugMode==true){
-					result("\n\tImages made into Binaries and shadowed.");
-				}
-				if(DisplayImages==1){ // Show the binary images on the screen. Contrast needs setting to avoid blankness
-					showImage(lowerImage);
-					showImage(higherImage);
-					showImage(binaryImage);
-					ImageDisplay lowerImageDisplay = ImageGetImageDisplay( lowerImage, 0 )
-					ImageDisplay higherImageDisplay = ImageGetImageDisplay( higherImage, 0 )
-					ImageDisplay binaryImageDisplay = ImageGetImageDisplay( binaryImage, 0 )
-					lowerImageDisplay.ImageDisplaySetContrastLimits(0,1);
-					higherImageDisplay.ImageDisplaySetContrastLimits(0,1);
-					binaryImageDisplay.ImageDisplaySetContrastLimits(0,1);
-				}
-				if(SaveImages != 0){ // save the images to the listed subdirectory unless set to 0
-					string binaryFileName, binaryFilePath, lowerFileName, lowerFilePath, higherFileName, higherFilePath;
-					binaryFileName = label + "_binary_shadowed"
-					binaryFilePath = PathConcatenate ( saveDirectory, binaryFileName )
-					SaveAsGatan(binaryImage, binaryFilePath);
-					if(SaveImages == 2){
-						lowerFileName = label + "_binary_lower"
-						lowerFilePath = PathConcatenate ( saveDirectory, lowerFileName )
-						SaveAsGatan(lowerImage, lowerFilePath);
-						higherFileName = label + "_binary_higher"
-						higherFilePath = PathConcatenate ( saveDirectory, higherFileName )
-						SaveAsGatan(higherImage, higherFilePath);
-					}
-				}
-				if(ExportImages != 0){
-					self.transparencyExport(binaryImage, saveDirectory)
-					if(ExportImages == 2){
-						self.transparencyExport(lowerImage, saveDirectory)
-						self.transparencyExport(higherImage, saveDirectory)
-					}
-				}
-			}
-			else 
-			{ // Image is not to use the shadowing feature, so just use the middle image
-				image middleImage;
-				if(UseImageID){
-					number imageID
-					DFList.TagGroupGetTagAsNumber(tagPathToMiddle, imageID);
-					middleImage = GetImageFromID( imageID );
-					if(middleImage.ImageIsValid() == 0){
-						throw("Image not found by ID method");
-					}
-				}
-				else // Use filepaths
-				{
-					string ImagePath;
-					DFList.TagGroupGetTagAsString(tagPathToMiddle, ImagePath);
-					ImagePath = PathConcatenate( directory, ImagePath);
-					if(debugMode==true){result("\nImage File: " + ImagePath);}
-					
-					middleImage := OpenImage ( ImagePath );
-					if(middleImage.ImageIsValid() == 0){
-						throw("Image not found by File Path method");
-					}
-				}
-				// Store an image if needed for referencing later.
-				if(!RefImStored){
-					RefIm = middleImage;
-					RefImStored = 1;
-				}
-				if(makeBinaries){ // Image needs making into binary first.
-					middleImage := self.levelAndDespeckleImage(middleImage, targetPercentage);
-				}
-				binaryImage := middleImage;
-				binaryImage.ImageSetName(label + "_binary_no_shadow");
-				if(DisplayImages){
-					showImage(middleImage);
-					ImageDisplay middleImageDisplay = ImageGetImageDisplay( middleImage, 0 )
-					middleImageDisplay.ImageDisplaySetContrastLimits(0,1);
-				}
-				if(SaveImages){ // save the images to the listed subdirectory unless set to 0
-					string binaryFileName, binaryFilePath;
-					binaryFileName = label + "_binary_no_shadow"
-					binaryFilePath = PathConcatenate ( saveDirectory, binaryFileName );
-					SaveAsGatan(middleImage, binaryFilePath);
-				}
-				if(ExportImages){
-					self.transparencyExport(binaryImage, saveDirectory)
-				}	
-			}
-			// The images will all be added together, regardless of the parameters.
-			binarySum = binarySum + binaryImage;
-		} // end of loop
-		copyTags(binarySum, RefIm);
-		
-		string binarySumTitle = (useShadowImages != 0) ? "Sum_from_Shadows" : "Sum_from_Middle" ;
-		binarySum.ImageSetName(binarySumTitle);
-		if(SaveImages){
-			binarySumFileName = binarySumTitle
-			binarySumFilePath = PathConcatenate ( saveDirectory, binarySumFileName )
-			SaveAsGatan(binarySum, binarySumFilePath);
-		}
-		if(DisplayImages){
-			showImage(binarySum);
-		}
-		if(ExportImages){
-			self.transparencyExport(binarySum, saveDirectory);
-		}
-		return binarySum;
-	}
-
-	/* Function to make binary images out of a generic image list */
-	void binaryAllImages(object self, TagGroup imageList, number targetPercentage, number ExportImages, string saveDirectory){
-		result("\nmaking binaries of a set of images...")
-		number totalImages = taggroupcounttags(imageList);
-		result("\n\tFound " + totalImages + " images.");
-		number i;
-		for(i=0; i < totalImages; i++){
-			number ImageID
-			TagGroupGetIndexedTagAsNumber( imageList, i, imageID );
-			image thisImage := GetImageFromID(ImageID);
-			string imageTitle = thisImage.GetName();
-			image binaryImage :=  self.levelAndDespeckleImage(thisImage, targetPercentage);
-			showImage(binaryImage);
-			binaryImage.ImageSetName(imageTitle + " binary");
-			if(ExportImages){
-				self.transparencyExport(binaryImage , saveDirectory);
-			}
-		}
-		result("\nAll Images processed.");
-	}
-
-	/* Function to align an entire directory */
-	void alignAllImages(object self, TagGroup imageList){
-		result("\nAligning a set of images...")
-		number totalImages = taggroupcounttags(imageList);
-		result("\n\tFound " + totalImages + " images.");
-		number i;
-		number maxXShift, maxYShift, minXShift, minYShift;
-		image xShiftImage := IntegerImage( "xShift Array", 4, 1, totalImages, 1);
-		image yShiftImage := IntegerImage( "yShift Array", 4, 1, totalImages, 1);
-		image image2, baseImage;
-		if(!GetTwoImagesWithPrompt( "Select the Base Image to compare all others to", "Base Image Selection", baseImage, image2) ){
-			exit(0);
-		}
-		string baseImageTitle = baseImage.GetName();
-		
-		for(i=0; i < totalImages; i++){
-			number ImageID
-			TagGroupGetIndexedTagAsNumber( imageList, i, imageID );
-			image thisImage := GetImageFromID(ImageID);
-			string imageTitle = thisImage.GetName();
-			if(imageTitle == baseImageTitle){
-				continue;
-			}
-			number offsetX, offsetY;
-			if(!imageAlignmentDialog.alignTwoImages(thisImage, baseImage, offsetX, offsetY)){
-				// User pressed Cancel. Stop everything.
-				return;
-			}
-			xShiftImage.setPixel(i, 0, -offsetX);
-			yShiftImage.setPixel(i, 0, -offsetY);
-		}
-		result("\nAll Images aligned. Making aligned image set...");
-		//Find the maximum shift values.
-		ImageCalculateMinMax( xShiftImage, 0, 0, minXShift, maxXShift );
-		if(debugMode==true){result("\n\tmaxXShift = " + maxXShift + "\n\tminXShift = " + minXShift);}
-		ImageCalculateMinMax( yShiftImage, 0, 0, minYShift, maxYShift );
-		if(debugMode==true){result("\n\tmaxYShift = " + maxYShift + "\n\tminYShift = " + minYShift);}
-		
-		// minX/YShifts need to be either 0 or the largest -ve number.
-		// maxX/YShifts need to be either 0 or the largest +ve number
-		maxXShift = tert( (maxXShift >= 0), maxXShift, 0 );
-		minXShift = tert( (minXShift <= 0), minXShift, 0 );
-		maxYShift = tert( (maxYShift >= 0), maxYShift, 0 );
-		minYShift = tert( (minYShift <= 0), minYShift, 0 );
-		
-		for(i=0; i < totalImages; i++){
-			number ImageID, XShift, YShift, xSize, ySize;
-			TagGroupGetIndexedTagAsNumber( imageList, i, imageID );
-			XShift = getPixel( xShiftImage, i, 0 );
-			YShift = getPixel( yShiftImage, i, 0 );
-			image thisImage := GetImageFromID(ImageID);
-			string imageTitle = thisImage.GetName();
-			result("\n\tProcessing " + imageTitle)
-			GetSize(thisImage, xSize, ySize);
-			image alignedImage :=  imageAlignmentDialog.createAlignedImage (thisImage, minXShift, minYShift, maxXShift, maxYShift, XShift, YShift);
-			showImage(alignedImage);
-		}
-	}
 
 	/* TOP LEVEL BUTTON FUNCTIONS */
 	void calibrateButtonPress(object self)
@@ -6563,12 +7002,15 @@ class CreateDF360DialogClass : uiframe
 	void saveVariablesToMemoryPress(object self){
 		dataObject.updatePersistent(dataObject.createPersistent(1));
 	}
-}//****************************************************
+}
+
+//****************************************************
 // STARTUP FUNCTIONS
 //****************************************************
 
 // This function is called when the toolkit starts.
-// The data object will be made, a reference DP taken, key handler started and the dataObject returned to be installed in the dialogue object.
+// It creates, configures and stores the dialogs and tag groups found in the other sections.
+
 object startToolkit () {
 	
 	result("\nCreating toolkit data store...")
@@ -6587,6 +7029,9 @@ object startToolkit () {
 	result("\nLoading Image Set Tools...")
 	object theImageSetTools = alloc(ImageSetTools);
 	
+	result("\nLoading Camera Controls...")
+	object theCameraControlObject = alloc(CameraControl);
+	
 	result("\nCreating KeyListener for shortcut commands...")
 	// Create objects that will be used later but must be created now before the class drops from scope
 	object KeyListener=alloc(MyKeyHandler) // Key handler for the view Window for shortcut key presses. Not attached yet.
@@ -6599,6 +7044,9 @@ object startToolkit () {
 	
 	result("\nCreating Tilt Calibration Input Dialog...")
 	object tiltDialog = alloc(TiltValueDialog);
+	
+	result("\nLoading Image Processing Functions...")
+	object ImageProcessingObject = alloc(ImageProcessing);
 	
 	if(dataObject.checkPersistent()==false){
 		TagGroup persistentSave = dataObject.createDefaultPersistent(); // make a blank set of data
@@ -6616,7 +7064,8 @@ object startToolkit () {
 	Toolkit.storeAlignmentDialog(alignmentDialog); // Stored in toolkit object.
 	Toolkit.storeCalibrationDialog(calibrationDialog);
 	Toolkit.storeTiltDialog(tiltDialog);
-	
+	Toolkit.storeCameraControlObject(theCameraControlObject);
+	Toolkit.storeImageProcessingObject(ImageProcessingObject);
 	Toolkit.updateDialog();
 	return Toolkit;
 }
@@ -6628,7 +7077,7 @@ void main()
 	result("\n-----------------------");
 	result("\nDarkField360 Toolkit");
 	result("\n-----------------------");
-	result("\nLoading Toolbar ...");
+	result("\nLoading Toolkit ...");
 
 	object ToolKit = startToolkit();		
 	

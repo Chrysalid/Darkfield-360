@@ -1519,6 +1519,7 @@ class CreateDF360DialogClass : uiframe
 					if(ImageSet.TagGroupDoesTagExist(BottomTagPath)){
 						showImage(BottomDFImage);
 					}
+				}
 			}
 			
 			// If in Integrated image mode add it to the current integration image and display any completed integrated images.
@@ -1526,84 +1527,116 @@ class CreateDF360DialogClass : uiframe
 				middleIntegratedImage = middleIntegratedImage + MiddleDFImage;
 				higherIntegratedImage = higherIntegratedImage + TopDFImage;
 				lowerIntegratedImage = lowerIntegratedImage + BottomDFImage;
-				result("\nIntegrating Exposures " + im +" of " + spotTotal);
+				result("\nIntegrating Exposures for spot " + im +" of " + spotTotal);
 				if(remainder(im, NumberOfIntegrations) == 0){ // save this integrated image and start a new one.
 					middleSumImage = middleSumImage + middleIntegratedImage;
 					middleIntegratedImage.ImageSetName( "Integrated Image " + im + " Middle" );
-					string fileDirectory = GetApplicationDirectory("auto_save", 0);
-					fileName = "Integrated Image " + im;
-					filePath = PathConcatenate(fileDirectory, fileName); // Construct the full file path for the save command.
-					SaveAsGatan(integratedImage, filePath);
+					if(displayImages == true){
+						showImage( middleIntegratedImage.ImageClone() );
+					}
+					if(saveImages == true){
+						string fileDirectory = GetApplicationDirectory("auto_save", 0);
+						fileName = "Integrated_Image_" + im + "_Middle";
+						filePath = PathConcatenate(fileDirectory, fileName); // Construct the full file path for the save command.
+						SaveAsGatan(middleIntegratedImage, filePath);
+					}
 					result("\nIntegrated " + NumberOfIntegrations + " exposures into Integrated Image " + im);
-					integratedImage = integratedImage * 0; // Set old image to 0 for next integration sequence.
-					if(debugMode==true){OpenImage(filePath + ".dm3");} // Display the image as well if in debug mode.
-					
+					middleIntegratedImage = middleIntegratedImage * 0; // Set old image to 0 for next integration sequence.
+										
 					if(ImageSet.TagGroupDoesTagExist(TopTagPath)){
 						higherSumImage = higherSumImage + higherIntegratedImage;
-						
-						
+						higherIntegratedImage.ImageSetName( "Integrated Image " + im + " Higher" );
+						if(displayImages == true){
+							showImage( higherIntegratedImage.ImageClone() );
+						}
+						if(saveImages == true){
+							string fileDirectory = GetApplicationDirectory("auto_save", 0);
+							fileName = "Integrated_Image_" + im + "_Higher";
+							filePath = PathConcatenate(fileDirectory, fileName); // Construct the full file path for the save command.
+							SaveAsGatan(higherIntegratedImage, filePath);
+						}
+						higherIntegratedImage = higherIntegratedImage * 0; // Set old image to 0 for next integration sequence.
 					}
 					if(ImageSet.TagGroupDoesTagExist(BottomTagPath)){
 						lowerSumImage = lowerSumImage + lowerIntegratedImage;
-						
-						
+						lowerIntegratedImage.ImageSetName( "Integrated Image " + im + " Lower" );
+						if(displayImages == true){
+							showImage( lowerIntegratedImage.ImageClone() );
+						}
+						if(saveImages == true){
+							string fileDirectory = GetApplicationDirectory("auto_save", 0);
+							fileName = "Integrated_Image_" + im + "_Lower";
+							filePath = PathConcatenate(fileDirectory, fileName); // Construct the full file path for the save command.
+							SaveAsGatan(lowerIntegratedImage, filePath);
+						}
+						lowerIntegratedImage = lowerIntegratedImage * 0; // Set old image to 0 for next integration sequence.
 					}
-					
-					
 				}
-			}
-			else { // Save the image as a Gatan file or display it if in debug mode.
-				if(debugMode==true){
-					ImageSetName(DFImage, fileName);
-					ShowImage(DFImage);
-					ImageDocumentClean(ImageGetOrCreateImageDocument( DFImage )); // So it can be closed easily
-					result("\nSingle Exposure " + (im + 1) +" of " + tracker + " completed and displayed as image " + fileName);
-				} else {
-					string fileDirectory = GetApplicationDirectory("auto_save", 0);
-					filePath = PathConcatenate(fileDirectory, fileName); // Construct the full file path for the save command.
-					SaveAsGatan( DFImage, filePath );
-					closeImage( DFImage );
-					result("\nSingle Exposure " + (im + 1) +" of " + tracker + " saved as: " + filePath);
-				}
-			}
-			updateAllImages();
-		}
+			} // end of integration section
+		} // end of for loop
 		self.beamCentre();
 		
-		// A bright field image is taken at the end to compare to the start. This can track drift.
+		// Create the final BF image to compare to the start. This can track drift.
 		image endBFImage;
 		endBFImage := sscUnprocessedAcquire(BFExposure,0,0,cameraWidth,cameraHeight);
-		string fileName, filePath, longSpotID;
-		longSpotID = "";
-		fileName = "End_BrightField_" + constructTimeStamp();
-		if(debugMode==true)
-		{
-			ImageSetName(endBFImage, fileName);
-			ShowImage(endBFImage);
-			ImageDocumentClean(ImageGetOrCreateImageDocument( endBFImage )); // So it can be closed easily
-			result("\nEnding Bright Field exposure displayed as " + filename);
+		
+		// Create image tags
+		TagGroup EndBFImageTags = ImageSetTools.createNewImageForImageSet();
+		if(ImageSetTools.addImageDataToCurrentImageSet(EndBFImageTags, "Middle") == 0){
+			result("\nSomething has gone wrong creating the image data for the final BF image.")
+			return 0;
 		}
-		else
-		{
+		EndBFImageTags.TagGroupSetTagAsString("ImageType", "BF");
+		EndBFImageTags.TagGroupSetTagAsNumber("ExposureTime", BFExposure);
+		EndBFImageTags.TagGroupSetTagAsNumber("xTiltRelative", 0);
+		EndBFImageTags.TagGroupSetTagAsNumber("yTiltRelative", 0);		
+		EndBFImageTags.TagGroupSetTagAsNumber("xTiltValue", xTiltCenter);
+		EndBFImageTags.TagGroupSetTagAsNumber("yTiltValue", yTiltCenter);
+		EndBFImageTags.TagGroupSetTagAsNumber("ShadowValue", 1);
+		EndBFImageTags.TagGroupSetTagAsNumber("ShadowDistance", 0);
+		EndBFImageTags.TagGroupSetTagAsNumber("DSpacingAng", 0);
+		
+		/* Still left to figure out...
+		BFImageTags.TagGroupSetTagAsNumber("ImageID"); // Unique imageID number
+		BFImageTags.TagGroupSetTagAsString("FileName"); // Name of saved file if present.
+		BFImageTags.TagGroupSetTagAsString("ImageMode");
+		*/
+		
+		string fileName = "Brightfield_End_" + constructTimeStamp();
+		
+		if(saveImages == 1){
 			string fileDirectory = GetApplicationDirectory("auto_save", 0);
-			filePath = PathConcatenate(fileDirectory, fileName); // Construct the full file path for the save command.
+			filePath = PathConcatenate(fileDirectory, fileName);
+			EndBFImageTags.TagGroupSetTagAsString("FileName", fileName);
+			EndBFImageTags.TagGroupSetTagAsNumber("SavedAsFile", 1);
 			SaveAsGatan( endBFImage, filePath );
-			closeImage( endBFImage );
-			result("\nEnding Bright Field exposure saved as: " + filePath);
+			result("\nSaved final Brightfield image as " + filePath);
+		} else { // If not saving the image...
+			EndBFImageTags.TagGroupSetTagAsNumber("SavedAsFile", 0);
 		}
+		
+		if(displayImages == true) // If displaying the image...
+		{
+			showImage(endBFImage);
+		}
+		
 		// Find the image drift.
 		number xShiftBF, yShiftBF;
 		findImageShift(startBFImage, endBFImage, xShiftBF, yShiftBF, debugMode);
 		result("\nDuring the exposures the image drifted by (" + xShiftBF + ", " + yShiftBF + ") pixels")
-		if(integration==true){ //show Sum.
-			showImage(sumImage);
-			copyTags(sumImage, endBFImage);
-			copyScale(sumImage, endBFImage);
+		
+		if(integration==true){ //show or save the sum images
+			if(saveImages){
+				fileName = "Sum_Of_Integrated_Images"
+				string fileDirectory = GetApplicationDirectory("auto_save", 0);
+				filePath = PathConcatenate(fileDirectory, fileName);
+				SaveAsGatan( sumImage, filePath );
+				result("\nSaved sum of integration images as " + filePath);
+			}
 		}
+
 		positionDebugWindow(debugMode); //Return View Window to the front if it is not all ready
 		Result("\n------------- Ending Dark Field Imaging Process ---------------\n");
-		dataObject.setDFList(DFList);
-		if(debugMode==true){dataObject.showDFList();} // Used to check on the Tag group when debugging
 	}
 
 	/* 	Function that performs the Calibration process
@@ -1611,6 +1644,7 @@ class CreateDF360DialogClass : uiframe
 			Store the central beam as the first data point.
 			Calibrate the Tilt Vectors (pixels per tilt unit)
 	 */
+	 
 	 void startDPStoring(object self){
 		// Load data from dataObject
 		// Not Reference DP. That is set later.
@@ -1799,29 +1833,25 @@ class CreateDF360DialogClass : uiframe
 	 }
 	 
 	/* Function to take a pixel radius and load the calculated tilt coordinates into the data array
-		returns the number of points used, since this is useful to other functions.
+		
 	*/
-	void loadRingPoints (object self, number radiusPX, number shadowDistanceNM, number &numberOfPoints )
+	void loadRingPoints (object self, number radiusPX, number shadowDistanceNM, number numberOfPoints )
 	{
 		// Load data from dataObject
-		if(debugMode==true){result("\nStarting to load Ring Data Points.");}
-		number DPExposure = dataObject.getDPExposure();
-		number DFExposure = dataObject.getDFExposure();
+		if(debugMode==true){result("\nStarting to create Ring Data Points.");}
+		number DPExposure = CameraControlObject.getDPExposure();
 		number xTiltVectorX, xTiltVectorY, yTiltVectorX, yTiltVectorY;
 		dataObject.getTiltVectors(xTiltVectorX, xTiltVectorY, yTiltVectorX, yTiltVectorY);
-		number cameraWidth = dataObject.getCameraWidth();
-		number cameraHeight = dataObject.getCameraHeight();
-		number binning = dataObject.getBinningMultiplier();
+		number cameraWidth = CameraControlObject.getCameraWidth();
+		number cameraHeight = CameraControlObject.getCameraHeight();
+		number binning = CameraControlObject.getBinningMultiplier();
 		number beamCentreX = dataObject.getCentreXTilt();
 		number beamCentreY = dataObject.getCentreYTilt();
-		image dataArray := dataObject.getDataArray();
 		
 		TagGroup newImageSet = imageSetTools.createNewImageSet();
 		newImageSet.TagGroupSetTagAsNumber("RingMode", 1);
 		newImageSet.TagGroupSetTagAsNumber("ShadowDistance", shadowDistanceNM);
-		newImageSet.TagGroupSetTagAsNumber("DSpacingAng", dataObject.convertPixelDistanceToNM(radiusPX));
-		imageSetTools.addImageSet(newImageSet);
-		
+		newImageSet.TagGroupSetTagAsNumber("DSpacingAng", dataObject.convertPixelDistanceToNM(radiusPX));		
 		
 		if(debugMode==true){result("\n\tData Object loaded into variables.");}
 
@@ -1830,12 +1860,6 @@ class CreateDF360DialogClass : uiframe
 			throw("Please perform the tilt calibration first.")
 		}
 		
-		numberOfPoints = 360; // Not using shadowing yet. (Spend 10s at each 1° angle = 1hr.)
-								// Will be changed below, but default option is 360.
-
-		if(!getNumber("How many measurements should be taken?", numberOfPoints, numberOfPoints)){
-			throw("Cancelled by User");
-		}
 		if(debugMode==true){result("\n\tNumber of points is " + numberOfPoints);}
 		if(numberOfPoints<=0){
 			throw("Wrong number of points.");
@@ -1847,6 +1871,8 @@ class CreateDF360DialogClass : uiframe
 		alpha = atan2(xTiltVectorY, xTiltVectorX);
 		// tiltVectorX is the tilt needed to reach the target radius using only xTilt
 		number tiltVectorX
+		
+		/* debug code for checking maths
 		if(debugMode==true){result("\nTiltVectorX Calculation values:");}
 		if(debugMode==true){result("\n\tRadiusPX: " + radiusPX);}
 		if(debugMode==true){result("\n\tRadiusPX ^ 2: " + radiusPX**2);}
@@ -1855,11 +1881,13 @@ class CreateDF360DialogClass : uiframe
 		if(debugMode==true){result("\n\ttan(alpha): " + tan(alpha));}
 		if(debugMode==true){result("\n\ttan(alpha) ^ 2: " + tan(alpha)**2);}
 		if(debugMode==true){result("\n\tTiltVectorX ^ 2: " + radiusPX**2 / ( xTiltVectorX**2 * (1 + tan(alpha)**2 ) ));}
+		*/
+		
 		tiltVectorX = sqrt( radiusPX**2 / ( xTiltVectorX**2 * (1 + tan(alpha)**2 ) ) );
 		if(debugMode==true){
-			result("\nAlpha for tiltVectorX: " + alpha );
-			result("\ntan (alpha): " + tan(alpha) );
-			result("\ntiltVectorX = " + tiltVectorX);
+			result("\n\tAlpha for tiltVectorX: " + alpha );
+			result("\n\ttan (alpha): " + tan(alpha) );
+			result("\n\ttiltVectorX = " + tiltVectorX);
 		}
 		number averageTiltVector = tiltVectorX; // Would use an average of X and Y vectors, but geometry is broken. Just using X.
 		
@@ -1867,18 +1895,24 @@ class CreateDF360DialogClass : uiframe
 		if (!ContinueCancelDialog( "Complete darkfield imaging of this ring will take approximately " + estimatedTime + " minutes. Would you like to target these points?" )){
 			throw("Cancelled by User");
 		}
+		imageSetTools.addImageSet(newImageSet); // add image set to toolkit now that it is confirmed.
 		result("\nGenerating Tilt coordinates...");
 
 		number i, angleToMove, tiltX, tiltY;
 		number tiltXHigher, tiltYHigher, tiltXLower, tiltYLower, extraTilt;
 		for(i=0; i < numberOfPoints; i++){
-			number tracker = dataObject.getTracker()
 			angleToMove = i * angleStep; // This is in Degrees.
 			angleToMove = angleToMove * pi() / 180; // converted to radians
 			
 			// work out change in tilt to get there.
 			tiltX = beamCentreX + (averageTiltVector * sin(angleToMove));
 			tiltY = beamCentreY + (averageTiltVector * cos(angleToMove));
+			
+			number xTiltRelative, yTiltRelative; // tilt values relative to centre tilt
+			xTiltRelative = tiltX - beamCentreX
+			yTiltRelative = tiltY - beamCentreY;
+			
+			/* debug code to check maths in detail
 			if(debugMode==true){result("\n\ti: " + i);}
 			if(debugMode==true){result("\n\tAngleToMove: " + angleToMove);}
 			if(debugMode==true){result("\n\tsin(angle): " + sin(angleToMove));}
@@ -1886,20 +1920,20 @@ class CreateDF360DialogClass : uiframe
 			if(debugMode==true){result("\n\tAdditional TiltX: " + (averageTiltVector * sin(angleToMove)));}
 			if(debugMode==true){result("\n\tAdditional TiltY: " + (averageTiltVector * sin(angleToMove)));}
 			if(debugMode==true){result("\n\t---------");}
+			*/
 			
-			setpixel(dataArray, tracker, 0, tracker); // spotID
-			setpixel(dataArray, tracker, 1, tiltX); // xTilt value
-			setpixel(dataArray, tracker, 2, tiltY); // yTilt value
-		
-			number xTiltRelative, yTiltRelative; // tilt values relative to centre tilt
-			xTiltRelative = tiltX - beamCentreX
-			yTiltRelative = tiltY - beamCentreY;
-			setpixel(dataArray, tracker, 3, xTiltRelative);
-			setpixel(dataArray, tracker, 4, yTiltRelative);
+			TagGroup thisImage = ImageSetTools.createNewImageForImageSet();
+			thisImage.TagGroupSetTagAsString("ImageType", "DP");
+			thisImage.TagGroupSetTagAsNumber("ExposureTime", DPExposure);
+			thisImage.TagGroupSetTagAsNumber("xTiltRelative", xTiltRelative);
+			thisImage.TagGroupSetTagAsNumber("yTiltRelative", xTiltRelative);		
+			thisImage.TagGroupSetTagAsNumber("xTiltValue", tiltX);
+			thisImage.TagGroupSetTagAsNumber("yTiltValue", tiltY);
+			thisImage.TagGroupSetTagAsNumber("ShadowValue", 1);
+			thisImage.TagGroupSetTagAsNumber("ShadowDistance", shadowDistanceNM);
+			thisImage.TagGroupSetTagAsNumber("DSpacingAng", dataObject.convertPixelDistanceToNM(radiusPX));
 
-			tracker += 1;
-			dataObject.setTracker(tracker);
-			if(remainder(i,60)==0){ //This part just puts a '.' every 60 calculations as a crude progress bar.
+			if(remainder(i,60)==0){ //This part just puts a '.' every calculations as a crude progress bar, and a line break every 60.
 				result("\n");
 			} else {
 				result(".");
@@ -1908,32 +1942,45 @@ class CreateDF360DialogClass : uiframe
 		result("\nTilt coordinates have been generated for darkfield imaging");
 	 }
 
-	/* Function to check the ring coordinates before imaging begins.
-		angleStep = angleStep size used to generate tilt coordinates. This controls which coordinates will be used.
-		e.g. if a step size of 2° was used it will only have 180 coordinates.
+	/* Function to record a selection of diffraction patterns from a ring dataset.
+		ImageSet - tag group generated by loadRingPoints
+		numberOfDP - number of DPs to take. They will be distributed evenly around the ring.
+		saveImages - if the DPs should be auto-saved
+		displayImages - if the DPs should be displayed afterwards
+		Note: saveImages and displayImages can both be set to 0 to skip this process entirely.
+		
+		Returns 1/0 to indicate failure or success.
 	*/
-	void imageRingDP (object self, number angleStep)
+	number imageRingDP (object self, TagGroup ImageSet, number numberOfDP, number saveImages, number displayImages)
 	{
-		image dataArray := dataObject.getDataArray();
-		number DPExposure = dataObject.getDPExposure();
+		if( saveImages == 0 && displayImages == 0 ){
+			result("No diffraction patterns of the ring were taken because the save images and display images inputs were both 0");
+			return 1;
+		}
 		number xTiltVectorX, xTiltVectorY, yTiltVectorX, yTiltVectorY;
 		dataObject.getTiltVectors(xTiltVectorX, xTiltVectorY, yTiltVectorX, yTiltVectorY);
-		number cameraWidth = dataObject.getCameraWidth();
-		number cameraHeight = dataObject.getCameraHeight();
-		number binning = dataObject.getBinningMultiplier();
+		number cameraWidth = CameraControlObject.getCameraWidth();
+		number cameraHeight = CameraControlObject.getCameraHeight();
+		number binning = CameraControlObject.getBinningMultiplier();
+		number DPExposure = CameraControlObject.getDPExposure();
 		number beamCentreX = dataObject.getCentreXTilt();
 		number beamCentreY = dataObject.getCentreYTilt();
-		number tracker = dataObject.getTracker(); // This is the # of points recorded.
-				
+		
+		TagGroup spots
+		ImageSet.TagGroupGetTagAsTagGroup("Spots", spots);
+		number TotalSpots = spots.TagGroupCountTags();
+		
 		number i
-		number numberOfPoints = 8; // can be changed to provide more or less
-		for(i=0; i < numberOfPoints; i++){
-			number j = 1 + (round(tracker / numberOfPoints) * i); // the index of the value in the data array to use
-			// Load coordinates from dataArray
-			number tiltXRelative = getPixel( dataArray, j, 3)
-			number tiltYRelative = getPixel( dataArray, j, 4)
+		for(i=0; i < numberOfDP; i++){
+			number j = 1 + round(( TotalSpots / numberOfDP ) * i)
+			// Load coordinates 
+			TagGroup thisDP
+			spots.TagGroupGetTagAsTagGroup(j, thisDP);
+			number xTiltRealtive, yTiltRealtive;
+			thisDP.TagGroupGetTagAsNumber("xTiltRelative", xTiltRealtive);
+			thisDP.TagGroupGetTagAsNumber("yTiltRelative", yTiltRealtive);
 			// Move there
-			moveBeamTilt( tiltXRelative + beamCentreX, tiltYRelative + beamCentreY );
+			moveBeamTilt( xTiltRealtive + beamCentreX, yTiltRealtive + beamCentreY );
 			// Take image
 			image DPImage := sscUnprocessedAcquire(DPExposure,0,0,cameraWidth,cameraHeight);
 			string fileName = "Ring at " + (i * angleStep) + " deg"
@@ -1947,17 +1994,18 @@ class CreateDF360DialogClass : uiframe
 			self.drawReticle(DPImage, 0); // add the reticle so that the exact spot targetted can be seen
 			self.cleanReticle(DPImage); // clean it so the reticle etc can be editted later.
 			DPImage.ImageGetOrCreateImageDocument().ImageDocumentClean(); // Image can be closed without saving warning.
-			if(debugMode==false){ // save the images if debugmode is off.
+			if(saveImages == true){
 				string fileDirectory = GetApplicationDirectory("auto_save", 0);
 				string filePath = PathConcatenate(fileDirectory, fileName); // Construct the full file path for the save command.
 				SaveAsGatan( DPImage, filePath );
+			}
+			if(displayImages == false){
 				DPImage.ImageGetOrCreateImageDocument().ImageDocumentClean(); // just added
 				closeImage( DPImage );
 			}
 		}
 		self.beamCentre();
-	}
- 
+	} 
 	
 
 	/* TOP LEVEL BUTTON FUNCTIONS */
