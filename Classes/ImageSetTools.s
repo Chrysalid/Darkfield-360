@@ -71,12 +71,23 @@ class ImageSetTools
 		imageSetData.TagGroupCreateNewLabeledTag("ImagesTaken") // 0/1; // if the image set has been taken (1) or if it is waiting to be taken.
 		imageSetData.TagGroupCreateNewLabeledTag("DiffractionScale") //<value used>
 		imageSetData.TagGroupCreateNewLabeledTag("CameraLength");
+		
 		imageSetData.TagGroupCreateNewLabeledTag("RingMode");
+		imageSetData.TagGroupCreateNewLabeledTag("DegreeStep"); // if ring mode is used each 'step' is a certain number of degrees apart.
+		imageSetData.TagGroupCreateNewLabeledTag("NumberOfRingPoints"); // # of points to generate and image
+		imageSetData.TagGroupCreateNewLabeledTag("RingDSpacing"); // the D-spacing being examined in Angstroms
+		
 		imageSetData.TagGroupCreateNewLabeledTag("IntegratedImage"); // 0/1
 		imageSetData.TagGroupCreateNewLabeledTag("NumberOfIntegrations") // 0/value
-		imageSetData.TagGroupCreateNewLabeledTag("DegreeStep"); // if ring mode is used each 'step' is a certain number of degrees apart.
+		imageSetData.TagGroupCreateNewLabeledTag("AutoSaveNonInt"); // 0/1 : If all images will be saved, not just integrated images.
+		imageSetData.TagGroupCreateNewLabeledTag("AutoDisplayNonInt") // 0/1 : If all images will be displayed, not just integrated images.
+		
 		imageSetData.TagGroupCreateNewLabeledTag("ShadowDistance"); // 0/value
-		imageSetData.TagGroupCreateNewLabeledTag("ImageNotes"); // String
+		
+		imageSetData.TagGroupCreateNewLabeledTag("AutoSaveImages"); // 0/1 : If the images will be saved to harddisk as they are taken
+		imageSetData.TagGroupCreateNewLabeledTag("AutoDisplayImages"); // 0/1 If the images will be displayed when they are taken
+		
+		imageSetData.TagGroupCreateNewLabeledTag("ImageNotes"); // String to record information about the imageSet
 		
 		number time = GetCurrentTime();
 		number dateFormat = 2
@@ -383,6 +394,38 @@ class ImageSetTools
 			return 0;
 		}
 		if(debugMode==1){result("\nDarkfield image tag group found.");}
+		return 1;
+	}
+	
+	/* Save the taggroup as a gtg file used natively by DM. Function will ask for file path etc. */
+	number exportImageSetAsGTG(object self, TagGroup ImageSet){
+		String path;
+		string defaultName;
+		ImageSet.TagGroupGetTagAsString("SetName", defaultName);
+		number SavePathSelected = SaveAsDialog( "Save Image Set to...", defaultName, path );
+		if(SavePathSelected == 0){
+			return 0;
+		}
+		ImageSet.TagGroupSaveToFile( path );
+		if(debugMode==true){
+			result("\nImageSet saved to " + path);
+		}
+		return 1;
+	}
+	
+	/* Import an imageset file. Will ask for file, pass the taggroup and return 0/1 for fail/pass. */
+	number importImageSet(object self, TagGroup &LoadedImageSet){
+		String path;
+		number fileSelected =  OpenDialog( path );
+		
+		if(fileSelected == 0){
+			return 0;
+		}
+		
+		number fileLoaded = TagGroupLoadFromFile( LoadedImageSet, path );
+		if(fileLoaded == 0){
+			return 0;
+		}
 		return 1;
 	}
 	

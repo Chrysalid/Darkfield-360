@@ -212,9 +212,8 @@ class MyDataObject
 	number getRefScale(object self) {
 		return refScale;
 	}
-	number setRefScale(object self, number newValue) {
+	void setRefScale(object self, number newValue) {
 		refScale = newValue;
-		return refScale;
 	}
 	
 	number getShadowDistanceNM(object self) {
@@ -258,9 +257,6 @@ class MyDataObject
 		"\nspotTracker: " + spotTracker +\
 		"\nROITracker: " + ROITracker +\
 		"\ndebugMode: " + debugMode +\
-		"\nDFExposure: " + DFExposure +\
-		"\nDPExposure: " + DPExposure +\
-		"\nBFExposure: " + BFExposure +\
 		"\nxTiltVectorX: " + xTiltVectorX +\
 		"\nxTiltVectorY: " + xTiltVectorY +\
 		"\nyTiltVectorX: " + yTiltVectorX +\
@@ -268,9 +264,6 @@ class MyDataObject
 		"\nmaxDeviation: " + maxDeviation +\
 		"\ncentreXTilt: " + centreXTilt +\
 		"\ncentreYTilt: " + centreYTilt +\
-		"\nbinningMultiplier: " + binningMultiplier +\
-		"\ncameraWidth: " + cameraWidth +\
-		"\ncameraHeight: " + cameraHeight +\
 		"\nkeyListenerKeyToken: " + keyListenerKeyToken +\
 		"\noriginalScale: " + originalScale +\
 		"\noriginalScaleString: " + originalScaleString +\
@@ -283,39 +276,13 @@ class MyDataObject
 
 	/* Function to print out all the values in the data image for debugging and backup */
 	void printSpotIDArray (object self){
-		number coordinatesRecorded = tracker;
-		result("\nThe following spots have been stored...\n");
-		result("\nSpot ID# \txTilt \tyTilt \txTiltRelative \tyTiltRelative \txPixelShift \tyPixelShift");
-		number pi;
-		for(pi=0;pi<coordinatesRecorded;pi++){
-			result("\n\t" + getpixel(dataArray, pi, 0));
-			result("\t" + getpixel(dataArray, pi, 1));
-			result("\t\t" + getpixel(dataArray, pi, 2));
-			result("\t\t" + getpixel(dataArray, pi, 3));
-			result("\t\t\t" + getpixel(dataArray, pi, 4));
-			result("\t\t" + getpixel(dataArray, pi, 5));
-			result("\t\t" + getpixel(dataArray, pi, 6));
-		}	
-		result("\n... End of Spot ID Data.")
+		result("\nprintSpotIDArray() called. Debug function requires updating.")
 	}
 	/* Function to print out all the values in the data image for debugging and backup.
 			This version ignores the tracker value in the dataObject and uses the one provided.
 	 */
 	void printSpotIDArray (object self, number forcedValue){
-		number coordinatesRecorded = forcedValue;
-		result("\nThe following spots have been stored in the first " + forcedValue + " columns in the data array");
-		result("\nSpot ID# \txTilt \tyTilt \txTiltRelative \tyTiltRelative \txPixelShift \tyPixelShift");
-		number pi;
-		for(pi=0;pi<coordinatesRecorded;pi++){
-			result("\n\t" + getpixel(dataArray, pi, 0));
-			result("\t" + getpixel(dataArray, pi, 1));
-			result("\t\t" + getpixel(dataArray, pi, 2));
-			result("\t\t" + getpixel(dataArray, pi, 3));
-			result("\t\t\t" + getpixel(dataArray, pi, 4));
-			result("\t\t" + getpixel(dataArray, pi, 5));
-			result("\t\t" + getpixel(dataArray, pi, 6));
-		}	
-		result("\n... End of Sample. There is more in the image Array but you do not need to see 5000 null entries.")
+		result("\nprintSpotIDArray() called. Debug function requires updating.");
 	}
 
 	 /* Displays a TagList saved inside the data Object. Used for debugging. */
@@ -350,13 +317,6 @@ class MyDataObject
 			result("\nStored points have been cleared. Calibration data are still in memory.")
 		}
 	 }
-	
-	/* Function to get VIEW image xscale despite the mis-calibration of our 2100 */
-	number returnViewScale(object self){
-		number xscale=1;
-		xscale = binningMultiplier * RefScale;
-		return xscale;
-	}
 	
 	// ************************************
 	//  Tilt calculations

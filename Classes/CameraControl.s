@@ -24,21 +24,6 @@ class CameraControl
 	number BFExposure; // # of seconds to expose the camera for taking BrightField images.
 	
 
-	void initialise(object self, number theToolkitID, number theDataObjectID, number theImageSetToolsID){
-		ToolkitID = theToolkitID;
-		dataObjectID = theDataObjectID;
-		imageSetToolsID = theImageSetToolsID;
-		
-		self.updateEMstatus(); // set the AllowControl variable asap.
-	}
-
-	void setDebugMode(object self, number input)
-	{
-		debugMode = input;
-		if(debugMode == 1){result("\n\tDebug Mode Activated in Camera Control Object");}
-	}
-	
-	
 	// Check if the microscope is online and if there is a Live View Image
 	void updateEMstatus(object self)
 	{
@@ -53,6 +38,20 @@ class CameraControl
 				AllowControl = 1; // View window and microscope detected.
 			}
 		}
+	}
+	
+	void initialise(object self, number theToolkitID, number theDataObjectID, number theImageSetToolsID){
+		ToolkitID = theToolkitID;
+		dataObjectID = theDataObjectID;
+		imageSetToolsID = theImageSetToolsID;
+		
+		self.updateEMstatus(); // set the AllowControl variable asap.
+	}
+
+	void setDebugMode(object self, number input)
+	{
+		debugMode = input;
+		if(debugMode == 1){result("\n\tDebug Mode Activated in Camera Control Object");}
 	}
 	
 	// External functions can call this to see if they can use the microscope.
@@ -91,7 +90,6 @@ class CameraControl
 			result("\nBinning Multiplier found to be out of range (<1). Setting multiplier to 1.")
 			binningMultiplier = 1;
 		}
-		GetScriptObjectFromID(dataObjectID).setBinningMultiplier(binningMultiplier);
 		if(debugMode==true){result("\n\tThe binning multiplier has been set to " + binningMultiplier);}
 		
 		return 1;
@@ -136,6 +134,13 @@ class CameraControl
 		return binningMultiplier;
 	}
 
+	/* Function to get VIEW image xscale despite the mis-calibration of our 2100 */
+	number getViewScale(object self){
+		number xscale=1;
+		xscale = binningMultiplier * GetScriptObjectFromID(dataObjectID).getRefScale();
+		return xscale;
+	}
+	
 	
 		// constructor
 	CameraControl(object self){

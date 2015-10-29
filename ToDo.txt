@@ -16,9 +16,7 @@ Bug Fixes
 ---------
 D-Spacing tag record is always 0
 ImageProcessing processDarkFieldImages() uses camera size, not image sizes.
-
-
-
+StartDPStoring / calibration does not update any current image sets yet
 
 Desired Features
 ----------------
@@ -32,4 +30,3 @@ Cycle through saved tilt settings
 
 Currently
 ----------
-update generating ring coords

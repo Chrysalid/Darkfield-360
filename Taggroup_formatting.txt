@@ -42,11 +42,20 @@ ImageSets
 		ImageNotes: <string value>
 		
 		RingMode: 0/1
+		NumberOfRingPoints: <0 / value>
+		RingDSpacing: <0 / Value>
+		DegreeStep: 0/value // if ring mode is used each 'step' is a certain number of degrees apart.
+		
 		IntegratedImage: 0/1
 		NumberOfIntegrations: 0/value
-		DegreeStep: 0/value // if ring mode is used each 'step' is a certain number of degrees apart.
+		AutoSaveNonInt: 0/1
+		AutoDisplayNonInt: 0/1		
+		
 		ShadowDistance: 0/value
 		
+		AutoSaveImages: 0/1
+		AutoDisplayImages: 0/1
+				
 		TiltCalibration
 			xTiltx: <conversion factor> // number of x pixels moved per 1 unit of xTilt
 			xTilty: <conversion factor> // number of y pixels moved per 1 unit of xTilt

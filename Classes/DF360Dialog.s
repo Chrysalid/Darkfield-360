@@ -88,9 +88,11 @@ class CreateDF360DialogClass : uiframe
 	/* Attach the KeyListener to a display so it can function */
 	void attachKeyListener(object self, imageDisplay theDisplay)
 	{
-		number keyToken = theDisplay.ImageDisplayAddKeyHandler(KeyListener, "HandleKey")
-		if(debugmode==1){result("\nToolkit function: Attaching key handler object to display. KeyToken = " + keyToken);}
+		number keyToken = theDisplay.ImageDisplayAddKeyHandler(KeyListener, "HandleKey");
+		if(debugmode==1){result("\nToolkit function: Attached key handler object to display. KeyToken = " + keyToken);}
+		if(debugmode==1){result("\nToolkit function: Attempting to set the Keyhandler to Listen to the view display....");}
 		KeyListener.startListening(keyToken);
+		if(debugmode==1){result("\nToolkit function: Keyhandler is now listening.");}
 	}
 	number getKeyListenerID(object self)
 	{
@@ -297,11 +299,12 @@ class CreateDF360DialogClass : uiframe
 		if(debugMode==1){result("\n\tReticle added to View window.");}
 		
 		imageDisplay frontdisp
-		if(!returnViewImageDisplay(debugMode, frontdisp)){
+		if(returnViewImageDisplay(debugMode, frontdisp) != true){
 			result("\nNo View Display found.")
 			exit(0);	
 		}
 		
+		if(debugMode==1){result("\n\tKeyListener will be attached to a display. Validity: " + ImageDisplayIsValid(frontdisp));}
 		self.attachKeyListener(frontdisp) // attach the keylistener to the live-view display and start it up.
 		if(debugMode==1){result("\n\tKeyListener created and attached. Shortcut keys available.");}
 		
@@ -345,7 +348,7 @@ class CreateDF360DialogClass : uiframe
 	
 	/* Function to centre beam */
 	void beamCentre(object self){
-		if(dataObject.ScriptObjectIsValid()){ // If dataobject is not there, do not let it set the beam tilt to 0,0!
+		if(CameraControlObject.getAllowControl() == true){
 			number centreXTilt = dataObject.getCentreXTilt();
 			number centreYTilt = dataObject.getCentreYTilt();
 			moveBeamTilt ( centreXTilt, centreYTilt );
@@ -646,7 +649,7 @@ class CreateDF360DialogClass : uiframe
 		// Make the dialog into a floating palette. Needs a lot of work to make it usable.
 		// self.RegisterScriptPalette("Darkfield 360", "Darkfield 360");
 		
-		self.updateEMstatus();
+		CameraControlObject.updateEMstatus();
 	}
 	//********************************
 	// RING CONTROL FUNCTIONS
@@ -733,7 +736,7 @@ class CreateDF360DialogClass : uiframe
 		markerRing.ComponentGetBoundingRect( top, left, bottom, right );
 		measuredRadiusPX = (bottom - top) / 2;
 		if(debugMode==true){result("\nmeasuredRadiusPX = " + measuredRadiusPX);}
-		scaleX = dataObject.returnViewScale();
+		scaleX = CameraControlObject.getViewScale();
 		if(debugMode==true){result("\nscaleX = " + scaleX);}
 		measuredRadiusNM = measuredRadiusPX * scaleX;
 		number measureRadiusAngstrom = 10 / measuredRadiusNM;
@@ -752,11 +755,11 @@ class CreateDF360DialogClass : uiframe
 		measuredRadiusPX = (bottom - top) / 2;
 		centreX = right - measuredRadiusPX;
 		centreY = bottom - measuredRadiusPX;
-		number binningMultiplier = dataObject.getBinningMultiplier();
+		number binningMultiplier = CameraControlObject.getBinningMultiplier();
 		if((binningMultiplier==0) || (binningMultiplier.isNaN())){
 			throw("Please calibrate the toolkit first");
 		}
-		scaleX = dataObject.returnViewScale();
+		scaleX = CameraControlObject.getViewScale();
 		desiredRadiusPX = desiredRadiusNM / scaleX;
 		if(debugMode==true){result("\nscaleX = " + scaleX);}
 		if(debugMode==true){result("\ndesiredRadiusNM: " + desiredRadiusNM + " (1/nm)");}
@@ -776,9 +779,9 @@ class CreateDF360DialogClass : uiframe
 			exit(0);
 		}
 		number top, bottom, left, right, centreX, centreY;
-		number binningMultiplier = dataObject.getBinningMultiplier();
-		number cameraHeight = dataObject.getCameraHeight();
-		number cameraWidth = dataObject.getCameraWidth();
+		number binningMultiplier = CameraControlObject.getBinningMultiplier();
+		number cameraHeight = CameraControlObject.getCameraHeight();
+		number cameraWidth = CameraControlObject.getCameraWidth();
 		// Check if calibrated yet. Stop if not.
 		if((binningMultiplier==0) || (binningMultiplier.isNaN())){
 			throw("Please calibrate the toolkit first");
@@ -1217,8 +1220,8 @@ class CreateDF360DialogClass : uiframe
 		number xTiltTarget, yTiltTarget, relativeXTilt, relativeYTilt;
 		
 		// Read relative xTilt and yTilt from array
-		relativeXTilt = DPImageTags.TagGroupGetTagAsNumber("xTiltRealtive");
-		relativeYTilt = DPImageTags.TagGroupGetTagAsNumber("yTiltRealtive");
+		DPImageTags.TagGroupGetTagAsNumber("xTiltRealtive", relativeXTilt);
+		DPImageTags.TagGroupGetTagAsNumber("yTiltRealtive", relativeYTilt);
 		
 		xTiltTarget = dataObject.getCentreXTilt() + relativeXTilt;
 		yTiltTarget = dataObject.getCentreYTilt() + relativeYTilt;
@@ -1238,7 +1241,9 @@ class CreateDF360DialogClass : uiframe
 		}
 		
 		// Take the  Image
-		number Exposure = CameraControl.getDFExposure();
+		number Exposure = CameraControlObject.getDFExposure();
+		number cameraWidth = CameraControlObject.getCameraWidth();
+		number cameraHeight = CameraControlObject.getCameraHeight();
 		image DFImage;
 		DFImage := sscUnprocessedAcquire(Exposure,0,0,cameraWidth,cameraHeight);
 		
@@ -1358,8 +1363,8 @@ class CreateDF360DialogClass : uiframe
 		image ReferenceDP = dataObject.getReferenceDP();
 
 		image startBFImage;
-		image integratedImage;
-		image sumImage;
+		image middleIntegratedImage, higherIntegratedImage, lowerIntegratedImage;
+		image middleSumImage, higherSumImage, lowerSumImage;
 		
 		if(debugMode==true){result("\nLoading the variables for this image set for DF imaging..");}
 		// Load values from the imageSet data
@@ -1400,7 +1405,7 @@ class CreateDF360DialogClass : uiframe
 			lowerSumImage = lowerSumImage * 0;
 		}
 
-		
+		number tracker = dataObject.getTracker();
 		Result("\n------------- Starting Dark Field Imaging Process ---------------\n");
 		result("\n" + tracker + " exposures to take, taking " + (DFExposure * tracker / 60) + " minutes.");
 		
@@ -1409,7 +1414,6 @@ class CreateDF360DialogClass : uiframe
 		}
 		
 		// Create the first image, which will always be a bright field image of the region
-		number BFExposure = CameraControlObject.getBFExposure();
 		moveBeamTilt(xTiltCenter, yTiltCenter); // Move to the tilt coords
 		startBFImage := sscUnprocessedAcquire(BFExposure,0,0,cameraWidth,cameraHeight); // Image
 		
@@ -1439,7 +1443,7 @@ class CreateDF360DialogClass : uiframe
 		
 		if(saveImages == 1){
 			string fileDirectory = GetApplicationDirectory("auto_save", 0);
-			filePath = PathConcatenate(fileDirectory, fileName);
+			string filePath = PathConcatenate(fileDirectory, fileName);
 			BFImageTags.TagGroupSetTagAsString("FileName", fileName);
 			BFImageTags.TagGroupSetTagAsNumber("SavedAsFile", 1);
 			SaveAsGatan( startBFImage, filePath );
@@ -1470,14 +1474,14 @@ class CreateDF360DialogClass : uiframe
 				TopDFImage := self.takeDFImage (ImageSet, im, "Higher", HigherImageTags);
 			}
 			if(ImageSet.TagGroupDoesTagExist(BottomTagPath)){
-				BottomDFImage: = self.takeDFImage (ImageSet, im, "Lower", LowerImageTags);
+				BottomDFImage := self.takeDFImage (ImageSet, im, "Lower", LowerImageTags);
 			}
 			
 			if(saveImages == true){
 				if((integration == 0) || (saveNonIntegrated == 1)){ // Does not save the integrated images. These must be done seperately.
 					fileName = ("DF_Spot_" + im + "_" + constructTimeStamp()) + "_MIDDLE"
 					string fileDirectory = GetApplicationDirectory("auto_save", 0);
-					filePath = PathConcatenate(fileDirectory, fileName);
+					string filePath = PathConcatenate(fileDirectory, fileName);
 					MiddleImageTags.TagGroupSetTagAsString("FileName", fileName);
 					MiddleImageTags.TagGroupSetTagAsNumber("SavedAsFile", 1);
 					SaveAsGatan( MiddleDFImage, filePath );
@@ -1537,7 +1541,7 @@ class CreateDF360DialogClass : uiframe
 					if(saveImages == true){
 						string fileDirectory = GetApplicationDirectory("auto_save", 0);
 						fileName = "Integrated_Image_" + im + "_Middle";
-						filePath = PathConcatenate(fileDirectory, fileName); // Construct the full file path for the save command.
+						string filePath = PathConcatenate(fileDirectory, fileName); // Construct the full file path for the save command.
 						SaveAsGatan(middleIntegratedImage, filePath);
 					}
 					result("\nIntegrated " + NumberOfIntegrations + " exposures into Integrated Image " + im);
@@ -1552,7 +1556,7 @@ class CreateDF360DialogClass : uiframe
 						if(saveImages == true){
 							string fileDirectory = GetApplicationDirectory("auto_save", 0);
 							fileName = "Integrated_Image_" + im + "_Higher";
-							filePath = PathConcatenate(fileDirectory, fileName); // Construct the full file path for the save command.
+							string filePath = PathConcatenate(fileDirectory, fileName); // Construct the full file path for the save command.
 							SaveAsGatan(higherIntegratedImage, filePath);
 						}
 						higherIntegratedImage = higherIntegratedImage * 0; // Set old image to 0 for next integration sequence.
@@ -1566,7 +1570,7 @@ class CreateDF360DialogClass : uiframe
 						if(saveImages == true){
 							string fileDirectory = GetApplicationDirectory("auto_save", 0);
 							fileName = "Integrated_Image_" + im + "_Lower";
-							filePath = PathConcatenate(fileDirectory, fileName); // Construct the full file path for the save command.
+							string filePath = PathConcatenate(fileDirectory, fileName); // Construct the full file path for the save command.
 							SaveAsGatan(lowerIntegratedImage, filePath);
 						}
 						lowerIntegratedImage = lowerIntegratedImage * 0; // Set old image to 0 for next integration sequence.
@@ -1602,11 +1606,11 @@ class CreateDF360DialogClass : uiframe
 		BFImageTags.TagGroupSetTagAsString("ImageMode");
 		*/
 		
-		string fileName = "Brightfield_End_" + constructTimeStamp();
+		fileName = "Brightfield_End_" + constructTimeStamp();
 		
 		if(saveImages == 1){
 			string fileDirectory = GetApplicationDirectory("auto_save", 0);
-			filePath = PathConcatenate(fileDirectory, fileName);
+			string filePath = PathConcatenate(fileDirectory, fileName);
 			EndBFImageTags.TagGroupSetTagAsString("FileName", fileName);
 			EndBFImageTags.TagGroupSetTagAsNumber("SavedAsFile", 1);
 			SaveAsGatan( endBFImage, filePath );
@@ -1627,12 +1631,23 @@ class CreateDF360DialogClass : uiframe
 		
 		if(integration==true){ //show or save the sum images
 			if(saveImages){
-				fileName = "Sum_Of_Integrated_Images"
+				fileName = "Sum_Of_Integrated_Images_Middle"
 				string fileDirectory = GetApplicationDirectory("auto_save", 0);
-				filePath = PathConcatenate(fileDirectory, fileName);
-				SaveAsGatan( sumImage, filePath );
+				string filePath = PathConcatenate(fileDirectory, fileName);
+				SaveAsGatan( middleSumImage, filePath );
 				result("\nSaved sum of integration images as " + filePath);
+				if(shadowDistance != 0){
+					fileName = "Sum_Of_Integrated_Images_Higher"
+					filePath = PathConcatenate(fileDirectory, fileName);
+					SaveAsGatan( higherSumImage, filePath );
+
+					fileName = "Sum_Of_Integrated_Images_Lower"
+					filePath = PathConcatenate(fileDirectory, fileName);
+					SaveAsGatan( lowerSumImage, filePath );
+				}
 			}
+			
+			
 		}
 
 		positionDebugWindow(debugMode); //Return View Window to the front if it is not all ready
@@ -1641,7 +1656,7 @@ class CreateDF360DialogClass : uiframe
 
 	/* 	Function that performs the Calibration process
 			Take image of the DP for reference when storing.
-			Store the central beam as the first data point.
+			// Store the central beam as the first data point. Do we still do this with the new tags?
 			Calibrate the Tilt Vectors (pixels per tilt unit)
 	 */
 	 
@@ -1649,19 +1664,28 @@ class CreateDF360DialogClass : uiframe
 		// Load data from dataObject
 		// Not Reference DP. That is set later.
 		number tracker = dataObject.getTracker();
-		number DPExposure = dataObject.getDPExposure();
-		image dataArray := dataObject.getDataArray();
+		number DPExposure = CameraControlObject.getDPExposure();
 		number xTiltVectorX, xTiltVectorY, yTiltVectorX, yTiltVectorY;
 		dataObject.getTiltVectors(xTiltVectorX, xTiltVectorY, yTiltVectorX, yTiltVectorY);
-		number cameraWidth = dataObject.getCameraWidth();
-		number cameraHeight = dataObject.getCameraHeight();
+		number cameraWidth = CameraControlObject.getCameraWidth();
+		number cameraHeight = CameraControlObject.getCameraHeight();
 		if(debugMode==true){result("\nstartDPStoring()");}
+		
+		number refScaleX, refScaleY;
+		refScaleX = dataObject.getRefScale();
+		if(debugMode==true){result("\nrefScaleX: " + refScaleX);}
+		if(refScaleX == 0){
+			throw("Please set Camera Length");
+		}		
+		
+		// Update the camera values: binningMultiplier, and Reference DP image.
+		CameraControlObject.storeCameraDetails();
 		
 		image viewImage;
 		if(!returnViewImage(debugMode, viewImage)){
-			result("\nNo view Image detected. This error should not be possible.");
+			result("\nNo view Image detected. This error should not be possible, but here we are.");
 		}	
-		if(tracker!=0){ //("There is Calibration data all ready stored.")
+		if(tracker!=0){ //("There is image/calibration data all ready stored.")
 			if(!ContinueCancelDialog( "There is all ready calibration data stores. Would you like to overwrite it?" )){
 				return;
 			}
@@ -1669,53 +1693,17 @@ class CreateDF360DialogClass : uiframe
 		// Set central Tilt values
 		dataObject.setCentreTiltHere();
 		
-		// Take the reference Diffraction Pattern for future use in calculations.
-		image ReferenceDP := sscUnprocessedAcquire(DPExposure,0,0,cameraWidth,cameraHeight);
-
-		number refScaleX, refScaleY;
-		refScaleX = dataObject.getRefScale();
-		if(debugMode==true){result("\nrefScaleX: " + refScaleX);}
-		if(refScaleX == 0){
-			throw("Please set Camera Length");
-		}
-		ImageSetDimensionScale(ReferenceDP, 0, refScaleX)
-		ImageSetDimensionUnitString(ReferenceDP, 0, "1/nm" )
-		ImageSetDimensionScale(ReferenceDP, 1, refScaleX)
-		ImageSetDimensionUnitString(ReferenceDP, 1, "1/nm" )	
-		
-		// Calculate the binning of the view screen
-		number viewSizeX, viewSizeY, refSizeX, refSizeY;
-		getSize(viewImage, viewSizeX, viewSizeY )
-		getsize(ReferenceDP, refSizeX, refSizeY )
-
-		number binning = refSizeX / viewSizeX;
-		dataObject.setBinningMultiplier(binning);
-		if(debugMode==true){result("\n\tBinning set to " + binning);}
-		referenceDP.SetName("Reference Diffraction Pattern");
-		
-		// Load the reference image into the dataObject
-		if(debugMode==true){result("\nNow Setting ReferenceDP in the DataObject...");}
-		dataObject.setReferenceDP(ReferenceDP);
-		
 		number oldTracker = dataObject.getTracker();
 		dataObject.setTracker(0);
 		
-		// Store the tilt etc. as the 0 value in the array image.
-		if(debugMode==1){result("\nNow Storing Centre Tilt Coords... ");}
-		// self.storeTiltCoord(0, 0); // This is the old code, but for calibration we need to do things differently and fill out the correct tag groups.
 		number xTilt, yTilt;
 		EMGetBeamTilt(xTilt, yTilt);
 		number xTiltRelative = 0;
 		number yTiltRelative = 0;
-		setpixel(dataArray, 0, 0, 0);
-		setpixel(dataArray, 0, 1, xTilt); // xTilt value
-		setpixel(dataArray, 0, 2, yTilt); // yTilt value
-		setpixel(dataArray, 0, 3, xTiltRelative); // relative xTilt value
-		setpixel(dataArray, 0, 4, yTiltRelative); // relative yTilt value
+
 		dataObject.setTracker( 1 );
-		if(debugMode==1){result(" Done");}
 		
-		if(oldTracker != 0){ // reset tracker so stored spots are accessible
+		if(oldTracker != 0){ // reset tracker so stored spots are still recorded in the totals
 			dataObject.setTracker( oldTracker ); 
 		}
 		
@@ -1745,7 +1733,7 @@ class CreateDF360DialogClass : uiframe
 		number xTiltPixelShiftX, xTiltPixelShiftY, xTiltShiftX, xTiltShiftY;
 		EMGetBeamTilt(xTiltShiftX,xTiltShiftY);
 		xTiltShiftX = xTiltShiftX - centreXTilt;
-		findImageShift(ReferenceDP, xTiltDP, xTiltPixelShiftX, xTiltPixelShiftY, debugMode);
+		findImageShift(dataObject.getReferenceDP(), xTiltDP, xTiltPixelShiftX, xTiltPixelShiftY, debugMode);
 		xTiltVectorX = xTiltPixelShiftX / xTiltShiftX;
 		if(isNaN(xTiltVectorX)||isInfinite(xTiltVectorX)){
 			xTiltVectorX = 0;
@@ -1773,7 +1761,7 @@ class CreateDF360DialogClass : uiframe
 		number yTiltPixelShiftX, yTiltPixelShiftY, yTiltShiftX, yTiltShiftY;
 		EMGetBeamTilt(yTiltShiftX,yTiltShiftY);
 		yTiltShiftY = yTiltShiftY - centreYTilt;
-		findImageShift(ReferenceDP, yTiltDP, yTiltPixelShiftX, yTiltPixelShiftY, debugMode);
+		findImageShift(dataObject.getReferenceDP(), yTiltDP, yTiltPixelShiftX, yTiltPixelShiftY, debugMode);
 		yTiltVectorX = yTiltPixelShiftX / yTiltShiftY;
 		yTiltVectorY = yTiltPixelShiftY / yTiltShiftY;
 		if(isNaN(yTiltVectorX)||isInfinite(yTiltVectorX)){
@@ -1801,6 +1789,9 @@ class CreateDF360DialogClass : uiframe
 		vectors.TagGroupSetTagAsNumber("yTilty", yTiltVectorY);
 		dataObject.setTiltVectors(xTiltVectorX, xTiltVectorY, yTiltVectorX, yTiltVectorY);
 		dataObject.setTiltVectorCalibrations(dataObject.getCameraLength(), vectors);
+		
+		// What do we do about generating / updating ImageSets?
+		
 		result("\nCalibration Complete.");
 		printCommands();
 	}
@@ -1812,9 +1803,9 @@ class CreateDF360DialogClass : uiframe
 	 /* Function to return the radius of the marker ring in pixels for unbinned images */
 	 number markerRingRadius(object self)
 	 {
-		number cameraWidth = dataObject.getCameraWidth();
-		number cameraHeight = dataObject.getCameraHeight();
-		number binning = dataObject.getBinningMultiplier();
+		number cameraWidth = CameraControlObject.getCameraWidth();
+		number cameraHeight = CameraControlObject.getCameraHeight();
+		number binning = CameraControlObject.getBinningMultiplier();
 		number beamPixelCentreX, beamPixelCentreY, tiltVectorX, tiltVectorY, targetRadiusPX, scaleX, scaleY;
 		scaleX = dataObject.getRefScale(); // Scales for an unbinned image
 		scaleY = dataObject.getRefScale(); 
@@ -1840,6 +1831,7 @@ class CreateDF360DialogClass : uiframe
 		// Load data from dataObject
 		if(debugMode==true){result("\nStarting to create Ring Data Points.");}
 		number DPExposure = CameraControlObject.getDPExposure();
+		number DFExposure = CameraControlObject.getDFExposure();
 		number xTiltVectorX, xTiltVectorY, yTiltVectorX, yTiltVectorY;
 		dataObject.getTiltVectors(xTiltVectorX, xTiltVectorY, yTiltVectorX, yTiltVectorY);
 		number cameraWidth = CameraControlObject.getCameraWidth();
@@ -1851,7 +1843,7 @@ class CreateDF360DialogClass : uiframe
 		TagGroup newImageSet = imageSetTools.createNewImageSet();
 		newImageSet.TagGroupSetTagAsNumber("RingMode", 1);
 		newImageSet.TagGroupSetTagAsNumber("ShadowDistance", shadowDistanceNM);
-		newImageSet.TagGroupSetTagAsNumber("DSpacingAng", dataObject.convertPixelDistanceToNM(radiusPX));		
+		newImageSet.TagGroupSetTagAsNumber("DSpacingAng", dataObject.convertPixelDistanceToNM(radiusPX, 0));
 		
 		if(debugMode==true){result("\n\tData Object loaded into variables.");}
 
@@ -1931,7 +1923,7 @@ class CreateDF360DialogClass : uiframe
 			thisImage.TagGroupSetTagAsNumber("yTiltValue", tiltY);
 			thisImage.TagGroupSetTagAsNumber("ShadowValue", 1);
 			thisImage.TagGroupSetTagAsNumber("ShadowDistance", shadowDistanceNM);
-			thisImage.TagGroupSetTagAsNumber("DSpacingAng", dataObject.convertPixelDistanceToNM(radiusPX));
+			thisImage.TagGroupSetTagAsNumber("DSpacingAng", dataObject.convertPixelDistanceToNM(radiusPX, 0));
 
 			if(remainder(i,60)==0){ //This part just puts a '.' every calculations as a crude progress bar, and a line break every 60.
 				result("\n");
@@ -1975,7 +1967,7 @@ class CreateDF360DialogClass : uiframe
 			number j = 1 + round(( TotalSpots / numberOfDP ) * i)
 			// Load coordinates 
 			TagGroup thisDP
-			spots.TagGroupGetTagAsTagGroup(j, thisDP);
+			spots.TagGroupGetIndexedTagAsTagGroup(j, thisDP);
 			number xTiltRealtive, yTiltRealtive;
 			thisDP.TagGroupGetTagAsNumber("xTiltRelative", xTiltRealtive);
 			thisDP.TagGroupGetTagAsNumber("yTiltRelative", yTiltRealtive);
@@ -1983,7 +1975,9 @@ class CreateDF360DialogClass : uiframe
 			moveBeamTilt( xTiltRealtive + beamCentreX, yTiltRealtive + beamCentreY );
 			// Take image
 			image DPImage := sscUnprocessedAcquire(DPExposure,0,0,cameraWidth,cameraHeight);
-			string fileName = "Ring at " + (i * angleStep) + " deg"
+			string angleName = " ";
+			angleName = angleName + round (360 / (numberOfDP * (i+1) ));
+			string fileName = "Ring at " + angleName + " deg"
 			DPImage.ImageSetName(fileName);
 			showImage(DPImage);
 			number refScaleX = dataObject.getRefScale(); // Fix the image's scale for future use.
@@ -2005,6 +1999,7 @@ class CreateDF360DialogClass : uiframe
 			}
 		}
 		self.beamCentre();
+		return 1;
 	} 
 	
 
@@ -2071,6 +2066,9 @@ class CreateDF360DialogClass : uiframe
 		if(debugMode==true){result("\nSelection is " + returnname);}
 		dataObject.setCameraLength(returnname);
 		
+		// update camera
+		CameraControlObject.storeCameraDetails();
+		
 		// Update the scales
 		number newScale = dataObject.getScaleCalibration(returnname);
 		if(debugMode==true){result("\nNew Scale is " + newScale);}
@@ -2097,7 +2095,7 @@ class CreateDF360DialogClass : uiframe
 		}
 		
 		// View image scale
-		number binning = dataObject.getBinningMultiplier();
+		number binning = CameraControlObject.getBinningMultiplier();
 
 		ImageSetDimensionScale(viewImage, 0, (newScale * binning))
 		ImageSetDimensionUnitString(viewImage, 0, "1/nm" )
@@ -2131,7 +2129,7 @@ class CreateDF360DialogClass : uiframe
 		number newDFExposure;
 		taggroup intfield=self.lookupelement("DarkfieldExposureFieldInput")
 		newDFExposure = dlggetvalue(intfield);
-		dataObject.setDFExposure(newDFExposure);
+		CameraControlObject.setDFExposure(newDFExposure);
 		if(debugMode==true){result("\nDarkField Exposure time set to " + newDFExposure + " seconds");}
 	}
 	void onBFChange (object self)
@@ -2139,7 +2137,7 @@ class CreateDF360DialogClass : uiframe
 		number newBFExposure;
 		taggroup intfield=self.lookupelement("BrightfieldExposureFieldInput")
 		newBFExposure = dlggetvalue(intfield);
-		dataObject.setBFExposure(newBFExposure);
+		CameraControlObject.setBFExposure(newBFExposure);
 		if(debugMode==true){result("\nBrightField Exposure time set to " + newBFExposure + " seconds");}
 	}
 	void onDPChange (object self)
@@ -2147,7 +2145,7 @@ class CreateDF360DialogClass : uiframe
 		number newDPExposure;
 		taggroup intfield=self.lookupelement("DiffractionExposureFieldInput")
 		newDPExposure = dlggetvalue(intfield);
-		dataObject.setDPExposure(newDPExposure);
+		CameraControlObject.setDPExposure(newDPExposure);
 		if(debugMode==true){result("\nDiffraction Pattern Exposure time set to " + newDPExposure + " seconds");}
 	}	
 	
@@ -2155,7 +2153,7 @@ class CreateDF360DialogClass : uiframe
 	/* CONTROL PANEL BUTTON FUNCTIONS*/
 	void beamCentreButtonPress (object self)
 	{
-		if(!AllowControl){
+		if(CameraControlObject.getAllowControl() != true){
 			result("\nToolkit Controls are offline. Ensure there is a live view window active.")
 			exit(0);
 		}
@@ -2167,7 +2165,7 @@ class CreateDF360DialogClass : uiframe
 	/* IMAGE PANEL BUTTON FUNCTIONS */
 	void StoreDPButtonPress (object self)
 	{
-		if(!AllowControl){
+		if(CameraControlObject.getAllowControl() != true){
 			result("\nToolkit Controls are offline. Ensure there is a live view window active and has been captured.")
 			exit(0);
 		}
@@ -2188,7 +2186,7 @@ class CreateDF360DialogClass : uiframe
 		
 	void storeROIButtonPress (object self)
 	{
-		if(!AllowControl){
+		if(CameraControlObject.getAllowControl() != true){
 			result("\nToolkit Controls are offline. Ensure there is a live view window active and has been captured.")
 			exit(0);
 		}
@@ -2281,34 +2279,28 @@ class CreateDF360DialogClass : uiframe
 
 	void storeRingButtonPress (object self)
 	{
-		if(!AllowControl){
+		if(CameraControlObject.getAllowControl() != true){
 			result("\nToolkit Controls are offline. Ensure there is a live view window active and has been captured.")
 			exit(0);
 		}
 		if(!markerRing.ComponentIsValid()){
 			throw("Marker Ring not found")
 		}
-		image dataArray := dataObject.getDataArray();
-		if(dataObject.getTracker() > 1){ // All ready results stored?
-			//if(TwoButtonDialog("Delete previous stored points?", "Yes", "No")){
-				dataObject.setTracker(1);
-				number height, width;
-				getSize(dataArray, width, height)
-				//realsubarea operator[( realimage img, number top, number left, number bottom, number right )
-				dataArray[0, 1, height, width] = 0; // Set all values except first to 0
-				result("\nStored points have been cleared. Calibration data are still in memory.")			
-			//}
-		}
+		/* Whole thing needs re-doing with new image config option dialog.
+		// Make new imageSet
+		TagGroup newSet = ImageSetTools.createNewImageSet();
 		number radiusPX = self.markerRingRadius();
 		number numberOfPoints;
 		self.loadRingPoints (radiusPX, 0, numberOfPoints);
+		// number imageRingDP (object self, TagGroup ImageSet, number numberOfDP, number saveImages, number displayImages)
 		self.imageRingDP (45);
 		self.beamCentre();
+		*/
 	}
 	
 	void deleteStoredTiltsButtonPress (object self)	
 	{
-		if(!AllowControl){
+		if(CameraControlObject.getAllowControl() != true){
 			result("\nToolkit Controls are offline. Ensure there is a live view window active and has been captured.")
 			exit(0);
 		}
@@ -2372,7 +2364,7 @@ class CreateDF360DialogClass : uiframe
 			number viewImageID = viewImage.ImageGetID();
 			if(targetImageID == viewImageID){ // AND the view image is being refered to
 				//get scale from dataObject
-				scaleX = dataObject.getRefScale() * dataObject.getBinningMultiplier();
+				scaleX = dataObject.getRefScale() * CameraControlObject.getBinningMultiplier();
 			}
 		} else { // use image scale
 			number scaleY
@@ -2390,7 +2382,7 @@ class CreateDF360DialogClass : uiframe
 	
 	void DarkFieldImageButtonPress (object self)
 	{
-		if(!AllowControl){
+		if(CameraControlObject.getAllowControl() != true){
 			result("\nToolkit Controls are offline. Ensure there is a live view window active and has been captured.")
 			exit(0);
 		}
@@ -2398,13 +2390,21 @@ class CreateDF360DialogClass : uiframe
 		{
 			Throw("No spots are stored.");
 		}
+		
+		// Needs updating for new dialog method
+		
 		number shadowDistanceNM = dataObject.getShadowDistanceNM();
 		number integrationDistance = 45;
 		number integration = TwoButtonDialog("Use integrated images? Can help when taking an entire ring.", "Yes", "No");
 		if(integration==true){
 			getNumber("How many results should each image be made of?", integrationDistance, integrationDistance);
 		}
-		self.darkFieldImage (shadowDistanceNM, integration, integrationDistance)
+		// darkfieldimage( ScriptObject self, TagGroup imageset, RealNumber savenonintegrated, RealNumber saveimages, RealNumber displaynonintegrated, RealNumber displayimages )
+
+
+		TagGroup imageSet;
+		ImageSetTools.getCurrentImageSet(imageSet);
+		self.darkFieldImage (imageSet, 0, 1, 0, 1); // hack job for now.
 	}
 	
 	void ProcessDirectoryButtonPress (object self) // Makes binaries for a collection of images.

@@ -12,13 +12,8 @@ object startToolkit () {
 	
 	result("\nSetting Variables.")
 	// Set Variables
-	dataObject.setDFExposure(30); // # of seconds to expose the camera for taking DarkField images.
-	dataObject.setBFExposure(1); // # of seconds to expose the camera for taking Diffraction Pattern images.
-	dataObject.setDPExposure(0.5); // # of seconds to expose the camera for taking BrightField images.
 	dataObject.setMaxDeviation(0.2); // difference (in 1/nm) allowed during pattern matching operations
 	image dataArray; // Array of values that are stored for future reference.
-	dataArray := RealImage( "Data Array", 4, 5000, 10 ); // 5000 x 10 sized
-	dataObject.setDataArray(dataArray);
 	
 	result("\nLoading Image Set Tools...")
 	object theImageSetTools = alloc(ImageSetTools);

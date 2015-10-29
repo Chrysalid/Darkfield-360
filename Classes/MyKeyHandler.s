@@ -6,6 +6,18 @@
 // D. R. G. Mitchell, adminnospam@dmscripting.com (remove the nospam to make this work)
 // www.dmscripting.com
 
+/* Functions to print out instructions to the output window. */
+void printCommands(){
+	result("\n\nShortcut Keys Available:");
+	result("\n\t'h' to display these commands again.");
+	result("\n\t's' to store a diffraction spot's coordinates.");
+	result("\n\t'r' to erase the stored diffraction spot cordinates.");
+	result("\n\t'p' to print stored tilt data to this screen.");
+	result("\n\t'1' to show the ring marker and measuring system.");
+	result("\n\t'2' to move the marker ring to a set D-Spacing.");
+	result("\n\t'3' to update the ring-mode radius display.");
+	result("\n\t'0' to return the beam to the centre of the screen.");
+}
 
 class MyKeyHandler
 {
@@ -13,13 +25,7 @@ class MyKeyHandler
 	number dataObjectID; // numerical ID of the dataObject script object.
 	number ToolkitID; // ID of the object this keyhandler will be stored inside of
 	number ImageSetToolsID; // ID of the imageset tools object
-	number toggle; // Variable
-	/* Global Values for the object to reference in function calls */
-	image targetArrayImage, referenceDP;
-	imageDocument viewWindowDocument;
-	number tracker, debugMode, DFExposure, DPExposure, BFExposure, numberOfPoints, takeAdditionalPoints;
-	component markerRing, ringRadiusText;
-	// object dataObject; Depreciated. We need to store a WEAK reference to the data object here and then put the key handler INSIDE the data object
+	number debugMode
 
 	// Function to print out the various saved variables for debugging
 	void printAllValues(object self)
@@ -34,30 +40,7 @@ class MyKeyHandler
 		result(textstring);
 		result("\n-------End----------------")
 	}
-	
-	/* Function to load the data from the dataObject. It's ID must have all ready been assigned.
-		We do NOT store the dataObject itself here, because the dataObject and the Keyhandler are inside the Toolkit object.
-	*/
-	number loadData(object self) {
-		object dataObject = GetScriptObjectFromID(dataObjectID);
-		toggle = dataObject.getToggle();
-		targetArrayImage = dataObject.getDataArray();
-		referenceDP = dataObject.getReferenceDP();
-		tracker = dataObject.getTracker();
-		DFExposure = dataObject.getDFExposure();
-		DPExposure = dataObject.getDPExposure();
-		BFExposure = dataObject.getBFExposure();
-		markerRing = dataObject.getMarkerRing();
-		ringRadiusText = dataObject.getRingRadiusText();
-		ImageDocument viewWindowDocument;
-		if(!returnViewImageDocument(debugMode, viewWindowDocument)){
-			result("No View Window detected.")
-			exit(0);
-		}
-		if(debugMode==1){result("\n\tKeyListener: Data Loaded.");}
-		
-		return 0;
-	}
+
 	
 	/* Function stores the dataObject's ID so it can reference itself later. */
 	image initialise(object self, number theToolkitID, number theDataObjectID, number theImageSetToolsID)
@@ -70,7 +53,6 @@ class MyKeyHandler
 	image startListening(object self, number KeyTok)
 	{
 			KeyToken = KeyTok; // the ID of the 'listener' that this handler is now being attached to.
-			self.loadData(); // Load all that data
 	}
 	
 	/* Function to dettach keylistner from the display  */
@@ -154,12 +136,6 @@ class MyKeyHandler
 					printGreeting();
 					printCommands();
 					return 0;
-				}
-			if(keydescription.MatchesKeyDescriptor( "t" )) // TOGGLE SWITCH
-				{
-					dataObject.setToggle();
-					toggle = dataObject.getToggle();
-					return toggle;
 				}
 			return 0;
 		}

@@ -366,20 +366,6 @@ number convertAngstromToInverseNM(number Angstroms){
 	return InverseNM;
 }
 
-
-/* Functions to print out instructions to the output window. */
-void printCommands(){
-	result("\n\nShortcut Keys Available:");
-	result("\n\t'h' to display these commands again.");
-	result("\n\t's' to store a diffraction spot's coordinates.");
-	result("\n\t'r' to erase the stored diffraction spot cordinates.");
-	result("\n\t'p' to print stored tilt data to this screen.");
-	//result("\n\t't' to switch the built-in toggle. This is not currently used");
-	result("\n\t'1' to show the ring marker and measuring system.");
-	result("\n\t'2' to move the marker ring to a set D-Spacing.");
-	result("\n\t'3' to update the ring-mode radius display.");
-	result("\n\t'0' to return the beam to the centre of the screen.");
-}
 void printGreeting(){
 	result("\n\n\n------- DarkField 360 Quick Start Guide --------");
 	result("\nMake sure that the magnification (SA-MAG mode) and camera length are set to the desired values and focused.");
