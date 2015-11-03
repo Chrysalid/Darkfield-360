@@ -37,6 +37,9 @@ object startToolkit () {
 	result("\nLoading Image Processing Functions...")
 	object ImageProcessingObject = alloc(ImageProcessing);
 	
+	result("\nLoading Image Set Configuration Dialog...")
+	object ImageConfigDialog = alloc(ImageConfiguration);
+	
 	if(dataObject.checkPersistent()==false){
 		TagGroup persistentSave = dataObject.createDefaultPersistent(); // make a blank set of data
 		dataObject.updatePersistent(persistentSave); // save it to memory
@@ -55,6 +58,7 @@ object startToolkit () {
 	Toolkit.storeTiltDialog(tiltDialog);
 	Toolkit.storeCameraControlObject(theCameraControlObject);
 	Toolkit.storeImageProcessingObject(ImageProcessingObject);
+	Toolkit.storeImageConfigDialog(ImageConfigDialog);
 	Toolkit.updateDialog();
 	return Toolkit;
 }

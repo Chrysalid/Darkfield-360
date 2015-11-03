@@ -94,7 +94,7 @@ class ImageConfiguration : uiframe
 		TagGroup Navigation = dlggroupitems(prevSetButton, newSetButton, nextSetButton).dlgtablelayout(3,1,0);
 		TagGroup FileArea = dlggroupitems(autoSaveMode, displayImagesMode, Navigation).dlgtablelayout(1,3,0);
  
-		TagGroup ImageNotes = DLGCreateTextBox( 50, 50, 2048 ).dlgidentifier("ImageNotesTextBox");
+		TagGroup ImageNotes = DLGCreateTextBox( 50, 5, 2048 ).dlgidentifier("ImageNotesTextBox");
 		
 		box_items.DLGAddElement(ImageSetTitle);
 		box_items.DLGAddElement(IntegrationArea);
@@ -106,22 +106,145 @@ class ImageConfiguration : uiframe
 		return box;
 	}
 	
+	
 	/* Fills the fields with the data from an ImageSet and enables/disables the fields */
 	
 	number updateDialog(object self, TagGroup ImageSet){
-		number ImagesTaken
+		if(debugMode==true){result("\nUpdating image set configuration dialog.");}
+		number ImagesTaken, DPsTaken;
 		string ImageSetID
 		ImageSet.TagGroupGetTagAsNumber("ImagesTaken", ImagesTaken);
+		ImageSet.TagGroupGetTagAsNumber("DPsTaken", DPsTaken);
 		if(ImagesTaken == 1){
 			result("\nAttempted to load Image set " + ImageSetID + " in the configuration dialog, but image set has all ready been taken and cannot be configured.");
 			return 0;
 		}
 		
+		// Get the variables...
+		number RingMode, NumberOfRingPoints, RingDSpacing, DegreeStep, IntegratedImage, NumberOfIntegrations;
+		number AutoSaveNonInt, AutoDisplayNonInt, shadowMode, ShadowDistance, AutoSaveImages, AutoDisplayImages;
+		
+		// ring mode values
+		ImageSet.TagGroupGetTagAsNumber("RingMode", RingMode);
+		ImageSet.TagGroupGetTagAsNumber("NumberOfRingPoints", NumberOfRingPoints);
+		ImageSet.TagGroupGetTagAsNumber("RingDSpacing", RingDSpacing);
+		ImageSet.TagGroupGetTagAsNumber("DegreeStep", DegreeStep);
+		
+		// integration
+		ImageSet.TagGroupGetTagAsNumber("IntegratedImage", IntegratedImage);
+		ImageSet.TagGroupGetTagAsNumber("NumberOfIntegrations", NumberOfIntegrations);
+		ImageSet.TagGroupGetTagAsNumber("AutoSaveNonInt", AutoSaveNonInt);
+		ImageSet.TagGroupGetTagAsNumber("AutoDisplayNonInt", AutoDisplayNonInt);
+		
+		// shadow settings
+		ImageSet.TagGroupGetTagAsNumber("ShadowDistance", ShadowDistance);
+		if(ShadowDistance != 0){
+			shadowMode = 1;
+		} else {
+			shadowMode = 0;
+		}
+		
+		ImageSet.TagGroupGetTagAsNumber("AutoSaveImages", AutoSaveImages);
+		ImageSet.TagGroupGetTagAsNumber("AutoDisplayImages", AutoDisplayImages);
+		
+		string imageSetNameString;
+		ImageSet.TagGroupGetTagAsString("SetName", imageSetNameString);
+		
+		// Fill fields
+		self.DLGValue("ImageSetNameField", imageSetNameString);
+		self.DLGValue("ImageSetIDField", ImageSetID);
+		self.DLGValue("IntegrationModeCheckBox", IntegratedImage);
+		self.DLGValue("IntegrationDistanceField", NumberOfIntegrations);
+		self.DLGValue("SaveNonIntImagesCheckBox", AutoSaveNonInt);
+		self.DLGValue("DisplayNonIntImagesCheckBox", AutoDisplayNonInt);
+		self.DLGValue("ShadowModeCheckBox", shadowMode);
+		self.DLGValue("ShadowDistanceField", ShadowDistance);
+		self.DLGValue("RingModeCheckBox", RingMode);
+		self.DLGValue("DSpacingField", RingDSpacing);
+		self.DLGValue("NumberOfRingPointsLabelField", NumberOfRingPoints);
+		self.DLGValue("SaveModeCheckBox", AutoSaveImages);
+		self.DLGValue("DisplayImagesModeCheckBox", AutoDisplayImages);
+		
+		self.SetElementIsEnabled("ImageSetIDField", 0); // this is always auto-generated
+		
+		if(IntegratedImage){
+			self.SetElementIsEnabled("SaveNonIntImagesCheckBox", 1);
+			self.SetElementIsEnabled("DisplayNonIntImagesCheckBox", 1);
+		} else {
+			self.SetElementIsEnabled("SaveNonIntImagesCheckBox", 0);
+			self.SetElementIsEnabled("DisplayNonIntImagesCheckBox", 0);
+		}
+		
+		if(DPsTaken == 0){
+			if(debugMode==true){result("\nDPs not taken, allowing mode switches.");}
+			self.SetElementIsEnabled("IntegrationModeCheckBox", 1);
+			self.SetElementIsEnabled("ShadowModeCheckBox", 1);
+			self.SetElementIsEnabled("ShadowDistanceField", 1);
+			self.SetElementIsEnabled("RingModeCheckBox", 1);
+			self.SetElementIsEnabled("DSpacingField", 1);
+			self.SetElementIsEnabled("NumberOfRingPointsLabelField", 1);
+			self.SetElementIsEnabled("IntegrationDistanceField", 1);
+		} else {
+			if(debugMode==true){result("\nDPs taken, disabling mode switches.");}
+			self.SetElementIsEnabled("IntegrationModeCheckBox", 0);
+			self.SetElementIsEnabled("ShadowModeCheckBox", 0);
+			self.SetElementIsEnabled("ShadowDistanceField", 0);
+			self.SetElementIsEnabled("RingModeCheckBox", 0);
+			self.SetElementIsEnabled("DSpacingField", 0);
+			self.SetElementIsEnabled("NumberOfRingPointsLabelField", 0);
+			self.SetElementIsEnabled("IntegrationDistanceField", 0);
+		}
+		
+	}
+	
+	/* Observes the current image set settings and makes a tag group out of them for future processing. */
+	TagGroup generateResultTags(object self){
+		TagGroup results = newTagGroup();
+		string imageSetNameString
+		string ImageSetID
+		number IntegratedImage, NumberOfIntegrations, AutoSaveNonInt, AutoDisplayNonInt, shadowMode, ShadowDistance, RingMode, RingDSpacing, NumberOfRingPoints, AutoSaveImages, AutoDisplayImages
+		
+		self.DLGGetValue("ImageSetNameField", imageSetNameString);
+		self.DLGGetValue("ImageSetIDField", ImageSetID);
+		self.DLGGetValue("IntegrationModeCheckBox", IntegratedImage);
+		self.DLGGetValue("IntegrationDistanceField", NumberOfIntegrations);
+		self.DLGGetValue("SaveNonIntImagesCheckBox", AutoSaveNonInt);
+		self.DLGGetValue("DisplayNonIntImagesCheckBox", AutoDisplayNonInt);
+		self.DLGGetValue("ShadowModeCheckBox", shadowMode);
+		self.DLGGetValue("ShadowDistanceField", ShadowDistance);
+		self.DLGGetValue("RingModeCheckBox", RingMode);
+		self.DLGGetValue("DSpacingField", RingDSpacing);
+		self.DLGGetValue("NumberOfRingPointsLabelField", NumberOfRingPoints);
+		self.DLGGetValue("SaveModeCheckBox", AutoSaveImages);
+		self.DLGGetValue("DisplayImagesModeCheckBox", AutoDisplayImages);
+		// notes not finished.
+		
+		results.TagGroupSetTagAsString("ImageSetNameField", imageSetNameString);
+		results.TagGroupSetTagAsString("ImageSetIDField", ImageSetID);
+		results.TagGroupSetTagAsNumber("IntegrationModeCheckBox", IntegratedImage);
+		results.TagGroupSetTagAsNumber("IntegrationDistanceField", NumberOfIntegrations);
+		results.TagGroupSetTagAsNumber("SaveNonIntImagesCheckBox", AutoSaveNonInt);
+		results.TagGroupSetTagAsNumber("DisplayNonIntImagesCheckBox", AutoDisplayNonInt);
+		results.TagGroupSetTagAsNumber("ShadowModeCheckBox", shadowMode);
+		results.TagGroupSetTagAsNumber("ShadowDistanceField", ShadowDistance);
+		results.TagGroupSetTagAsNumber("RingModeCheckBox", RingMode);
+		results.TagGroupSetTagAsNumber("DSpacingField", RingDSpacing);
+		results.TagGroupSetTagAsNumber("NumberOfRingPointsLabelField", NumberOfRingPoints);
+		results.TagGroupSetTagAsNumber("SaveModeCheckBox", AutoSaveImages);
+		results.TagGroupSetTagAsNumber("DisplayImagesModeCheckBox", AutoDisplayImages);
+		
+		return results;
 	}
 	
 	/* Create the Dialog. Must be called before showScaleValueDialog. Uses the CreateFields function output */
 	void generateDialog(object self){
-		self.super.init( self.createFields() );
+	TagGroup position;
+		position = DLGBuildPositionFromApplication();
+		position.TagGroupSetTagAsTagGroup( "Width", DLGBuildAutoSize() );
+		position.TagGroupSetTagAsTagGroup( "Height", DLGBuildAutoSize() );
+		position.TagGroupSetTagAsTagGroup( "X", DLGBuildRelativePosition( "Inside", 1 ) );
+		position.TagGroupSetTagAsTagGroup( "Y", DLGBuildRelativePosition( "Inside", 1 ) );
+		self.super.init( self.createFields().dlgposition(position) );
 	}
 	
 	/* Function to make the dialog visible on screen after it is constructed. */
@@ -138,11 +261,12 @@ class ImageConfiguration : uiframe
 		childDialog = self.ScriptObjectClone(); // Make a copy of itself and store it.
 		if(debugMode==1){result("\nGenerating child dialog");}
 		childDialog.generateDialog(); // Make the dialog for this copy
+		
 		if(debugMode==1){result("\nShowing child dialog");}
-		number useValues = childDialog.showCalibrationDialog();	// Display the child with Pose() system
+		number useValues = childDialog.showImageSettingsDialog();	// Display the child with Pose() system
 		if(useValues == 1){
 			// save temporary tag groups to the dataObject
-			self.saveToDataObject();
+			// self.saveToDataObject();
 		}
 		childDialog = NULL; // NULL the childDialog so it can go out of scope.
 		return useValues;

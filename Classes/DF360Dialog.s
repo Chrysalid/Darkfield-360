@@ -29,6 +29,8 @@ class CreateDF360DialogClass : uiframe
 	number CameraControlObjectID;
 	object ImageProcessingObject;
 	number ImageProcessingObjectID;
+	object ImageConfigDialog;
+	number ImageConfigDialogID;
 	component markerRing;
 	component ringRadiusText;
 	
@@ -164,6 +166,19 @@ class CreateDF360DialogClass : uiframe
 	number getImageProcessingObjectID(object self)
 	{
 		return ImageProcessingObjectID;
+	}
+	
+	/* Store the Image Configuration dialog object */
+	void storeImageConfigDialog(object self, object theImageConfigDialog)
+	{
+		imageConfigDialog = theImageConfigDialog;
+		imageConfigDialogID = imageConfigDialog.ScriptObjectGetID();
+		imageConfigDialog.initialise(ToolkitID, dataObjectID, imageSetToolsID); // Tell the object who it belongs to
+		imageConfigDialog.setDebugMode(debugMode);
+	}
+	number getImageConfigDialog(object self)
+	{
+		return imageConfigDialogID;
 	}
 	
 	
@@ -2286,6 +2301,8 @@ class CreateDF360DialogClass : uiframe
 		if(!markerRing.ComponentIsValid()){
 			throw("Marker Ring not found")
 		}
+		
+		number useValues = ImageConfigDialog.inputNewCalibration();
 		/* Whole thing needs re-doing with new image config option dialog.
 		// Make new imageSet
 		TagGroup newSet = ImageSetTools.createNewImageSet();

@@ -37,6 +37,7 @@ ImageSets
 		SetName
 		CreationTime: <time in milliseconds image set tag was created>
 		ImagesTaken: 0/1; // if the image set has been taken (1) or if it is waiting to be taken (0).
+		DPsTaken: 0/1; // if the diffraction patterns for each point have been taken.
 		DiffractionScale:<value used>
 		CameraLength: <value>
 		ImageNotes: <string value>

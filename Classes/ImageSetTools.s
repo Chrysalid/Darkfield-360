@@ -69,6 +69,8 @@ class ImageSetTools
 		imageSetData.TagGroupCreateNewLabeledTag("ImageSetName") // A name for the image set provided by the user
 		imageSetData.TagGroupCreateNewLabeledTag("CreationTime") //<time in milliseconds image set tag was created>
 		imageSetData.TagGroupCreateNewLabeledTag("ImagesTaken") // 0/1; // if the image set has been taken (1) or if it is waiting to be taken.
+		imageSetData.TagGroupCreateNewLabeledTag("DPsTaken"); // 0/1; // if the diffraction patterns for each point have been taken.
+		
 		imageSetData.TagGroupCreateNewLabeledTag("DiffractionScale") //<value used>
 		imageSetData.TagGroupCreateNewLabeledTag("CameraLength");
 		
