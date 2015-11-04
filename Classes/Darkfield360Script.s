@@ -2889,6 +2889,16 @@ class ImageSetTools
 		return 1;
 	}
 	
+	/* Returns the image set id string for a given image set tag group. Used to simplify using image sets in external functions.*/
+	number getImageSetID(object self, TagGroup ImageSet, string &ImageSetIDvariable){
+		string value;
+		if (ImageSet.TagGroupGetTagAsString( "ImageSetID", ImageSetIDvariable ) == 0){
+			result("\nNo ImageSetID found in tag group");
+			return 0;
+		}
+		return 1;
+	}
+	
 	
 	/* Function to create the persistent image tags to store information. Requires a lot of inputs.
 		createImageTags( imageSetID, imageSpotID, ImageType, ImageMode,	ringMode, integratedImage, NumberOfIntegrations,\
@@ -3574,6 +3584,9 @@ class CameraControl
 // ********************************
 // When creating a new image set and preparing to take darkfield images this dialog can be used to select the image set settings.
 // Not used to process or view image sets, which will have to show images and things.
+// an imageset is created ouside the dialog and passed to this local store. If values are kept it will create a new image set or overwrite the existing image set of the same ID.
+// when starting to save DPs it will create a new image set. All settings can be changed except set ID.
+// when starting darkfield imaging it will over-write or update. At this point it can only change image save settings (and notes when i get them working)
 
 class ImageConfiguration : uiframe
 {
@@ -3585,6 +3598,7 @@ class ImageConfiguration : uiframe
 	number toolkitID;
 	number ImageSetToolsID;
 	number debugMode;
+	TagGroup LocalImageSet; 
 	
 	void takeImageConfiguration(object self, tagGroup settingsGroup){ // updates the returnedSettings object
 		returnedSettings = settingsGroup;
@@ -3599,26 +3613,47 @@ class ImageConfiguration : uiframe
 		ImageSetToolsID = theImageSetToolsID;
 	}
 	
-	/* Function to create the dialog (minus the OK/Cancel buttons) */
+	/* Function to create the dialog (minus the OK/Cancel buttons)
+		In order to set the field valus etc. the dialog must be displayed, but as a modal dialog this cannot be done easily.
+		Therefore this function must also pre-load the initial values using the LocalImageSet tag group.
+			LocalImageSet must be set before calling this function.
+	
+	*/
 	TagGroup createFields (object self){
 		if(debugMode==1){result("\n\tCreating fields for ImageSet Config dialog.");}
 		taggroup box_items
 		taggroup box=dlgcreatebox("Configure Image Set", box_items)
 		box.dlgexternalpadding(5,3).dlginternalpadding(12,5)
 		
-		string imageSetNameString = "DEBUG";
-		string imageSetID = "i99999999999";
-		number integrationState = 1; 
-		number integrationDistance = 5;
-		number saveNonIntImages = 1;
-		number displayNonIntImages = 1;
-		number shadowState = 1;
-		number shadowDistance = 1;
-		number ringState = 1;
-		number DSpacing = 5;
-		number numberOfRingPoints = 180;
-		number autoSaveState = 1;
-		number displayImagesState = 1;
+		// Get the variables...
+		string imageSetNameString, imageSetID;
+		number RingMode, NumberOfRingPoints, RingDSpacing, DegreeStep, IntegratedImage, NumberOfIntegrations;
+		number AutoSaveNonInt, AutoDisplayNonInt, shadowMode, ShadowDistance, AutoSaveImages, AutoDisplayImages;
+		
+		// ring mode values
+		LocalImageSet.TagGroupGetTagAsNumber("RingMode", RingMode);
+		LocalImageSet.TagGroupGetTagAsNumber("NumberOfRingPoints", NumberOfRingPoints);
+		LocalImageSet.TagGroupGetTagAsNumber("RingDSpacing", RingDSpacing);
+		LocalImageSet.TagGroupGetTagAsNumber("DegreeStep", DegreeStep);
+		
+		// integration
+		LocalImageSet.TagGroupGetTagAsNumber("IntegratedImage", IntegratedImage);
+		LocalImageSet.TagGroupGetTagAsNumber("NumberOfIntegrations", NumberOfIntegrations);
+		LocalImageSet.TagGroupGetTagAsNumber("AutoSaveNonInt", AutoSaveNonInt);
+		LocalImageSet.TagGroupGetTagAsNumber("AutoDisplayNonInt", AutoDisplayNonInt);
+		
+		// shadow settings
+		LocalImageSet.TagGroupGetTagAsNumber("ShadowDistance", ShadowDistance);
+		if(ShadowDistance != 0){
+			shadowMode = 1;
+		} else {
+			shadowMode = 0;
+		}
+		
+		LocalImageSet.TagGroupGetTagAsNumber("AutoSaveImages", AutoSaveImages);
+		LocalImageSet.TagGroupGetTagAsNumber("AutoDisplayImages", AutoDisplayImages);
+		LocalImageSet.TagGroupGetTagAsString("SetName", imageSetNameString);
+		LocalImageSet.TagGroupGetTagAsString("ImageSetID", imageSetID)
 		
 		TagGroup ImageSetNameLabel = DLGCreateLabel("Image Set Name: ");
 		TagGroup ImageSetNameField = DLGCreateStringField(imageSetNameString, 20, "changedImageSetName" ).dlgidentifier("ImageSetNameField");		
@@ -3628,37 +3663,37 @@ class ImageConfiguration : uiframe
 		
 		// Integration Mode
 		TagGroup IntegrationLabel = DLGCreateLabel("Integration Title");
-		TagGroup IntegrationMode = DLGCreateCheckBox( "Integrated Images", integrationState, "changedIntegrationMode" ).dlgidentifier("IntegrationModeCheckBox");
+		TagGroup IntegrationMode = DLGCreateCheckBox( "Integrated Images", IntegratedImage, "changedIntegrationMode" ).dlgidentifier("IntegrationModeCheckBox");
 		TagGroup IntegrationDistanceLabel = DLGCreateLabel("# of images per integration:")
-		TagGroup IntegrationNumber = DLGCreateIntegerField(  integrationDistance, 10, "changedIntegrationDistance" ).dlgidentifier("IntegrationDistanceField");
+		TagGroup IntegrationNumber = DLGCreateIntegerField(  NumberOfIntegrations, 10, "changedIntegrationDistance" ).dlgidentifier("IntegrationDistanceField");
 		TagGroup IntDistArea = dlggroupitems(IntegrationDistanceLabel, IntegrationNumber).dlgtablelayout(2,1,0);
-		TagGroup SaveNonInt = DLGCreateCheckBox( "Save Non-Integrated Images", saveNonIntImages, "changedSaveNonIntImages" ).dlgidentifier("SaveNonIntImagesCheckBox");
-		TagGroup DisplayNonInt = DLGCreateCheckBox( "Display Non-Integrated Images", displayNonIntImages, "changedDisplayNonIntImages" ).dlgidentifier("DisplayNonIntImagesCheckBox");
+		TagGroup SaveNonInt = DLGCreateCheckBox( "Save Non-Integrated Images", AutoSaveNonInt, "changedSaveNonIntImages" ).dlgidentifier("SaveNonIntImagesCheckBox");
+		TagGroup DisplayNonInt = DLGCreateCheckBox( "Display Non-Integrated Images", AutoDisplayNonInt, "changedDisplayNonIntImages" ).dlgidentifier("DisplayNonIntImagesCheckBox");
 		TagGroup IntSavesArea = dlggroupitems(SaveNonInt, DisplayNonInt).dlgtablelayout(1,2,0)
 		TagGroup IntegrationArea = dlggroupitems(IntegrationLabel, IntegrationMode, IntDistArea, IntSavesArea).dlgtablelayout(1,4,0)
 		
 		// Shadow Mode
 		TagGroup ShadowLabel = DLGCreateLabel("Shadowing Title");
-		TagGroup ShadowMode = DLGCreateCheckBox( "Shadow Images", shadowState, "changedShadowMode" ).dlgidentifier("ShadowModeCheckBox");
+		TagGroup ShadowState = DLGCreateCheckBox( "Shadow Images", shadowMode, "changedShadowMode" ).dlgidentifier("ShadowModeCheckBox");
 		TagGroup ShadowDistanceLabel = DLGCreateLabel("Shadow Distance (1/nm):");
 		TagGroup ShadowDistanceField = DLGCreateRealField(  shadowDistance, 10, 1, "changedShadowDistance" ).dlgidentifier("ShadowDistanceField");
 		TagGroup ShadowDistanceValues = dlggroupitems(ShadowDistanceLabel, ShadowDistanceField).dlgtablelayout(2,1,0);
-		TagGroup ShadowArea = dlggroupitems(ShadowLabel, ShadowMode, ShadowDistanceValues).dlgtablelayout(1,3,0);
+		TagGroup ShadowArea = dlggroupitems(ShadowLabel, ShadowState, ShadowDistanceValues).dlgtablelayout(1,3,0);
 		
 		// Ring Mode
 		TagGroup RingLabel = DLGCreateLabel("Ring Title");
-		TagGroup RingMode = DLGCreateCheckBox( "Ring Mode", ringState, "changedRingMode" ).dlgidentifier("RingModeCheckBox");
+		TagGroup RingState = DLGCreateCheckBox( "Ring Mode", RingMode, "changedRingMode" ).dlgidentifier("RingModeCheckBox");
 		TagGroup DSpacingLabel = DLGCreateLabel("DSpacing (Angstroms):")
-		TagGroup DSpacingField = DLGCreateRealField(  DSpacing, 10, 1, "changedDSpacing" ).dlgidentifier("DSpacingField");
+		TagGroup DSpacingField = DLGCreateRealField(  RingDSpacing, 10, 1, "changedDSpacing" ).dlgidentifier("DSpacingField");
 		TagGroup DSpacingValues = dlggroupitems(DSpacingLabel, DSpacingField).dlgtablelayout(2,1,0);
 		TagGroup NumberOfRingPointsLabel = DLGCreateLabel("# of spots to image:")
 		TagGroup NumberOfRingPointsLabelField = DLGCreateIntegerField(  numberOfRingPoints, 10, "changedNumberOfRingPoints" ).dlgidentifier("NumberOfRingPointsLabelField");
 		TagGroup NumberOfRingsValue = dlggroupitems(NumberOfRingPointsLabel, NumberOfRingPointsLabelField).dlgtablelayout(2,1,0)
-		TagGroup RingArea = dlggroupitems(RingLabel, RingMode, DSpacingValues, NumberOfRingsValue).dlgtablelayout(1,4,0)
+		TagGroup RingArea = dlggroupitems(RingLabel, RingState, DSpacingValues, NumberOfRingsValue).dlgtablelayout(1,4,0)
 		
 		// Save/Display General
-		TagGroup autoSaveMode = DLGCreateCheckBox( "Auto-Save Images", autoSaveState, "changedSaveMode" ).dlgidentifier("SaveModeCheckBox");
-		TagGroup displayImagesMode = DLGCreateCheckBox( "Display Images", displayImagesState, "changedDisplayImagesMode" ).dlgidentifier("DisplayImagesModeCheckBox");
+		TagGroup autoSaveMode = DLGCreateCheckBox( "Auto-Save Images", AutoSaveImages, "changedSaveMode" ).dlgidentifier("SaveModeCheckBox");
+		TagGroup displayImagesMode = DLGCreateCheckBox( "Display Images", AutoDisplayImages, "changedDisplayImagesMode" ).dlgidentifier("DisplayImagesModeCheckBox");
 		TagGroup newSetButton = DLGCreatePushButton("New Image Set", "onNewPress");
 		TagGroup nextSetButton = DLGCreatePushButton(">", "onNextPress");
 		TagGroup prevSetButton = DLGCreatePushButton("<", "onPrevPress");
@@ -3677,8 +3712,8 @@ class ImageConfiguration : uiframe
 		return box;
 	}
 	
-	
 	/* Fills the fields with the data from an ImageSet and enables/disables the fields */
+	/* Feed it the LocalImageSet to update it. */
 	
 	number updateDialog(object self, TagGroup ImageSet){
 		if(debugMode==true){result("\nUpdating image set configuration dialog.");}
@@ -3721,51 +3756,112 @@ class ImageConfiguration : uiframe
 		string imageSetNameString;
 		ImageSet.TagGroupGetTagAsString("SetName", imageSetNameString);
 		
-		// Fill fields
-		self.DLGValue("ImageSetNameField", imageSetNameString);
-		self.DLGValue("ImageSetIDField", ImageSetID);
-		self.DLGValue("IntegrationModeCheckBox", IntegratedImage);
-		self.DLGValue("IntegrationDistanceField", NumberOfIntegrations);
-		self.DLGValue("SaveNonIntImagesCheckBox", AutoSaveNonInt);
-		self.DLGValue("DisplayNonIntImagesCheckBox", AutoDisplayNonInt);
-		self.DLGValue("ShadowModeCheckBox", shadowMode);
-		self.DLGValue("ShadowDistanceField", ShadowDistance);
-		self.DLGValue("RingModeCheckBox", RingMode);
-		self.DLGValue("DSpacingField", RingDSpacing);
-		self.DLGValue("NumberOfRingPointsLabelField", NumberOfRingPoints);
-		self.DLGValue("SaveModeCheckBox", AutoSaveImages);
-		self.DLGValue("DisplayImagesModeCheckBox", AutoDisplayImages);
-		
 		self.SetElementIsEnabled("ImageSetIDField", 0); // this is always auto-generated
 		
-		if(IntegratedImage){
+		if(IntegratedImage==1){ // can always change these values, as it does not affect the others.
 			self.SetElementIsEnabled("SaveNonIntImagesCheckBox", 1);
 			self.SetElementIsEnabled("DisplayNonIntImagesCheckBox", 1);
+			self.SetElementIsEnabled("IntegrationDistanceField", 1);
 		} else {
 			self.SetElementIsEnabled("SaveNonIntImagesCheckBox", 0);
 			self.SetElementIsEnabled("DisplayNonIntImagesCheckBox", 0);
-		}
-		
-		if(DPsTaken == 0){
-			if(debugMode==true){result("\nDPs not taken, allowing mode switches.");}
-			self.SetElementIsEnabled("IntegrationModeCheckBox", 1);
-			self.SetElementIsEnabled("ShadowModeCheckBox", 1);
-			self.SetElementIsEnabled("ShadowDistanceField", 1);
-			self.SetElementIsEnabled("RingModeCheckBox", 1);
-			self.SetElementIsEnabled("DSpacingField", 1);
-			self.SetElementIsEnabled("NumberOfRingPointsLabelField", 1);
-			self.SetElementIsEnabled("IntegrationDistanceField", 1);
-		} else {
-			if(debugMode==true){result("\nDPs taken, disabling mode switches.");}
-			self.SetElementIsEnabled("IntegrationModeCheckBox", 0);
-			self.SetElementIsEnabled("ShadowModeCheckBox", 0);
-			self.SetElementIsEnabled("ShadowDistanceField", 0);
-			self.SetElementIsEnabled("RingModeCheckBox", 0);
-			self.SetElementIsEnabled("DSpacingField", 0);
-			self.SetElementIsEnabled("NumberOfRingPointsLabelField", 0);
 			self.SetElementIsEnabled("IntegrationDistanceField", 0);
 		}
 		
+		if(shadowMode==1 && DPsTaken == 0){
+			self.SetElementIsEnabled("ShadowDistanceField", 1);
+		} else {
+			self.SetElementIsEnabled("ShadowDistanceField", 0);
+		}
+		
+		if(RingMode==1 && DPsTaken == 0){
+			self.SetElementIsEnabled("DSpacingField", 1);
+			self.SetElementIsEnabled("NumberOfRingPointsLabelField", 1);	
+		} else {
+			self.SetElementIsEnabled("DSpacingField", 0);
+			self.SetElementIsEnabled("NumberOfRingPointsLabelField", 0);
+		}
+		
+		if(DPsTaken == 1){
+			if(debugMode==true){result("\nDPs taken, disabling most switches.");}
+			self.SetElementIsEnabled("IntegrationModeCheckBox", 0);
+			self.SetElementIsEnabled("ShadowModeCheckBox", 0);
+			self.SetElementIsEnabled("RingModeCheckBox", 0);
+		}
+		
+	}
+	
+	/* Called when image set name is changed. This will update the LocalImageSet and then refresh the dialog with it. */
+	void changedImageSetName(object self, tagGroup tg){ // tg is the source of the call
+		string theValue = tg.DLGGetStringValue();
+		LocalImageSet.TagGroupSetTagAsString("SetName", theValue);
+		self.updateDialog(LocalImageSet);
+	}
+	
+	void changedIntegrationMode(object self, tagGroup tg){ // tg is the source of the call
+		number theValue = tg.DLGGetValue();
+		LocalImageSet.TagGroupSetTagAsNumber("IntegratedImage", theValue);
+		self.updateDialog(LocalImageSet);
+	}
+	
+	void changedIntegrationDistance(object self, tagGroup tg){ // tg is the source of the call
+		number theValue = tg.DLGGetValue();
+		LocalImageSet.TagGroupSetTagAsNumber("NumberOfIntegrations", theValue);
+		self.updateDialog(LocalImageSet);
+	}
+	
+	void changedSaveNonIntImages(object self, tagGroup tg){ // tg is the source of the call
+		number theValue = tg.DLGGetValue();
+		LocalImageSet.TagGroupSetTagAsNumber("AutoSaveNonInt", theValue);
+		self.updateDialog(LocalImageSet);
+	}
+	
+	void changedDisplayNonIntImages(object self, tagGroup tg){ // tg is the source of the call
+		number theValue = tg.DLGGetValue();
+		LocalImageSet.TagGroupSetTagAsNumber("AutoDisplayNonInt", theValue);
+		self.updateDialog(LocalImageSet);
+	}
+	
+	void changedShadowMode(object self, tagGroup tg){ // tg is the source of the call
+		number theValue = tg.DLGGetValue();
+		//LocalImageSet.TagGroupSetTagAsNumber("NumberOfIntegrations", theValue);
+		self.updateDialog(LocalImageSet);
+	}
+	
+	void changedShadowDistance(object self, tagGroup tg){ // tg is the source of the call
+		number theValue = tg.DLGGetValue();
+		LocalImageSet.TagGroupSetTagAsNumber("ShadowDistance", theValue);
+		self.updateDialog(LocalImageSet);
+	}
+	
+	void changedRingMode(object self, tagGroup tg){ // tg is the source of the call
+		number theValue = tg.DLGGetValue();
+		LocalImageSet.TagGroupSetTagAsNumber("RingMode", theValue);
+		self.updateDialog(LocalImageSet);
+	}
+	
+	void changedDSpacing(object self, tagGroup tg){ // tg is the source of the call
+		number theValue = tg.DLGGetValue();
+		LocalImageSet.TagGroupSetTagAsNumber("RingDSpacing", theValue);
+		self.updateDialog(LocalImageSet);
+	}
+	
+	void changedNumberOfRingPoints(object self, tagGroup tg){ // tg is the source of the call
+		number theValue = tg.DLGGetValue();
+		LocalImageSet.TagGroupSetTagAsNumber("NumberOfRingPoints", theValue);
+		self.updateDialog(LocalImageSet);
+	}
+	
+	void changedSaveMode(object self, tagGroup tg){ // tg is the source of the call
+		number theValue = tg.DLGGetValue();
+		LocalImageSet.TagGroupSetTagAsNumber("AutoSaveImages", theValue);
+		self.updateDialog(LocalImageSet);
+	}
+	
+	void changedDisplayImagesMode(object self, tagGroup tg){ // tg is the source of the call
+		number theValue = tg.DLGGetValue();
+		LocalImageSet.TagGroupSetTagAsNumber("AutoDisplayImages", theValue);
+		self.updateDialog(LocalImageSet);
 	}
 	
 	/* Observes the current image set settings and makes a tag group out of them for future processing. */
@@ -3820,26 +3916,40 @@ class ImageConfiguration : uiframe
 	
 	/* Function to make the dialog visible on screen after it is constructed. */
 	number showImageSettingsDialog(object self){
+		// The local image set value has been assigned an image set by this point.
 		return self.pose(); // displays dialog as modal; it will make the script wait until it is done, so the loops etc. must be started before this.
 		// returns 1 if ok is pressed, 0 if cancelled
 	}
 
-	// Function used to summon forth the dialog. Dialog is Modal.
+	// Function used to summon forth the dialog for external functions. Dialog is Modal.
 	// Returns 1 if ok button pressed, 0 if cancelled.
-	number inputNewCalibration(object self)
+	// ImageSetID string is either an existing image set or "New" to create a new one.
+	number inputNewCalibration(object self, string ImageSetID)
 	{
+		
+		if(debugMode==1){result("\nLoading Image Set: " + ImageSetID);}
+		if(ImageSetID == "New"){
+			LocalImageSet = GetScriptObjectFromID(ImageSetToolsID).createNewImageSet();
+		} else {
+			TagGroup OriginalImageSet;
+			if( GetScriptObjectFromID(ImageSetToolsID).getImageSetByID(ImageSetID, OriginalImageSet) == 0){
+				result("\nImageSetID " + ImageSetID + " was not found while trying to load an existing ImageSet for the InputNewCalibration function.")
+				return 0;
+			}
+			LocalImageSet = TagGroupClone( OriginalImageSet ); // getImageSetByID will point at the set, so a copy is made here to prevent changing the imageSet data prematurely.
+		}
+		
 		if(debugMode==1){result("\nCreating child dialog Object (image set configuration options)");}
 		childDialog = self.ScriptObjectClone(); // Make a copy of itself and store it.
 		if(debugMode==1){result("\nGenerating child dialog");}
 		childDialog.generateDialog(); // Make the dialog for this copy
-		
 		if(debugMode==1){result("\nShowing child dialog");}
 		number useValues = childDialog.showImageSettingsDialog();	// Display the child with Pose() system
 		if(useValues == 1){
 			// save temporary tag groups to the dataObject
 			// self.saveToDataObject();
 		}
-		childDialog = NULL; // NULL the childDialog so it can go out of scope.
+		childDialog = NULL; // NULL the childDialog so it will always go out of scope.
 		return useValues;
 	}
 
@@ -6998,8 +7108,28 @@ class CreateDF360DialogClass : uiframe
 		if(!markerRing.ComponentIsValid()){
 			throw("Marker Ring not found")
 		}
+		number useValues;
+		TagGroup ImageSet
+		if( ImageSetTools.getCurrentImageSet(ImageSet) == 0){
+			// There is no current image set, so we must make a new one.
+			useValues = ImageConfigDialog.inputNewCalibration("New");
+		} else {
+			// There is an existing image set, so use that one or make a new one.
+			if ( TwoButtonDialog( "Do you wish to use the existing Image Set?", "Yes", "No, make a new one" ) == 0){
+				useValues = ImageConfigDialog.inputNewCalibration("New");
+			} else {
+				string imageSetID;
+				if(ImageSetTools.getImageSetID(ImageSet, imageSetID) == 1){
+					useValues = ImageConfigDialog.inputNewCalibration(imageSetID);
+				} else {
+					result("\nImageSetID not found inside existing ImageSet tag group. Creating New Image Set.")
+					useValues = ImageConfigDialog.inputNewCalibration("New");
+				}
+			}
+		}
+		// An image set should now be stored in the ImageConfigDialog.
+		// If the user selected 'ok' to use the data set then it can be added to the imageset list or overwrite the current set. 
 		
-		number useValues = ImageConfigDialog.inputNewCalibration();
 		/* Whole thing needs re-doing with new image config option dialog.
 		// Make new imageSet
 		TagGroup newSet = ImageSetTools.createNewImageSet();

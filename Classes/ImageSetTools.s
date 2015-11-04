@@ -431,6 +431,16 @@ class ImageSetTools
 		return 1;
 	}
 	
+	/* Returns the image set id string for a given image set tag group. Used to simplify using image sets in external functions.*/
+	number getImageSetID(object self, TagGroup ImageSet, string &ImageSetIDvariable){
+		string value;
+		if (ImageSet.TagGroupGetTagAsString( "ImageSetID", ImageSetIDvariable ) == 0){
+			result("\nNo ImageSetID found in tag group");
+			return 0;
+		}
+		return 1;
+	}
+	
 	
 	/* Function to create the persistent image tags to store information. Requires a lot of inputs.
 		createImageTags( imageSetID, imageSpotID, ImageType, ImageMode,	ringMode, integratedImage, NumberOfIntegrations,\

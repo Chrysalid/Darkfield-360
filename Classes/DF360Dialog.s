@@ -2301,8 +2301,28 @@ class CreateDF360DialogClass : uiframe
 		if(!markerRing.ComponentIsValid()){
 			throw("Marker Ring not found")
 		}
+		number useValues;
+		TagGroup ImageSet
+		if( ImageSetTools.getCurrentImageSet(ImageSet) == 0){
+			// There is no current image set, so we must make a new one.
+			useValues = ImageConfigDialog.inputNewCalibration("New");
+		} else {
+			// There is an existing image set, so use that one or make a new one.
+			if ( TwoButtonDialog( "Do you wish to use the existing Image Set?", "Yes", "No, make a new one" ) == 0){
+				useValues = ImageConfigDialog.inputNewCalibration("New");
+			} else {
+				string imageSetID;
+				if(ImageSetTools.getImageSetID(ImageSet, imageSetID) == 1){
+					useValues = ImageConfigDialog.inputNewCalibration(imageSetID);
+				} else {
+					result("\nImageSetID not found inside existing ImageSet tag group. Creating New Image Set.")
+					useValues = ImageConfigDialog.inputNewCalibration("New");
+				}
+			}
+		}
+		// An image set should now be stored in the ImageConfigDialog.
+		// If the user selected 'ok' to use the data set then it can be added to the imageset list or overwrite the current set. 
 		
-		number useValues = ImageConfigDialog.inputNewCalibration();
 		/* Whole thing needs re-doing with new image config option dialog.
 		// Make new imageSet
 		TagGroup newSet = ImageSetTools.createNewImageSet();
