@@ -2,7 +2,7 @@
 //	Imaging Configuration Dialog
 // ********************************
 // When creating a new image set and preparing to take darkfield images this dialog can be used to select the image set settings.
-// Not used to process or view image sets, which will have to show images and things.
+// Not used to process or view completed image sets, which will have to show images and things.
 // an imageset is created ouside the dialog and passed to this local store. If values are kept it will create a new image set or overwrite the existing image set of the same ID.
 // when starting to save DPs it will create a new image set. All settings can be changed except set ID.
 // when starting darkfield imaging it will over-write or update. At this point it can only change image save settings (and notes when i get them working)
@@ -114,11 +114,7 @@ class ImageConfiguration : uiframe
 		// Save/Display General
 		TagGroup autoSaveMode = DLGCreateCheckBox( "Auto-Save Images", AutoSaveImages, "changedSaveMode" ).dlgidentifier("SaveModeCheckBox");
 		TagGroup displayImagesMode = DLGCreateCheckBox( "Display Images", AutoDisplayImages, "changedDisplayImagesMode" ).dlgidentifier("DisplayImagesModeCheckBox");
-		TagGroup newSetButton = DLGCreatePushButton("New Image Set", "onNewPress");
-		TagGroup nextSetButton = DLGCreatePushButton(">", "onNextPress");
-		TagGroup prevSetButton = DLGCreatePushButton("<", "onPrevPress");
-		TagGroup Navigation = dlggroupitems(prevSetButton, newSetButton, nextSetButton).dlgtablelayout(3,1,0);
-		TagGroup FileArea = dlggroupitems(autoSaveMode, displayImagesMode, Navigation).dlgtablelayout(1,3,0);
+		TagGroup FileArea = dlggroupitems(autoSaveMode, displayImagesMode).dlgtablelayout(1,2,0);
  
 		TagGroup ImageNotes = DLGCreateTextBox( 50, 5, 2048 ).dlgidentifier("ImageNotesTextBox");
 		

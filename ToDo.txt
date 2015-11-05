@@ -26,6 +26,12 @@ Cycle through saved tilt settings
 
 Currently
 ----------
-
-Figure out how to disable imageConfig inputs on start up.
-	Something to do with the command being used to set the tags? It said something on the stack exchange thing about enabling fields.
+Fixed exposure configuration so it doesn't need buttons anymore.
+Make image set notes work
+Sort out when to make new image set and when to ask to use old one.
+	Fix old commands
+		StoreDP
+		StoreROI
+	Add new commands
+		New image set
+		Finalize image set (take DP images)

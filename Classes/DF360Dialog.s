@@ -481,7 +481,7 @@ class CreateDF360DialogClass : uiframe
 	{
 		taggroup panellist = dlgcreatepanellist().dlgidentifier("panellist").dlgexternalpadding(10,10)
 
-		// BUTTON METHODS are to be defined in the class definition (work needed);
+		// BUTTON METHODS are to be defined in the class definition;
 
 		// The first panel is for calibration
 		taggroup panel1=dlgcreatepanel()
@@ -490,35 +490,30 @@ class CreateDF360DialogClass : uiframe
 		panel1.DLGAddElement(self.makeCameraDropDownMenu() )
 		TagGroup tiltCalibrationAutoButton = DLGCreatePushButton("CALIBRATE TILT", "startCalibrationButtonPress")
 		panel1.dlgaddelement(tiltCalibrationAutoButton)
-		TagGroup DarkfieldImagingExposure = DLGCreateRealField( 30, 10, 3).dlgidentifier("DarkfieldExposureFieldInput")
+		panel1.dlgaddelement(dlgcreatelabel("Darkfield Exposure:"))
+		TagGroup DarkfieldImagingExposure = DLGCreateRealField( 30, 10, 3, "onDFChange").dlgidentifier("DarkfieldExposureFieldInput")
 		panel1.dlgaddelement(DarkfieldImagingExposure)
-		TagGroup SetDFExposureButton = DLGCreatePushButton("Set DF Exposure", "onDFChange");
-		panel1.dlgaddelement(SetDFExposureButton)
-		TagGroup BrightfieldImagingExposure = DLGCreateRealField( 0.5, 10, 3).dlgidentifier("BrightfieldExposureFieldInput")
+		panel1.dlgaddelement(dlgcreatelabel("Brightfield Exposure:")) // Label
+		TagGroup BrightfieldImagingExposure = DLGCreateRealField( 0.5, 10, 3, "onBFChange").dlgidentifier("BrightfieldExposureFieldInput")
 		panel1.dlgaddelement(BrightfieldImagingExposure)
-		TagGroup SetBFExposureButton = DLGCreatePushButton("Set BF Exposure", "onBFChange");
-		panel1.dlgaddelement(SetBFExposureButton)
-		TagGroup DiffractionImagingExposure = DLGCreateRealField( 1, 10, 3).dlgidentifier("DiffractionExposureFieldInput")
+		panel1.dlgaddelement(dlgcreatelabel("Diffraction Pattern Exposure:")) // Label
+		TagGroup DiffractionImagingExposure = DLGCreateRealField( 1, 10, 3, "onDPChange").dlgidentifier("DiffractionExposureFieldInput")
 		panel1.dlgaddelement(DiffractionImagingExposure)
-		TagGroup SetDPExposureButton = DLGCreatePushButton("Set DP Exposure", "onDPChange");
-		panel1.dlgaddelement(SetDPExposureButton)
 		
 			// Arrange the buttons and things
 		panel1.dlgtablelayout(2,6,0);
 		
-		// The second panel is for Spot Storage.
+		// The second panel is for Image Sets. They can be created and configured here, and can have points added to them.
 		taggroup panel2=dlgcreatepanel()
-		panel2.dlgaddelement(dlgcreatelabel("Target Diffraction Spots")) // Label
-		/*TagGroup storeDPSelect = DLGCreateCheckBox( "Record DP Images", 1 );
-		panel2.dlgaddelement(storeDPSelect) */
-		TagGroup storePointButton = DLGCreatePushButton("Single Diffraction Spot", "StoreDPButtonPress")
+		panel2.dlgaddelement(dlgcreatelabel("Define Image Sets")) // Label
+		TagGroup editImageSetButton = DLGCreatePushButton("Create/Configure Image Set", "EditImageSetButtonPress")
+		panel2.dlgaddelement(editImageSetButton)
+		TagGroup storePointButton = DLGCreatePushButton("Add Single Spot", "StoreDPButtonPress")
 		panel2.dlgaddelement(storePointButton)
-		TagGroup DarkFieldROIButton = DLGCreatePushButton("Target All ROI", "storeROIButtonPress")
+		TagGroup DarkFieldROIButton = DLGCreatePushButton("Add All ROI", "storeROIButtonPress")
 		panel2.dlgaddelement(DarkFieldROIButton)
-		TagGroup storeRingButton = DLGCreatePushButton("Target Ring", "storeRingButtonPress")
-		panel2.dlgaddelement(storeRingButton)
-		TagGroup resetTiltStoreButton = DLGCreatePushButton("Delete Stored Targets", "deleteStoredTiltsButtonPress")
-		panel2.dlgaddelement(resetTiltStoreButton)
+		TagGroup TakeDPImagesButton = DLGCreatePushButton("Save Image Set Targets", "TakeDPImagesButtonPress")
+		panel2.dlgaddelement(TakeDPImagesButton)
 		
 		// Panel 3 is for controlling the Marker Ring
 		taggroup panel3=dlgcreatepanel()
@@ -2139,27 +2134,21 @@ class CreateDF360DialogClass : uiframe
 		self.startDPStoring();
 	}
 		
-	void onDFChange (object self)
+	void onDFChange (object self, TagGroup tg)
 	{
-		number newDFExposure;
-		taggroup intfield=self.lookupelement("DarkfieldExposureFieldInput")
-		newDFExposure = dlggetvalue(intfield);
+		number newDFExposure = tg.dlggetvalue();
 		CameraControlObject.setDFExposure(newDFExposure);
 		if(debugMode==true){result("\nDarkField Exposure time set to " + newDFExposure + " seconds");}
 	}
-	void onBFChange (object self)
+	void onBFChange (object self, TagGroup tg)
 	{
-		number newBFExposure;
-		taggroup intfield=self.lookupelement("BrightfieldExposureFieldInput")
-		newBFExposure = dlggetvalue(intfield);
+		number newBFExposure = tg.dlggetvalue();
 		CameraControlObject.setBFExposure(newBFExposure);
 		if(debugMode==true){result("\nBrightField Exposure time set to " + newBFExposure + " seconds");}
 	}
-	void onDPChange (object self)
+	void onDPChange (object self, TagGroup tg)
 	{
-		number newDPExposure;
-		taggroup intfield=self.lookupelement("DiffractionExposureFieldInput")
-		newDPExposure = dlggetvalue(intfield);
+		number newDPExposure = tg.dlggetvalue();
 		CameraControlObject.setDPExposure(newDPExposure);
 		if(debugMode==true){result("\nDiffraction Pattern Exposure time set to " + newDPExposure + " seconds");}
 	}	
@@ -2322,10 +2311,7 @@ class CreateDF360DialogClass : uiframe
 		}
 		// An image set should now be stored in the ImageConfigDialog.
 		// If the user selected 'ok' to use the data set then it can be added to the imageset list or overwrite the current set. 
-		
-		/* Whole thing needs re-doing with new image config option dialog.
-		// Make new imageSet
-		TagGroup newSet = ImageSetTools.createNewImageSet();
+		/*
 		number radiusPX = self.markerRingRadius();
 		number numberOfPoints;
 		self.loadRingPoints (radiusPX, 0, numberOfPoints);
