@@ -2,10 +2,6 @@ Required Features
 -----------------
 Update image gathering functions to update imageSet values and image tags
 
-Save file tag instead of debug assuming no
-
-Popup interface with option radio buttons for image processing
-
 Tag group save methods
 	- Save image information for processing
 	- See the Taggroup_formatting.txt file for information
@@ -30,3 +26,6 @@ Cycle through saved tilt settings
 
 Currently
 ----------
+
+Figure out how to disable imageConfig inputs on start up.
+	Something to do with the command being used to set the tags? It said something on the stack exchange thing about enabling fields.

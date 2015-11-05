@@ -84,6 +84,7 @@ class ImageSetTools
 		imageSetData.TagGroupCreateNewLabeledTag("AutoSaveNonInt"); // 0/1 : If all images will be saved, not just integrated images.
 		imageSetData.TagGroupCreateNewLabeledTag("AutoDisplayNonInt") // 0/1 : If all images will be displayed, not just integrated images.
 		
+		imageSetData.TagGroupCreateNewLabeledTag("ShadowMode"); // 0/1
 		imageSetData.TagGroupCreateNewLabeledTag("ShadowDistance"); // 0/value
 		
 		imageSetData.TagGroupCreateNewLabeledTag("AutoSaveImages"); // 0/1 : If the images will be saved to harddisk as they are taken
@@ -105,6 +106,7 @@ class ImageSetTools
 		imageSetData.TagGroupSetTagAsNumber("IntegratedImage", 0 );
 		imageSetData.TagGroupSetTagAsNumber("NumberOfIntegrations", 0 );
 		imageSetData.TagGroupSetTagAsNumber("DegreeStep", 0 );
+		imageSetData.TagGroupSetTagAsNumber("ShadowMode", 0 );
 		imageSetData.TagGroupSetTagAsNumber("ShadowDistance", 0 );
 		
 		imageSetData.TagGroupCreateNewLabeledTag("TiltXCenter");

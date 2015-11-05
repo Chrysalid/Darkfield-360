@@ -52,6 +52,7 @@ ImageSets
 		AutoSaveNonInt: 0/1
 		AutoDisplayNonInt: 0/1		
 		
+		ShadowMode: 0/1
 		ShadowDistance: 0/value
 		
 		AutoSaveImages: 0/1
