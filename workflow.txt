@@ -1,0 +1,24 @@
+Workflow design
+
+Open program
+	Capture view screen if available
+Set Camera Length
+
+For taking new images:
+Calibrate system (Tilt, scale)
+Create new Image Set + Select options
+	Be able to Edit this image set configuration
+Select points to darkfield image
+	Manually by centering the spot and clicking 'Store' button
+	Automatically by adding ROI and clicking 'store ROI' button
+	Automatically by calculating Ring points. Automatically does this when image set is finalized (or made?).
+	Load an image set file.
+Save these points by pressing 'finalize' button
+	Take the Diffraction Pattern at all stored points or a selection of ring points.
+	Export the ImageSet data to a text file (or a DM format file?). Make new file "imagesetID + _in_progress"
+Perform Darkfield imaging by pressing 'darkfield image' button
+	Export the imageset data to a text file (or a DM format file?). Make new file "imagesetID + _complete"
+	Delete in_progress file unless it was loaded by user.
+
+
+For image processing:

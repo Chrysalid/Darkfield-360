@@ -30,7 +30,6 @@ class MyDataObject
 	number yTiltVectorY; // number of pixels moved in the (pixel) Y axis per tiltY unit
 	number maxDeviation; // number of pixels difference allowed during pattern matching operations
 	number centreXTilt, centreYTilt; // the centred tilt values. Do not set to 0,0, null, or any value that has not been verified.
-	number binningMultiplier; // binning of the VIEW window compared to Acquisition images (usually 4)
 	number cameraWidth, cameraHeight; // number of pixels on the camera.
 	number keyListenerKeyToken; // ID number for the event listener set up later on.
 	component markerRing, ringRadiusText; // Components used to draw the reticle.
@@ -330,9 +329,10 @@ class MyDataObject
 
 	/* Function to convert a pixel distance into 1/nanometers. Very simple, but making it into a function should avoid mistakes
 		isViewWindow parameter is 0 or 1
+		binningMultiplier is a value usually taken from CameraControl. It is the binning number of the view window.
 	*/
 		
-	number convertPixelDistanceToNM(object self, number pixelDistance, number isViewWindow)
+	number convertPixelDistanceToNM(object self, number pixelDistance, number isViewWindow, number binningMultiplier)
 	{
 		if(binningMultiplier==0){
 			throw("Please Calibrate the toolkit");
@@ -351,8 +351,9 @@ class MyDataObject
 
 	/* Function to convert a 1/NM distance into pixels. Very simple, but making it into a function should avoid mistakes
 		isViewWindow parameter is 0 or 1
+		binningMultiplier is a value usually taken from CameraControl. It is the binning number of the view window.
 	*/
-	number convertNMDistanceToPixel(object self, number NMDistance, number isViewWindow)
+	number convertNMDistanceToPixel(object self, number NMDistance, number isViewWindow, number binningMultiplier)
 	{
 		if(binningMultiplier==0){
 			throw("Please Calibrate the toolkit");
@@ -370,8 +371,9 @@ class MyDataObject
 
 	/* Function to convert a pixel distance into tilt. This doesn't work with direction, just magnitude.
 		isViewWindow parameter is 0 or 1
-		Assumes X-Tilt is being used, but can be told to use Y-Tilt instead. */
-	number convertPixelDistanceToTilt(object self, number pixelDistance, number isViewWindow, number useYTilt)
+		Assumes X-Tilt is being used, but can be told to use Y-Tilt instead.
+		binningMultiplier is a value usually taken from CameraControl. It is the binning number of the view window. */
+	number convertPixelDistanceToTilt(object self, number pixelDistance, number isViewWindow, number useYTilt, number binningMultiplier)
 	{
 		if(binningMultiplier==0){
 			throw("Please Calibrate the toolkit");
@@ -408,9 +410,10 @@ class MyDataObject
 				Since all beam movement functions are defined by relative shifts, this might be helpful.
 		pixelShiftOnly = 1 will assume the X and Y pixel coordinate values are relative shifts instead of coordinates.
 				Basically it will assume the origin is (0,0) instead of the centre of the image.
+		binningMultiplier is a value usually taken from CameraControl. It is the binning number of the view window.
 	 */
 	void pixelToTilt(object self, number xPixel, number yPixel, number &xTiltTarget, number &yTiltTarget,\
-			number isViewWindow, number tiltShiftOnly, number pixelShiftOnly)
+			number isViewWindow, number tiltShiftOnly, number pixelShiftOnly, number binningMultiplier)
 	{
 		number xTx, xTy, yTx, yTy;
 		self.getTiltVectors(xTx, xTy, yTx, yTy);
@@ -480,14 +483,17 @@ class MyDataObject
 	}
 
 	/* Function to convert Tilt SHIFT to pixel SHIFT.
-		isViewWindow parameter is 0 or 1. This will scale the returned pixel value by the binning multiplier. */
+		isViewWindow parameter is 0 or 1. This will scale the returned pixel value by the binning multiplier.
+		binningMultiplier is a value usually taken from CameraControl. It is the binning number of the view window.	
+	*/
 		
-	void tiltToPixel(object self, number xTilt, number yTilt, number &xPixelShift, number &yPixelShift, number isViewWindow)
+	void tiltToPixel(object self, number xTilt, number yTilt, number &xPixelShift, number &yPixelShift, number isViewWindow, number binningMultiplier)
 	{
 		// Load data from dataObject
 		number xTx, xTy, yTx, yTy;
 		self.getTiltVectors(xTx, xTy, yTx, yTy);
 		if(binningMultiplier == 0){
+			result("\nBinning Multiplier = 0");
 			throw("Please calibrate the toolkit");
 		}
 		

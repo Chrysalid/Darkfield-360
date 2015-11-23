@@ -1500,7 +1500,6 @@ class MyDataObject
 	number yTiltVectorY; // number of pixels moved in the (pixel) Y axis per tiltY unit
 	number maxDeviation; // number of pixels difference allowed during pattern matching operations
 	number centreXTilt, centreYTilt; // the centred tilt values. Do not set to 0,0, null, or any value that has not been verified.
-	number binningMultiplier; // binning of the VIEW window compared to Acquisition images (usually 4)
 	number cameraWidth, cameraHeight; // number of pixels on the camera.
 	number keyListenerKeyToken; // ID number for the event listener set up later on.
 	component markerRing, ringRadiusText; // Components used to draw the reticle.
@@ -1800,9 +1799,10 @@ class MyDataObject
 
 	/* Function to convert a pixel distance into 1/nanometers. Very simple, but making it into a function should avoid mistakes
 		isViewWindow parameter is 0 or 1
+		binningMultiplier is a value usually taken from CameraControl. It is the binning number of the view window.
 	*/
 		
-	number convertPixelDistanceToNM(object self, number pixelDistance, number isViewWindow)
+	number convertPixelDistanceToNM(object self, number pixelDistance, number isViewWindow, number binningMultiplier)
 	{
 		if(binningMultiplier==0){
 			throw("Please Calibrate the toolkit");
@@ -1821,8 +1821,9 @@ class MyDataObject
 
 	/* Function to convert a 1/NM distance into pixels. Very simple, but making it into a function should avoid mistakes
 		isViewWindow parameter is 0 or 1
+		binningMultiplier is a value usually taken from CameraControl. It is the binning number of the view window.
 	*/
-	number convertNMDistanceToPixel(object self, number NMDistance, number isViewWindow)
+	number convertNMDistanceToPixel(object self, number NMDistance, number isViewWindow, number binningMultiplier)
 	{
 		if(binningMultiplier==0){
 			throw("Please Calibrate the toolkit");
@@ -1840,8 +1841,9 @@ class MyDataObject
 
 	/* Function to convert a pixel distance into tilt. This doesn't work with direction, just magnitude.
 		isViewWindow parameter is 0 or 1
-		Assumes X-Tilt is being used, but can be told to use Y-Tilt instead. */
-	number convertPixelDistanceToTilt(object self, number pixelDistance, number isViewWindow, number useYTilt)
+		Assumes X-Tilt is being used, but can be told to use Y-Tilt instead.
+		binningMultiplier is a value usually taken from CameraControl. It is the binning number of the view window. */
+	number convertPixelDistanceToTilt(object self, number pixelDistance, number isViewWindow, number useYTilt, number binningMultiplier)
 	{
 		if(binningMultiplier==0){
 			throw("Please Calibrate the toolkit");
@@ -1878,9 +1880,10 @@ class MyDataObject
 				Since all beam movement functions are defined by relative shifts, this might be helpful.
 		pixelShiftOnly = 1 will assume the X and Y pixel coordinate values are relative shifts instead of coordinates.
 				Basically it will assume the origin is (0,0) instead of the centre of the image.
+		binningMultiplier is a value usually taken from CameraControl. It is the binning number of the view window.
 	 */
 	void pixelToTilt(object self, number xPixel, number yPixel, number &xTiltTarget, number &yTiltTarget,\
-			number isViewWindow, number tiltShiftOnly, number pixelShiftOnly)
+			number isViewWindow, number tiltShiftOnly, number pixelShiftOnly, number binningMultiplier)
 	{
 		number xTx, xTy, yTx, yTy;
 		self.getTiltVectors(xTx, xTy, yTx, yTy);
@@ -1950,14 +1953,17 @@ class MyDataObject
 	}
 
 	/* Function to convert Tilt SHIFT to pixel SHIFT.
-		isViewWindow parameter is 0 or 1. This will scale the returned pixel value by the binning multiplier. */
+		isViewWindow parameter is 0 or 1. This will scale the returned pixel value by the binning multiplier.
+		binningMultiplier is a value usually taken from CameraControl. It is the binning number of the view window.	
+	*/
 		
-	void tiltToPixel(object self, number xTilt, number yTilt, number &xPixelShift, number &yPixelShift, number isViewWindow)
+	void tiltToPixel(object self, number xTilt, number yTilt, number &xPixelShift, number &yPixelShift, number isViewWindow, number binningMultiplier)
 	{
 		// Load data from dataObject
 		number xTx, xTy, yTx, yTy;
 		self.getTiltVectors(xTx, xTy, yTx, yTy);
 		if(binningMultiplier == 0){
+			result("\nBinning Multiplier = 0");
 			throw("Please calibrate the toolkit");
 		}
 		
@@ -3630,7 +3636,7 @@ class ImageConfiguration : uiframe
 	
 	// Uses the LocalImageSet with the Image Tool function addImageSet().
 	// The Image Tool function decides what to do with the data, so it does not matter to the Image Config function what Tag group is sent forwards.
-	void addImageSetToImageList(){
+	void addImageSetToImageList(object self){
 		GetScriptObjectFromID(ImageSetToolsID).addImageSet(LocalImageSet);
 	}
 	
@@ -4846,6 +4852,7 @@ class CreateDF360DialogClass : uiframe
 	number ToolkitID; // the ID of this object
 	number EMOnline; // Stores 1 if there is a microscope ready for use. 0 if not.
 	number AllowControl; // Only allow control of the microscope if there is a live view image.
+	number isCalibrated; // flag to test if the scope is calibrated or not.
 	object dataObject;
 	number dataObjectID;
 	object imageSetTools;
@@ -5241,7 +5248,8 @@ class CreateDF360DialogClass : uiframe
 			if(debugMode==1){result("\n\txPixel = " + xPixel + " yPixel = " + yPixel);}
 			// void pixelToTilt(object dataObject, number xPixel, number yPixel, number &xTiltTarget, number &yTiltTarget,
 			//			number isViewWindow, number tiltShiftOnly, number pixelShiftOnly)
-			dataObject.pixelToTilt(xPixel, yPixel, xTiltTarget, yTiltTarget, 1, 0, 0);
+			number binningMultiplier = CameraControlObject.getBinningMultiplier();
+			dataObject.pixelToTilt(xPixel, yPixel, xTiltTarget, yTiltTarget, 1, 0, 0, binningMultiplier);
 			if(debugMode==1){result("\n\txTiltTarget = " + xTiltTarget + " yTiltTarget = " + yTiltTarget);}
 			moveBeamTilt(xTiltTarget, yTiltTarget);
 		}
@@ -5446,7 +5454,7 @@ class CreateDF360DialogClass : uiframe
 	{
 		ToolkitID = self.ScriptObjectGetID();
 		debugMode = 1;
-		
+		isCalibrated = 0;		
 	}
 		
 	// Function called on any destruction event.
@@ -5659,7 +5667,7 @@ class CreateDF360DialogClass : uiframe
 		shadowDistance = distance from the central point (in 1/nm) to perform shadowing. 0 = no shadowing.
 		saveImages (0/1) will auto-save the images to the auto-save directory
 		displayImages(0/1) will show the images created on the screen.
-			If saveImages and displayImages are set to 0 then storeTiltOnly variable will switch to 0
+			If saveImages and displayImages are set to 0 then storeTiltOnly variable will switch to 1
 	*/
 	void storeTiltCoord (object self, number shadowDistance, number saveImages, number displayImages) {
 		// Check to see if the EM is in diffraction mode.
@@ -5700,7 +5708,7 @@ class CreateDF360DialogClass : uiframe
 		TagGroup image1Data = imageSetTools.createNewImageForImageSet();
 		tracker = tracker + 1
 		image1Data.TagGroupSetTagAsString("ImageType", "DP");
-		image1Data.TagGroupSetTagAsNumber("ExposureTime", dataObject.getDPExposure());
+		image1Data.TagGroupSetTagAsNumber("ExposureTime", CameraControlObject.getDPExposure());
 		image1Data.TagGroupSetTagAsNumber("xTiltRelative", xTiltRelative);
 		image1Data.TagGroupSetTagAsNumber("yTiltRelative", yTiltRelative);
 		image1Data.TagGroupSetTagAsNumber("xTiltValue", xTilt);
@@ -5795,16 +5803,19 @@ class CreateDF360DialogClass : uiframe
 		
 		if(shadowDistance!=0)
 		{
+			if(debugMode==true){result("\nBeginning Shadowing.");}
 			//void tiltToPixel(dataObject, number xTilt, number yTilt, number &xPixelShift, number &yPixelShift, number isViewWindow)
 			number xTiltShift = xTilt - dataObject.getCentreXTilt();
 			number yTiltShift = yTilt - dataObject.getCentreYTilt();
 			number xPixelShift, yPixelShift, NMDistance;
-			tiltToPixel(dataObject, xTiltShift, yTiltShift, xPixelShift, yPixelShift, 0);
-			if(debugMode==true){result("\nBeginning Shadowing.");}
+			dataObject.tiltToPixel(xTiltShift, yTiltShift, xPixelShift, yPixelShift, 0, 1);
 			if(debugMode==true){result("\n\tTilt -> Pixel Shift = (" + xTiltShift + ", " + yTiltShift\
 					+ ") -> (" + xPixelShift + ", " + yPixelShift + ")px");}
 			NMDistance = distance(yPixelShift, xPixelShift) * dataObject.getRefScale();
 			number shadowMultiplier = shadowDistance / NMDistance;
+			if(shadowMultiplier.isNaN()){ // checks to see if the shadow multiplier is a real number
+				throw("Shadow Distance is not a number");
+			}
 			if(debugMode==true){result("\n\tNMDistance = " + NMDistance);}
 			if(debugMode==true){result("\n\tShadowMultiplier = " + shadowMultiplier);}
 			
@@ -5928,7 +5939,7 @@ class CreateDF360DialogClass : uiframe
 			TagGroup image3Data = imageSetTools.createNewImageForImageSet();
 			tracker = tracker + 1
 			image3Data.TagGroupSetTagAsString("ImageType", "DP");
-			image3Data.TagGroupSetTagAsNumber("ExposureTime", dataObject.getDPExposure());
+			image3Data.TagGroupSetTagAsNumber("ExposureTime", CameraControlObject.getDPExposure());
 			image3Data.TagGroupSetTagAsNumber("xTiltRelative", xTiltRelative);
 			image3Data.TagGroupSetTagAsNumber("yTiltRelative", yTiltRelative);
 			image3Data.TagGroupSetTagAsNumber("xTiltValue", xTilt);
@@ -6531,6 +6542,7 @@ class CreateDF360DialogClass : uiframe
 		}	
 		if(tracker!=0){ //("There is image/calibration data all ready stored.")
 			if(!ContinueCancelDialog( "There is all ready calibration data stores. Would you like to overwrite it?" )){
+				isCalibrated = 1;
 				return;
 			}
 		}
@@ -6560,6 +6572,7 @@ class CreateDF360DialogClass : uiframe
 			/*Boolean TwoButtonDialog( String prompt, String acceptLabel, String rejectLabel )*/
 			if(TwoButtonDialog("Use existing tilt values?", "Yes", "No")){
 				printCommands();
+				isCalibrated = 1;
 				return;
 			}
 		}
@@ -6635,7 +6648,7 @@ class CreateDF360DialogClass : uiframe
 		dataObject.setTiltVectorCalibrations(dataObject.getCameraLength(), vectors);
 		
 		// What do we do about generating / updating ImageSets?
-		
+		isCalibrated = 1;
 		result("\nCalibration Complete.");
 		printCommands();
 	}
@@ -6687,7 +6700,7 @@ class CreateDF360DialogClass : uiframe
 		TagGroup newImageSet = imageSetTools.createNewImageSet();
 		newImageSet.TagGroupSetTagAsNumber("RingMode", 1);
 		newImageSet.TagGroupSetTagAsNumber("ShadowDistance", shadowDistanceNM);
-		newImageSet.TagGroupSetTagAsNumber("DSpacingAng", dataObject.convertPixelDistanceToNM(radiusPX, 0));
+		newImageSet.TagGroupSetTagAsNumber("DSpacingAng", dataObject.convertPixelDistanceToNM(radiusPX, 0, binning));
 		
 		if(debugMode==true){result("\n\tData Object loaded into variables.");}
 
@@ -6767,7 +6780,7 @@ class CreateDF360DialogClass : uiframe
 			thisImage.TagGroupSetTagAsNumber("yTiltValue", tiltY);
 			thisImage.TagGroupSetTagAsNumber("ShadowValue", 1);
 			thisImage.TagGroupSetTagAsNumber("ShadowDistance", shadowDistanceNM);
-			thisImage.TagGroupSetTagAsNumber("DSpacingAng", dataObject.convertPixelDistanceToNM(radiusPX, 0));
+			thisImage.TagGroupSetTagAsNumber("DSpacingAng", dataObject.convertPixelDistanceToNM(radiusPX, 0, binning));
 
 			if(remainder(i,60)==0){ //This part just puts a '.' every calculations as a crude progress bar, and a line break every 60.
 				result("\n");
@@ -6958,7 +6971,7 @@ class CreateDF360DialogClass : uiframe
 	
 	void startCalibrationButtonPress (object self)
 	{	
-		if(!AllowControl){
+		if(CameraControlObject.getAllowControl() == 0){
 			result("\nToolkit Controls are offline. Ensure there is a live view window active and it has been captured.")
 			exit(0);
 		}
@@ -7043,11 +7056,10 @@ class CreateDF360DialogClass : uiframe
 			if(debugMode==true){result("\nUser cancelled image set creation/edit. No changes made.");}
 			return;
 		}
-		
-		
-	
 	}
 	
+	
+	// This button saves the current tilt setting for the current ImageSet with the storeTiltCoord() function.
 	void StoreDPButtonPress (object self)
 	{
 		if(CameraControlObject.getAllowControl() != true){
@@ -7055,18 +7067,44 @@ class CreateDF360DialogClass : uiframe
 			exit(0);
 		}
 		// Stores a diffraction spot's tilt coordinates and takes a picture to reference the spot in future.
-		if(dataObject.getTracker()<1)
-		{ //The first tiltStore needs to make the reference image as well.
-			Throw("Data NOT stored. Please Calibrate the system first.")
-		}
-		else
+		if(isCalibrated == 0)
 		{
-			number shadowDistanceNM;
-			shadowDistanceNM = dataObject.getShadowDistanceNM();
-			getNumber("Set Shadowing Distance in (1/nm):", shadowDistanceNM , shadowDistanceNM)
-			dataObject.setShadowDistanceNM(shadowDistanceNM)
-			self.storeTiltCoord (shadowDistanceNM , 0 );
+			Throw("Data NOT stored. Please Calibrate the system first.");
 		}
+		// Is there an open imageSet?
+		TagGroup targetImageSet
+		number isCurrent = imageSetTools.getCurrentImageSet(targetImageSet)
+		if(isCurrent == 0){
+			Throw("There is no Image set to save this point inside. Please create one.");
+		}
+		// Has the imageSet been finalized, and so does not accept new points.
+		// Boolean TagGroupGetTagAsNumber( TagGroup tagGroup, String tagPath, NumberVariable number )
+		number DPsTaken
+		if(targetImageSet.TagGroupGetTagAsNumber("DPsTaken", DPsTaken) == 0){
+			result("\n\tImage Set does not have the DPSTaken tag. This is an error.");
+			Throw("Image Set Error: No DPsTaken flag.");
+		} 
+		if(DPsTaken == 1){
+			result("\n\tImage Set has been finalized and cannot have any more spots added.");
+			throw("Image Set has been finalized.");
+		}
+		
+		// storeTiltCoord (object self, number shadowDistance, number saveImages, number displayImages)
+		number shadowDistanceNM, saveImages, displayImages;
+		if(targetImageSet.TagGroupGetTagAsNumber("ShadowDistance", shadowDistanceNM) == 0){
+			result("\n\tImage Set does not have the ShadpwDistance tag. This is an error.");
+			Throw("Image Set Error: No ShadowDistance flag.");
+		}
+		if(targetImageSet.TagGroupGetTagAsNumber("AutoSaveImages", saveImages) == 0){
+			result("\n\tImage Set does not have the AutoSaveImages tag. This is an error.");
+			Throw("Image Set Error: No AutoSaveImages flag.");
+		}
+		if(targetImageSet.TagGroupGetTagAsNumber("AutoDisplayImages", displayImages) == 0){
+			result("\n\tImage Set does not have the AutoDisplayImages tag. This is an error.");
+			Throw("Image Set Error: No AutoDisplayImages flag.");
+		}
+		
+		self.storeTiltCoord ( shadowDistanceNM, saveImages, displayImages );
 	}
 		
 	void storeROIButtonPress (object self)
@@ -7075,7 +7113,7 @@ class CreateDF360DialogClass : uiframe
 			result("\nToolkit Controls are offline. Ensure there is a live view window active and has been captured.")
 			exit(0);
 		}
-		if(dataObject.getTracker()<1){ // Has the system been calibrated?
+		if(isCalibrated == 0){ // Has the system been calibrated?
 			Throw("The system must be calibrated before you store points.");
 		}
 		// Get the total number of ROI on the screen
@@ -7114,7 +7152,7 @@ class CreateDF360DialogClass : uiframe
 		// Create the information for the image of the diffraction pattern. This makes sure BF and DP are paired up later.
 		TagGroup CentralImage = imageSetTools.createNewImageForImageSet();
 		CentralImage.TagGroupSetTagAsString("ImageType", "DP");
-		CentralImage.TagGroupSetTagAsNumber("ExposureTime", dataObject.getDPExposure());
+		CentralImage.TagGroupSetTagAsNumber("ExposureTime", CameraControlObject.getDPExposure());
 		CentralImage.TagGroupSetTagAsNumber("xTiltRelative", 0);
 		CentralImage.TagGroupSetTagAsNumber("yTiltRelative", 0);
 		CentralImage.TagGroupSetTagAsNumber("xTiltValue", dataObject.getCentreXTilt());
