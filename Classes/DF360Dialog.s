@@ -871,7 +871,7 @@ class CreateDF360DialogClass : uiframe
 			//void tiltToPixel(dataObject, number xTilt, number yTilt, number &xPixelShift, number &yPixelShift, number isViewWindow)
 			number xPixelShift, yPixelShift, NMDistance;
 			dataObject.tiltToPixel(xTiltRelative, yTiltRelative, xPixelShift, yPixelShift, 0, 1);
-			if(debugMode==true){result("\n\tTilt -> Pixel Shift = (" + xTiltShift + ", " + yTiltShift\
+			if(debugMode==true){result("\n\tTilt -> Pixel Shift = (" + xTiltRelative + ", " + yTiltRelative\
 					+ ") -> (" + xPixelShift + ", " + yPixelShift + ")px");}
 			NMDistance = distance(yPixelShift, xPixelShift) * dataObject.getRefScale();
 			number shadowMultiplier = shadowDistance / NMDistance;
@@ -932,254 +932,6 @@ class CreateDF360DialogClass : uiframe
 		}
 		dataObject.setTracker(tracker);
 		dataObject.setSpotTracker(spotTracker);
-	}
-
-	/* 
-		Image DP code from old store tilt function
-	*/
-	number DPImageCode(){
-	
-	// Check to see if the EM is in diffraction mode.
-		if ( (EMGetImagingOpticsMode() == "SAMAG") || (EMGetImagingOpticsMode() == "IMAGING")  || (EMGetImagingOpticsMode() == "MAG1") || (EMGetImagingOpticsMode() == "MAG2")) {
-			if (!ContinueCancelDialog( "Switch to diffraction mode before continuing." )){
-				Throw( "User aborted process." );
-			}
-		}
-	/* old file name generation system is old. adapt it to use the tag lists */
-		string fileName, spotID, filePath, timeString;
-		timeString = constructTimeStamp();
-		fileName = "DP_" + spotTracker + "_" + timeString + "_MIDDLE";
-		
-		
-		if(storeTiltOnly == false) // The image creation + storage parts can be ignored if storeTiltOnly parameter is set to true.
-		{
-			// Take new exposure for comparison of pixel movement.
-			number cameraWidth, cameraHeight;
-			cameraWidth = CameraControlObject.getCameraWidth();
-			cameraHeight = CameraControlObject.getCameraHeight();
-			
-			// Wait for the image to stabilize after moving.
-			number OSTickCount = GetOSTickCount();
-			number OSTicksPerSecond = GetOSTicksPerSecond();
-			number targetTick = OSTickCount + (OSTicksPerSecond);
-			while( targetTick > GetOSTickCount()){	// Do nothing
-			}
-			image newDPImage := sscUnprocessedAcquire(DPExposure,0,0,cameraWidth,cameraHeight);
-
-			// Compare to reference image
-			//findImageShift(image refIm, image newIm, number &XShift, number &YShift)
-			number XShift, YShift;
-			findImageShift(referenceDP, newDPImage, XShift, YShift, debugMode);
-			image1Data.TagGroupSetTagAsNumber("xShift", xShift);
-			image1Data.TagGroupSetTagAsNumber("yShift", yShift);
-			
-			// Convert the distance travelled to 1/nm
-			number pixelDistance = distance(XShift, YShift);
-			number scaleX = dataObject.getRefScale();
-			number realDistance = pixelDistance * scaleX;
-			image1Data.TagGroupSetTagAsNumber("DSpacingAng", convertInverseNMToAngstrom(realDistance));
-			
-			if(debugMode==true){Result( "\nPattern Distance Shift (1/nm): " + realDistance);}
-			if(debugMode==true){Result( "\nPattern Distance Shift (Angstroms): " + convertInverseNMToAngstrom(realDistance));}
-			
-			// Add the real distance as text in the image
-			// Add the pixel shift as text in the image
-			string textString = "D-Spacing: " + realDistance + " (1/nm)" + "\nPixel Shift: (" + XShift + ", " + YShift + ")";
-			// Add text annotations and set their colour, display mode and font
-			component textannot=newtextannotation(10,10, textString, 64);
-			textannot.componentsetfillmode(2);
-			textannot.componentsetdrawingmode(2);
-			textannot.componentsetforegroundcolor(1,0,0);
-			textannot.componentsetbackgroundcolor(0,0,0);
-			textannot.componentsetfontfacename("Microsoft Sans Serif");
-			
-			showImage(newDPImage) // Images needs to be shown to give it an ImageDisplay, which is needed for attaching components.
-			ImageDisplay imgDisplay = newDPImage.ImageGetImageDisplay(0)
-			imgDisplay.componentaddchildatend(textannot);
-			ImageDocument thisImageDocument = ImageGetOrCreateImageDocument( newDPImage );
-			
-			self.drawReticle(newDPImage, 0);
-			self.cleanReticle(newDPImage);
-			
-			if(saveImages == true) // If saving the image to hard disk...
-			{
-				string fileDirectory = GetApplicationDirectory("auto_save", 0);
-				filePath = PathConcatenate(fileDirectory, fileName);
-				image1Data.TagGroupSetTagAsString("FileName", fileName);
-				image1Data.TagGroupSetTagAsNumber("SavedAsFile", 1);
-				SaveAsGatan( newDPImage, filePath );
-				result("\nSaved tilt DP as " + fileName);
-			} else { // If not saving the image...
-				image1Data.TagGroupSetTagAsNumber("SavedAsFile", 0);
-			}
-			if(displayImages == true) // If displaying the image...
-			{
-				if(debugMode==true){
-					ImageDocumentClean(thisImageDocument); // So the window can be closed without asking to be saved
-					// Not set by default to avoid accidentally closing the images.
-				}
-				result("\nDiffraction Pattern recorded for " + fileName + ". Tilt value stored (" + xTilt + ", " + yTilt + ")");
-				positionDebugWindow(debugMode); // Return the View window to the front
-			} else { // If not displaying the image, close it.
-				ImageDocumentClean(thisImageDocument); // So the window can be closed without asking to be saved
-				CloseImage(newDPImage);
-			}
-		}
-		
-		string fileNameHigher, fileNameLower
-		fileNameHigher = "DP_" + spotTracker + "_" + timeString + "_HIGHER";
-		fileNameLower = "DP_" + spotTracker + "_" + timeString + "_LOWER";
-		
-		number OSTickCount = GetOSTickCount();
-			number OSTicksPerSecond = GetOSTicksPerSecond();
-			number targetTick = OSTickCount + (OSTicksPerSecond * DPExposure);
-			if(debugMode==true){result("\n\tTickCount = " + OSTickCount + "  TicksperSec = " + OSTicksPerSecond);}
-			ImageDocument higherDPView, lowerDPView
-			
-			if(storeTiltOnly != true)
-			{
-				// Wait for one second to let the ccd be exposed
-				while( targetTick > GetOSTickCount()){	// Do nothing
-				}
-
-				number cameraWidth, cameraHeight;
-				cameraWidth = CameraControlObject.getCameraWidth();
-				cameraHeight = CameraControlObject.getCameraHeight();
-				image newDPImage := sscUnprocessedAcquire(DPExposure,0,0,cameraWidth,cameraHeight);
-
-				// Compare to reference image
-				//findImageShift(image refIm, image newIm, number &XShift, number &YShift)
-				number XShift, YShift;
-				findImageShift(referenceDP, newDPImage, XShift, YShift, debugMode);
-				image2Data.TagGroupSetTagAsNumber("xShift", xShift);
-				image2Data.TagGroupSetTagAsNumber("yShift", yShift);
-				
-				// Convert the distance travelled to 1/nm
-				number pixelDistance = distance(XShift, YShift);
-				number scaleX = dataObject.getRefScale();
-				number realDistance = pixelDistance * scaleX;
-				image2Data.TagGroupSetTagAsNumber("DSpacingAng", convertInverseNMToAngstrom(realDistance));
-				
-				if(debugMode==true){Result( "\nPattern Distance Shift (1/nm): " + realDistance);}
-				if(debugMode==true){Result( "\nPattern Distance Shift (Angstroms): " + convertInverseNMToAngstrom(realDistance));}
-				
-				// Add the real distance as text in the image
-				// Add the pixel shift as text in the image
-				string textString = "D-Spacing: " + realDistance + " (1/nm)" + "\nPixel Shift: (" + XShift + ", " + YShift + ")";
-				// Add text annotations and set their colour, display mode and font
-				component textannot=newtextannotation(10,10, textString, 64);
-				textannot.componentsetfillmode(2);
-				textannot.componentsetdrawingmode(2);
-				textannot.componentsetforegroundcolor(1,0,0);
-				textannot.componentsetbackgroundcolor(0,0,0);
-				textannot.componentsetfontfacename("Microsoft Sans Serif");
-				
-				showImage(newDPImage) // Images needs to be shown to give it an ImageDisplay, which is needed for attaching components.
-				ImageDisplay imgDisplay = newDPImage.ImageGetImageDisplay(0)
-				imgDisplay.componentaddchildatend(textannot);
-				ImageDocument thisImageDocument = ImageGetOrCreateImageDocument( newDPImage );
-				
-				self.drawReticle(newDPImage, 0);
-				self.cleanReticle(newDPImage);
-				
-				if(saveImages == true) // If saving the image to hard disk...
-				{
-					string fileDirectory = GetApplicationDirectory("auto_save", 0);
-					filePath = PathConcatenate(fileDirectory, fileNameHigher);
-					image2Data.TagGroupSetTagAsString("FileName", fileNameHigher);
-					image2Data.TagGroupSetTagAsNumber("SavedAsFile", 1);
-					SaveAsGatan( newDPImage, filePath );
-					result("\nSaved tilt DP as " + fileNameHigher);
-				} else { // If not saving the image...
-					image2Data.TagGroupSetTagAsNumber("SavedAsFile", 0);
-				}
-				if(displayImages == true) // If displaying the image...
-				{
-					if(debugMode==true){
-						ImageDocumentClean(thisImageDocument); // So the window can be closed without asking to be saved
-						// Not set by default to avoid accidentally closing the images.
-					}
-					result("\nDiffraction Pattern shown for " + fileNameHigher + ". Tilt value stored (" + xTilt + ", " + yTilt + ")");
-					positionDebugWindow(debugMode); // Return the View window to the front
-				} else { // If not displaying the image, close it.
-					ImageDocumentClean(thisImageDocument); // So the window can be closed without asking to be saved
-					CloseImage(newDPImage);
-					result("\nDiffraction Pattern recorded for " + fileNameHigher + ". Tilt value stored (" + xTilt + ", " + yTilt + ")");
-				}
-			}
-			if(storeTiltOnly != 1)
-			{
-				OSTickCount = GetOSTickCount();
-				number targetTick = OSTickCount + (OSTicksPerSecond * DPExposure);
-				while( targetTick > GetOSTickCount())	{ // Do nothing
-				}
-				number cameraWidth, cameraHeight;
-				cameraWidth = CameraControlObject.getCameraWidth();
-				cameraHeight = CameraControlObject.getCameraHeight();
-				image newDPImage := sscUnprocessedAcquire(DPExposure,0,0,cameraWidth,cameraHeight);
-				
-				// Compare to reference image
-				//findImageShift(image refIm, image newIm, number &XShift, number &YShift)
-				number XShift, YShift;
-				findImageShift(referenceDP, newDPImage, XShift, YShift, debugMode);
-				image3Data.TagGroupSetTagAsNumber("xShift", xShift);
-				image3Data.TagGroupSetTagAsNumber("yShift", yShift);
-				
-				// Convert the distance travelled to 1/nm
-				number pixelDistance = distance(XShift, YShift);
-				number scaleX = dataObject.getRefScale();
-				number realDistance = pixelDistance * scaleX;
-				image3Data.TagGroupSetTagAsNumber("DSpacingAng", convertInverseNMToAngstrom(realDistance));
-				
-				if(debugMode==true){Result( "\nPattern Distance Shift (1/nm): " + realDistance);}
-				if(debugMode==true){Result( "\nPattern Distance Shift (Angstroms): " + convertInverseNMToAngstrom(realDistance));}
-				
-				// Add the real distance as text in the image
-				// Add the pixel shift as text in the image
-				string textString = "D-Spacing: " + realDistance + " (1/nm)" + "\nPixel Shift: (" + XShift + ", " + YShift + ")";
-				// Add text annotations and set their colour, display mode and font
-				component textannot=newtextannotation(10,10, textString, 64);
-				textannot.componentsetfillmode(2);
-				textannot.componentsetdrawingmode(2);
-				textannot.componentsetforegroundcolor(1,0,0);
-				textannot.componentsetbackgroundcolor(0,0,0);
-				textannot.componentsetfontfacename("Microsoft Sans Serif");
-				
-				showImage(newDPImage) // Images needs to be shown to give it an ImageDisplay, which is needed for attaching components.
-				ImageDisplay imgDisplay = newDPImage.ImageGetImageDisplay(0)
-				imgDisplay.componentaddchildatend(textannot);
-				ImageDocument thisImageDocument = ImageGetOrCreateImageDocument( newDPImage );
-				
-				self.drawReticle(newDPImage, 0);
-				self.cleanReticle(newDPImage);
-				
-				if(saveImages == true) // If saving the image to hard disk...
-				{
-					string fileDirectory = GetApplicationDirectory("auto_save", 0);
-					filePath = PathConcatenate(fileDirectory, fileNameLower);
-					image3Data.TagGroupSetTagAsString("FileName", fileNameLower);
-					image3Data.TagGroupSetTagAsNumber("SavedAsFile", 1);
-					SaveAsGatan( newDPImage, filePath );
-					result("\nSaved Diffraction Pattern for " + fileNameLower);
-				} else { // If not saving the image...
-					image3Data.TagGroupSetTagAsNumber("SavedAsFile", 0);
-				}
-				if(displayImages == true) // If displaying the image...
-				{
-					if(debugMode==true){
-						ImageDocumentClean(thisImageDocument); // So the window can be closed without asking to be saved
-						// Not set by default to avoid accidentally closing the images.
-					}
-					result("\nDiffraction Pattern shown for " + fileNameLower + ". Tilt value stored (" + xTilt + ", " + yTilt + ")");
-					positionDebugWindow(debugMode); // Return the View window to the front
-				} else { // If not displaying the image, close it.
-					ImageDocumentClean(thisImageDocument); // So the window can be closed without asking to be saved
-					CloseImage(newDPImage);
-					// No result here since it is not possible to neither saveImages or displayImages
-				}
-				
-			}
-		
 	}
 	
 	
@@ -2278,35 +2030,50 @@ class CreateDF360DialogClass : uiframe
 		if(!returnViewImageDisplay(debugMode, viewDisplay)){
 			throw("No Live View window found");
 		}
-		/* Create the ImageSet Tag Group. The values will be filled out as the function goes on and uploaded to the dataObject before the storeROIButtonPress function ends. */
-		TagGroup imageSet = imageSetTools.createNewImageSet();
-		imageSetTools.addImageSet(imageSet);
-				
+		// Is there an open imageSet?
+		TagGroup targetImageSet
+		number isCurrent = imageSetTools.getCurrentImageSet(targetImageSet)
+		if(isCurrent == 0){
+			Throw("There is no Image Set to save this point inside. Please create one.");
+		}
+		// Has the imageSet been finalized, and so does not accept new points?
+		// Boolean TagGroupGetTagAsNumber( TagGroup tagGroup, String tagPath, NumberVariable number )
+		number DPsTaken
+		if(targetImageSet.TagGroupGetTagAsNumber("DPsTaken", DPsTaken) == 0){
+			result("\n\tImage Set does not have the DPSTaken tag. This is an error.");
+			Throw("Image Set Error: No DPsTaken flag.");
+		} 
+		if(DPsTaken == 1){
+			result("\n\tImage Set has been finalized and cannot have any more spots added.");
+			result("\n\tPlease create a new image set.");
+			throw("Image Set has been finalized.");
+		}
+					
 		number totalROI = viewDisplay.ImageDisplayCountROIs(); // Count ROIs
 		if(debugMode==true){result("\nThere are " + totalROI + " ROI highlighted on the View Window before any shadowing.");}
 		if(totalROI < 1)
 		{ 
 			Throw("No ROI are present.")
 		}
-		image dataArray := dataObject.getDataArray();
-		//if(dataObject.getTracker() > 1){ // All ready results stored?
-			//if(TwoButtonDialog("Delete previous stored points?", "Yes", "No")){
-				dataObject.setTracker(1);
-				number height, width;
-				getSize(dataArray, width, height)
-				//realsubarea operator[( realimage img, number top, number left, number bottom, number right )
-				dataArray[0, 1, height, width] = 0; // Set all values except first to 0
-				result("\nStored points have been cleared. Calibration data are still in memory.")			
-			//}
-		//}
-		number shadowDistanceNM;
-		shadowDistanceNM = dataObject.getShadowDistanceNM();
-		getNumber("Shadow points by (1/nm): ", shadowDistanceNM, shadowDistanceNM);
 		
-		dataObject.setShadowDistanceNM(shadowDistanceNM)
-		imageSet.TagGroupSetTagAsNumber("ShadowDistance", shadowDistanceNM); // store in imageSet Tags
+		number shadowDistanceNM, shadowMode;
+		if(targetImageSet.TagGroupGetTagAsNumber("ShadowMode", shadowMode) == 0){
+			result("\n\tImage Set does not have the ShadowMode tag. This is an error.");
+			Throw("Image Set Error: No ShadowMode flag.");
+		}
+		if(targetImageSet.TagGroupGetTagAsNumber("ShadowDistance", shadowDistanceNM) == 0){
+			result("\n\tImage Set does not have the ShadpwDistance tag. This is an error.");
+			Throw("Image Set Error: No ShadowDistance flag.");
+		}
+		if(ShadowMode == 0){ // the shadow distance can be a non-0 value, yet not be used.
+			shadowDistanceNM = 0;
+		}
+		if(ShadowMode==1 && shadowDistanceNM==0){
+			result("\n\tImage Set shadowing distance is set to 0, but the shadow mode option is On.");
+			Throw("Shadow distance not set");
+		}
 		
-		// Create the information for the image of the diffraction pattern. This makes sure BF and DP are paired up later.
+		// Create the information for the image of the centre of the diffraction pattern. This will be used to make the central BF image later.
 		TagGroup CentralImage = imageSetTools.createNewImageForImageSet();
 		CentralImage.TagGroupSetTagAsString("ImageType", "DP");
 		CentralImage.TagGroupSetTagAsNumber("ExposureTime", CameraControlObject.getDPExposure());
@@ -2322,6 +2089,7 @@ class CreateDF360DialogClass : uiframe
 		
 		if(debugMode==true){result("\nCreating ROI List...");}
 		if(debugMode==true){result("\n\tROIs present: " + totalROI);}
+		// use an image to store ROI data, since this is an easy way to make an array of numbers.
 		image ROIData := IntegerImage("ROI ID List", 4, 0, totalROI, 2);
 		number i
 		for(i=0;i<totalROI;i++){
@@ -2333,25 +2101,40 @@ class CreateDF360DialogClass : uiframe
 			setPixel(ROIData, i , 1, i);
 		}
 		if(debugMode==true){result("\nROI List created.");}
+		
+		// Do I need to save the ROI list for future use now that I have image sets to hold data?
 		dataobject.setROIList(ROIData);
 		if(debugMode==true){result("\nROI List loaded to DataObject.");}
+
 		
-		image ROIList = dataObject.getROIList();
-		// For each ROI...
-		if(debugMode==true){result("\nBeginning to move to and store ROIs...");}
+		if(debugMode==true){result("\nGenerating tilt coordinates for these ROIs...");}
 		for(i=0; i < totalROI; i++)
 		{
 			result("\n\tROI " + (i+1) + " of " + totalROI);
 			if(debugMode==true){result("\nROI " + (i+1) + " of " + totalROI +  " has index ");}
-			number indexValue = getPixel(ROIList, i, 1);
+			number indexValue = getPixel(ROIData, i, 1);
 			if(debugMode==true){result(indexValue);}
 			dataObject.setROITracker(indexValue); // Set ROI tracker number
-			self.moveToCurrentROI(); // Go there.
-			self.storeTiltCoord(shadowDistanceNM, 0); // Store it in the system + Shadow.
+			
+			ROI ROItoMoveTo = viewDisplay.ImageDisplayGetROI( indexValue );
+			number xPixel, yPixel, xTiltTarget, yTiltTarget;
+			if(ROItoMoveTo.ROIIsPoint() != 1){
+				if(debugMode==true){result("\n\tROI #" + indexValue + " is not a point. Skipping over it.");}
+				continue;
+			}
+
+			ROItoMoveTo.ROIGetPoint(xPixel, yPixel);
+			if(debugMode==1){result("\n\txPixel = " + xPixel + " yPixel = " + yPixel);}
+			// void pixelToTilt(object dataObject, number xPixel, number yPixel, number &xTiltTarget, number &yTiltTarget,
+			//			number isViewWindow, number tiltShiftOnly, number pixelShiftOnly, number binningMultiplier)
+			number binningMultiplier = CameraControlObject.getBinningMultiplier();
+			dataObject.pixelToTilt(xPixel, yPixel, xTiltTarget, yTiltTarget, 1, 0, 0, binningMultiplier);
+			if(debugMode==1){result("\n\txTiltTarget = " + xTiltTarget + " yTiltTarget = " + yTiltTarget);}
+
+			self.storeTiltCoord(xTiltTarget, yTiltTarget, shadowDistanceNM); // Store it in the system + Shadow.
 		}
 		if(debugMode==true){result("\nAll ROIs stored.");}
 		OkDialog("All ROI have been stored. You may now begin imaging.");
-		self.beamCentre();
 		if(debugMode==true){
 			imageSetTools.showImageSets();
 		}

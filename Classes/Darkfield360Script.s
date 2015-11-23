@@ -5663,38 +5663,23 @@ class CreateDF360DialogClass : uiframe
 	// IMAGING PROCESSES
 	//****************************************************
 	 
-	/* Function to store tilt values and record the spot for later recall
+	/* Function to store tilt values and record the spot for later recall in the current Image Set
+		xTilt, yTilt = the tilt coordinates (not relative values) of the intended spot.
 		shadowDistance = distance from the central point (in 1/nm) to perform shadowing. 0 = no shadowing.
-		saveImages (0/1) will auto-save the images to the auto-save directory
-		displayImages(0/1) will show the images created on the screen.
-			If saveImages and displayImages are set to 0 then storeTiltOnly variable will switch to 1
+		Does not store images or move anything.
 	*/
-	void storeTiltCoord (object self, number shadowDistance, number saveImages, number displayImages) {
-		// Check to see if the EM is in diffraction mode.
-		if ( (EMGetImagingOpticsMode() == "SAMAG") || (EMGetImagingOpticsMode() == "IMAGING")  || (EMGetImagingOpticsMode() == "MAG1") || (EMGetImagingOpticsMode() == "MAG2")) {
-			if (!ContinueCancelDialog( "Switch to diffraction mode before continuing." )){
-				Throw( "User aborted process." );
-			}
-		}
-		number storeTiltOnly = 0;
-		if(saveImages == 0 && displayImages == 0){
-			storeTiltOnly = 1;
-		}
-		Number xTilt, yTilt;
-		EMGetBeamTilt(xTilt, yTilt); //Get the current tilt values.
-		
+	
+	void storeTiltCoord (object self, number xTilt, number yTilt, number shadowDistance) {
 		number xTiltCenter = dataObject.getCentreXTilt();
 		number yTiltCenter = dataObject.getCentreYTilt();
 		number spotTracker = dataObject.getSpotTracker();
 		number tracker = dataObject.getTracker();
 		number DPExposure = CameraControlObject.getDPExposure();
-		image dataArray := dataObject.getDataArray();
 		image ReferenceDP = dataObject.getReferenceDP();
 		
 		if(debugMode==true)
 		{
 			result("\nStoring the tilt coordinate. Shadowing distance is set to " + shadowDistance + "(1/nm)");
-			result("\nstoreTiltOnly = " + storeTiltOnly);
 			positionDebugWindow(debugMode);
 		}
 		
@@ -5717,99 +5702,16 @@ class CreateDF360DialogClass : uiframe
 		image1Data.TagGroupSetTagAsNumber("ShadowValue", 1);
 
 		imageSetTools.addImageDataToCurrentSpot(image1Data, "Middle"); // this is the middle image and is added to that tag in the spot taggroup
-		
-		/* old file name generation system is old. adapt it to use the tag lists */
-		string fileName, spotID, filePath, timeString;
-		timeString = constructTimeStamp();
-		fileName = "DP_" + spotTracker + "_" + timeString + "_MIDDLE";
-		
-		
-		if(storeTiltOnly == false) // The image creation + storage parts can be ignored if storeTiltOnly parameter is set to true.
-		{
-			// Take new exposure for comparison of pixel movement.
-			number cameraWidth, cameraHeight;
-			cameraWidth = CameraControlObject.getCameraWidth();
-			cameraHeight = CameraControlObject.getCameraHeight();
-			
-			// Wait for the image to stabilize after moving.
-			number OSTickCount = GetOSTickCount();
-			number OSTicksPerSecond = GetOSTicksPerSecond();
-			number targetTick = OSTickCount + (OSTicksPerSecond);
-			while( targetTick > GetOSTickCount()){	// Do nothing
-			}
-			image newDPImage := sscUnprocessedAcquire(DPExposure,0,0,cameraWidth,cameraHeight);
-
-			// Compare to reference image
-			//findImageShift(image refIm, image newIm, number &XShift, number &YShift)
-			number XShift, YShift;
-			findImageShift(referenceDP, newDPImage, XShift, YShift, debugMode);
-			image1Data.TagGroupSetTagAsNumber("xShift", xShift);
-			image1Data.TagGroupSetTagAsNumber("yShift", yShift);
-			
-			// Convert the distance travelled to 1/nm
-			number pixelDistance = distance(XShift, YShift);
-			number scaleX = dataObject.getRefScale();
-			number realDistance = pixelDistance * scaleX;
-			image1Data.TagGroupSetTagAsNumber("DSpacingAng", convertInverseNMToAngstrom(realDistance));
-			
-			if(debugMode==true){Result( "\nPattern Distance Shift (1/nm): " + realDistance);}
-			if(debugMode==true){Result( "\nPattern Distance Shift (Angstroms): " + convertInverseNMToAngstrom(realDistance));}
-			
-			// Add the real distance as text in the image
-			// Add the pixel shift as text in the image
-			string textString = "D-Spacing: " + realDistance + " (1/nm)" + "\nPixel Shift: (" + XShift + ", " + YShift + ")";
-			// Add text annotations and set their colour, display mode and font
-			component textannot=newtextannotation(10,10, textString, 64);
-			textannot.componentsetfillmode(2);
-			textannot.componentsetdrawingmode(2);
-			textannot.componentsetforegroundcolor(1,0,0);
-			textannot.componentsetbackgroundcolor(0,0,0);
-			textannot.componentsetfontfacename("Microsoft Sans Serif");
-			
-			showImage(newDPImage) // Images needs to be shown to give it an ImageDisplay, which is needed for attaching components.
-			ImageDisplay imgDisplay = newDPImage.ImageGetImageDisplay(0)
-			imgDisplay.componentaddchildatend(textannot);
-			ImageDocument thisImageDocument = ImageGetOrCreateImageDocument( newDPImage );
-			
-			self.drawReticle(newDPImage, 0);
-			self.cleanReticle(newDPImage);
-			
-			if(saveImages == true) // If saving the image to hard disk...
-			{
-				string fileDirectory = GetApplicationDirectory("auto_save", 0);
-				filePath = PathConcatenate(fileDirectory, fileName);
-				image1Data.TagGroupSetTagAsString("FileName", fileName);
-				image1Data.TagGroupSetTagAsNumber("SavedAsFile", 1);
-				SaveAsGatan( newDPImage, filePath );
-				result("\nSaved tilt DP as " + fileName);
-			} else { // If not saving the image...
-				image1Data.TagGroupSetTagAsNumber("SavedAsFile", 0);
-			}
-			if(displayImages == true) // If displaying the image...
-			{
-				if(debugMode==true){
-					ImageDocumentClean(thisImageDocument); // So the window can be closed without asking to be saved
-					// Not set by default to avoid accidentally closing the images.
-				}
-				result("\nDiffraction Pattern recorded for " + fileName + ". Tilt value stored (" + xTilt + ", " + yTilt + ")");
-				positionDebugWindow(debugMode); // Return the View window to the front
-			} else { // If not displaying the image, close it.
-				ImageDocumentClean(thisImageDocument); // So the window can be closed without asking to be saved
-				CloseImage(newDPImage);
-			}
-		}
 
 		// For images with Shadowing activated...
 		
 		if(shadowDistance!=0)
 		{
-			if(debugMode==true){result("\nBeginning Shadowing.");}
+			if(debugMode==true){result("\nFinding Shadowing Coordinates.");}
 			//void tiltToPixel(dataObject, number xTilt, number yTilt, number &xPixelShift, number &yPixelShift, number isViewWindow)
-			number xTiltShift = xTilt - dataObject.getCentreXTilt();
-			number yTiltShift = yTilt - dataObject.getCentreYTilt();
 			number xPixelShift, yPixelShift, NMDistance;
-			dataObject.tiltToPixel(xTiltShift, yTiltShift, xPixelShift, yPixelShift, 0, 1);
-			if(debugMode==true){result("\n\tTilt -> Pixel Shift = (" + xTiltShift + ", " + yTiltShift\
+			dataObject.tiltToPixel(xTiltRelative, yTiltRelative, xPixelShift, yPixelShift, 0, 1);
+			if(debugMode==true){result("\n\tTilt -> Pixel Shift = (" + xTiltRelative + ", " + yTiltRelative\
 					+ ") -> (" + xPixelShift + ", " + yPixelShift + ")px");}
 			NMDistance = distance(yPixelShift, xPixelShift) * dataObject.getRefScale();
 			number shadowMultiplier = shadowDistance / NMDistance;
@@ -5820,19 +5722,16 @@ class CreateDF360DialogClass : uiframe
 			if(debugMode==true){result("\n\tShadowMultiplier = " + shadowMultiplier);}
 			
 			// Need centre -> Tilt, not just tilt value.
-			number shadowXshift = xTiltShift * shadowMultiplier;
-			number shadowYshift = yTiltShift * shadowMultiplier;
+			number shadowXshift = xTiltRelative * shadowMultiplier;
+			number shadowYshift = yTiltRelative * shadowMultiplier;
 			if(debugMode==true){result("\n\tShadowXShift (tilt) = " + shadowXshift);}
 			if(debugMode==true){result("\n\tShadowYShift (tilt) = " + shadowYshift);}
 			
-			string fileNameHigher, fileNameLower
-			fileNameHigher = "DP_" + spotTracker + "_" + timeString + "_HIGHER";
-			fileNameLower = "DP_" + spotTracker + "_" + timeString + "_LOWER";
+			xTilt = xTilt + shadowXshift;
+			yTilt = yTilt + shadowYshift;
 			
-			EMChangeTilt(shadowXshift, shadowYshift);
-			if(debugMode==1){result("\n\tBeam tilt moved to 1st shadow point.");}
+			if(debugMode==1){result("\n\tBeam tilt caclulated for 1st shadow point.");}
 			// Store new beam tilt.
-			EMGetBeamTilt(xTilt, yTilt)
 			xTiltRelative = xTilt - xTiltCenter;
 			yTiltRelative = yTilt - yTiltCenter;
 			
@@ -5847,97 +5746,18 @@ class CreateDF360DialogClass : uiframe
 			image2Data.TagGroupSetTagAsNumber("ShadowDistance", shadowDistance);
 			image2Data.TagGroupSetTagAsNumber("ShadowValue", 2);
 			imageSetTools.addImageDataToCurrentSpot(image2Data, "Higher");
-			
-			number OSTickCount = GetOSTickCount();
-			number OSTicksPerSecond = GetOSTicksPerSecond();
-			number targetTick = OSTickCount + (OSTicksPerSecond * DPExposure);
-			if(debugMode==true){result("\n\tTickCount = " + OSTickCount + "  TicksperSec = " + OSTicksPerSecond);}
-			ImageDocument higherDPView, lowerDPView
-			
-			if(storeTiltOnly != true)
-			{
-				// Wait for one second to let the ccd be exposed
-				while( targetTick > GetOSTickCount()){	// Do nothing
-				}
-
-				number cameraWidth, cameraHeight;
-				cameraWidth = CameraControlObject.getCameraWidth();
-				cameraHeight = CameraControlObject.getCameraHeight();
-				image newDPImage := sscUnprocessedAcquire(DPExposure,0,0,cameraWidth,cameraHeight);
-
-				// Compare to reference image
-				//findImageShift(image refIm, image newIm, number &XShift, number &YShift)
-				number XShift, YShift;
-				findImageShift(referenceDP, newDPImage, XShift, YShift, debugMode);
-				image2Data.TagGroupSetTagAsNumber("xShift", xShift);
-				image2Data.TagGroupSetTagAsNumber("yShift", yShift);
-				
-				// Convert the distance travelled to 1/nm
-				number pixelDistance = distance(XShift, YShift);
-				number scaleX = dataObject.getRefScale();
-				number realDistance = pixelDistance * scaleX;
-				image2Data.TagGroupSetTagAsNumber("DSpacingAng", convertInverseNMToAngstrom(realDistance));
-				
-				if(debugMode==true){Result( "\nPattern Distance Shift (1/nm): " + realDistance);}
-				if(debugMode==true){Result( "\nPattern Distance Shift (Angstroms): " + convertInverseNMToAngstrom(realDistance));}
-				
-				// Add the real distance as text in the image
-				// Add the pixel shift as text in the image
-				string textString = "D-Spacing: " + realDistance + " (1/nm)" + "\nPixel Shift: (" + XShift + ", " + YShift + ")";
-				// Add text annotations and set their colour, display mode and font
-				component textannot=newtextannotation(10,10, textString, 64);
-				textannot.componentsetfillmode(2);
-				textannot.componentsetdrawingmode(2);
-				textannot.componentsetforegroundcolor(1,0,0);
-				textannot.componentsetbackgroundcolor(0,0,0);
-				textannot.componentsetfontfacename("Microsoft Sans Serif");
-				
-				showImage(newDPImage) // Images needs to be shown to give it an ImageDisplay, which is needed for attaching components.
-				ImageDisplay imgDisplay = newDPImage.ImageGetImageDisplay(0)
-				imgDisplay.componentaddchildatend(textannot);
-				ImageDocument thisImageDocument = ImageGetOrCreateImageDocument( newDPImage );
-				
-				self.drawReticle(newDPImage, 0);
-				self.cleanReticle(newDPImage);
-				
-				if(saveImages == true) // If saving the image to hard disk...
-				{
-					string fileDirectory = GetApplicationDirectory("auto_save", 0);
-					filePath = PathConcatenate(fileDirectory, fileNameHigher);
-					image2Data.TagGroupSetTagAsString("FileName", fileNameHigher);
-					image2Data.TagGroupSetTagAsNumber("SavedAsFile", 1);
-					SaveAsGatan( newDPImage, filePath );
-					result("\nSaved tilt DP as " + fileNameHigher);
-				} else { // If not saving the image...
-					image2Data.TagGroupSetTagAsNumber("SavedAsFile", 0);
-				}
-				if(displayImages == true) // If displaying the image...
-				{
-					if(debugMode==true){
-						ImageDocumentClean(thisImageDocument); // So the window can be closed without asking to be saved
-						// Not set by default to avoid accidentally closing the images.
-					}
-					result("\nDiffraction Pattern shown for " + fileNameHigher + ". Tilt value stored (" + xTilt + ", " + yTilt + ")");
-					positionDebugWindow(debugMode); // Return the View window to the front
-				} else { // If not displaying the image, close it.
-					ImageDocumentClean(thisImageDocument); // So the window can be closed without asking to be saved
-					CloseImage(newDPImage);
-					result("\nDiffraction Pattern recorded for " + fileNameHigher + ". Tilt value stored (" + xTilt + ", " + yTilt + ")");
-				}
-			}
-			
+						
 			// Second shadowing point
 		
-			EMChangeTilt((-2 * shadowXshift), (-2 * shadowYshift));
-			if(debugMode==1){result("\n\tBeam tilt moved to 2nd shadow point.");}
-			// Store new beam tilt
-			EMGetBeamTilt(xTilt, yTilt)
-			tracker = tracker + 1
+			xTilt = xTilt - (2 * shadowXshift);
+			yTilt = yTilt - (2 * shadowYshift);
+			
 			xTiltRelative = xTilt - xTiltCenter;
 			yTiltRelative = yTilt - yTiltCenter;
+			if(debugMode==1){result("\n\tBeam tilt calculated for 2nd shadow point.");}
 			
 			TagGroup image3Data = imageSetTools.createNewImageForImageSet();
-			tracker = tracker + 1
+			tracker = tracker + 1;
 			image3Data.TagGroupSetTagAsString("ImageType", "DP");
 			image3Data.TagGroupSetTagAsNumber("ExposureTime", CameraControlObject.getDPExposure());
 			image3Data.TagGroupSetTagAsNumber("xTiltRelative", xTiltRelative);
@@ -5947,87 +5767,14 @@ class CreateDF360DialogClass : uiframe
 			image3Data.TagGroupSetTagAsNumber("ShadowDistance", shadowDistance);
 			image3Data.TagGroupSetTagAsNumber("ShadowValue", 3);
 			imageSetTools.addImageDataToCurrentSpot(image3Data, "Lower");
-			
-			if(storeTiltOnly != 1)
-			{
-				OSTickCount = GetOSTickCount();
-				number targetTick = OSTickCount + (OSTicksPerSecond * DPExposure);
-				while( targetTick > GetOSTickCount())	{ // Do nothing
-				}
-				number cameraWidth, cameraHeight;
-				cameraWidth = CameraControlObject.getCameraWidth();
-				cameraHeight = CameraControlObject.getCameraHeight();
-				image newDPImage := sscUnprocessedAcquire(DPExposure,0,0,cameraWidth,cameraHeight);
-				
-				// Compare to reference image
-				//findImageShift(image refIm, image newIm, number &XShift, number &YShift)
-				number XShift, YShift;
-				findImageShift(referenceDP, newDPImage, XShift, YShift, debugMode);
-				image3Data.TagGroupSetTagAsNumber("xShift", xShift);
-				image3Data.TagGroupSetTagAsNumber("yShift", yShift);
-				
-				// Convert the distance travelled to 1/nm
-				number pixelDistance = distance(XShift, YShift);
-				number scaleX = dataObject.getRefScale();
-				number realDistance = pixelDistance * scaleX;
-				image3Data.TagGroupSetTagAsNumber("DSpacingAng", convertInverseNMToAngstrom(realDistance));
-				
-				if(debugMode==true){Result( "\nPattern Distance Shift (1/nm): " + realDistance);}
-				if(debugMode==true){Result( "\nPattern Distance Shift (Angstroms): " + convertInverseNMToAngstrom(realDistance));}
-				
-				// Add the real distance as text in the image
-				// Add the pixel shift as text in the image
-				string textString = "D-Spacing: " + realDistance + " (1/nm)" + "\nPixel Shift: (" + XShift + ", " + YShift + ")";
-				// Add text annotations and set their colour, display mode and font
-				component textannot=newtextannotation(10,10, textString, 64);
-				textannot.componentsetfillmode(2);
-				textannot.componentsetdrawingmode(2);
-				textannot.componentsetforegroundcolor(1,0,0);
-				textannot.componentsetbackgroundcolor(0,0,0);
-				textannot.componentsetfontfacename("Microsoft Sans Serif");
-				
-				showImage(newDPImage) // Images needs to be shown to give it an ImageDisplay, which is needed for attaching components.
-				ImageDisplay imgDisplay = newDPImage.ImageGetImageDisplay(0)
-				imgDisplay.componentaddchildatend(textannot);
-				ImageDocument thisImageDocument = ImageGetOrCreateImageDocument( newDPImage );
-				
-				self.drawReticle(newDPImage, 0);
-				self.cleanReticle(newDPImage);
-				
-				if(saveImages == true) // If saving the image to hard disk...
-				{
-					string fileDirectory = GetApplicationDirectory("auto_save", 0);
-					filePath = PathConcatenate(fileDirectory, fileNameLower);
-					image3Data.TagGroupSetTagAsString("FileName", fileNameLower);
-					image3Data.TagGroupSetTagAsNumber("SavedAsFile", 1);
-					SaveAsGatan( newDPImage, filePath );
-					result("\nSaved Diffraction Pattern for " + fileNameLower);
-				} else { // If not saving the image...
-					image3Data.TagGroupSetTagAsNumber("SavedAsFile", 0);
-				}
-				if(displayImages == true) // If displaying the image...
-				{
-					if(debugMode==true){
-						ImageDocumentClean(thisImageDocument); // So the window can be closed without asking to be saved
-						// Not set by default to avoid accidentally closing the images.
-					}
-					result("\nDiffraction Pattern shown for " + fileNameLower + ". Tilt value stored (" + xTilt + ", " + yTilt + ")");
-					positionDebugWindow(debugMode); // Return the View window to the front
-				} else { // If not displaying the image, close it.
-					ImageDocumentClean(thisImageDocument); // So the window can be closed without asking to be saved
-					CloseImage(newDPImage);
-					// No result here since it is not possible to neither saveImages or displayImages
-				}
-				
-			}
-			// All shadow images are now stored
+
+			// All shadow coordinates are now stored
 		}
-		// All images are now stored
 		dataObject.setTracker(tracker);
 		dataObject.setSpotTracker(spotTracker);
-
 	}
-
+	
+	
 	/* Will take a number of images of the DP moved to values in the list of stored points.
 		This is to test the tilt calibration and alignment.
 	 */
@@ -7060,6 +6807,7 @@ class CreateDF360DialogClass : uiframe
 	
 	
 	// This button saves the current tilt setting for the current ImageSet with the storeTiltCoord() function.
+	// Does not create any images or move the beam.
 	void StoreDPButtonPress (object self)
 	{
 		if(CameraControlObject.getAllowControl() != true){
@@ -7069,7 +6817,7 @@ class CreateDF360DialogClass : uiframe
 		// Stores a diffraction spot's tilt coordinates and takes a picture to reference the spot in future.
 		if(isCalibrated == 0)
 		{
-			Throw("Data NOT stored. Please Calibrate the system first.");
+			Throw("Data not stored. Please Calibrate the system first.");
 		}
 		// Is there an open imageSet?
 		TagGroup targetImageSet
@@ -7090,21 +6838,22 @@ class CreateDF360DialogClass : uiframe
 		}
 		
 		// storeTiltCoord (object self, number shadowDistance, number saveImages, number displayImages)
-		number shadowDistanceNM, saveImages, displayImages;
-		if(targetImageSet.TagGroupGetTagAsNumber("ShadowDistance", shadowDistanceNM) == 0){
-			result("\n\tImage Set does not have the ShadpwDistance tag. This is an error.");
-			Throw("Image Set Error: No ShadowDistance flag.");
+		number xTilt, yTilt
+		EMGetBeamTilt(xTilt, yTilt);
+		number shadowDistanceNM, shadowMode;
+		if(targetImageSet.TagGroupGetTagAsNumber("ShadowMode", shadowMode) == 0){
+			result("\n\tImage Set does not have the ShadowMode tag. This is an error.");
+			Throw("Image Set Error: No ShadowMode flag.");
+			if(targetImageSet.TagGroupGetTagAsNumber("ShadowDistance", shadowDistanceNM) == 0){
+				result("\n\tImage Set does not have the ShadpwDistance tag. This is an error.");
+				Throw("Image Set Error: No ShadowDistance flag.");
+			}
 		}
-		if(targetImageSet.TagGroupGetTagAsNumber("AutoSaveImages", saveImages) == 0){
-			result("\n\tImage Set does not have the AutoSaveImages tag. This is an error.");
-			Throw("Image Set Error: No AutoSaveImages flag.");
+		if(ShadowMode == 0){ // the shadow distance can be a non-0 value, yet not be used.
+			shadowDistanceNM = 0;
 		}
-		if(targetImageSet.TagGroupGetTagAsNumber("AutoDisplayImages", displayImages) == 0){
-			result("\n\tImage Set does not have the AutoDisplayImages tag. This is an error.");
-			Throw("Image Set Error: No AutoDisplayImages flag.");
-		}
-		
-		self.storeTiltCoord ( shadowDistanceNM, saveImages, displayImages );
+		// void storeTiltCoord (object self, number xTilt, number yTilt, number shadowDistance)
+		self.storeTiltCoord ( xTilt, yTilt, shadowDistanceNM );
 	}
 		
 	void storeROIButtonPress (object self)
@@ -7121,35 +6870,50 @@ class CreateDF360DialogClass : uiframe
 		if(!returnViewImageDisplay(debugMode, viewDisplay)){
 			throw("No Live View window found");
 		}
-		/* Create the ImageSet Tag Group. The values will be filled out as the function goes on and uploaded to the dataObject before the storeROIButtonPress function ends. */
-		TagGroup imageSet = imageSetTools.createNewImageSet();
-		imageSetTools.addImageSet(imageSet);
-				
+		// Is there an open imageSet?
+		TagGroup targetImageSet
+		number isCurrent = imageSetTools.getCurrentImageSet(targetImageSet)
+		if(isCurrent == 0){
+			Throw("There is no Image Set to save this point inside. Please create one.");
+		}
+		// Has the imageSet been finalized, and so does not accept new points?
+		// Boolean TagGroupGetTagAsNumber( TagGroup tagGroup, String tagPath, NumberVariable number )
+		number DPsTaken
+		if(targetImageSet.TagGroupGetTagAsNumber("DPsTaken", DPsTaken) == 0){
+			result("\n\tImage Set does not have the DPSTaken tag. This is an error.");
+			Throw("Image Set Error: No DPsTaken flag.");
+		} 
+		if(DPsTaken == 1){
+			result("\n\tImage Set has been finalized and cannot have any more spots added.");
+			result("\n\tPlease create a new image set.");
+			throw("Image Set has been finalized.");
+		}
+					
 		number totalROI = viewDisplay.ImageDisplayCountROIs(); // Count ROIs
 		if(debugMode==true){result("\nThere are " + totalROI + " ROI highlighted on the View Window before any shadowing.");}
 		if(totalROI < 1)
 		{ 
 			Throw("No ROI are present.")
 		}
-		image dataArray := dataObject.getDataArray();
-		//if(dataObject.getTracker() > 1){ // All ready results stored?
-			//if(TwoButtonDialog("Delete previous stored points?", "Yes", "No")){
-				dataObject.setTracker(1);
-				number height, width;
-				getSize(dataArray, width, height)
-				//realsubarea operator[( realimage img, number top, number left, number bottom, number right )
-				dataArray[0, 1, height, width] = 0; // Set all values except first to 0
-				result("\nStored points have been cleared. Calibration data are still in memory.")			
-			//}
-		//}
-		number shadowDistanceNM;
-		shadowDistanceNM = dataObject.getShadowDistanceNM();
-		getNumber("Shadow points by (1/nm): ", shadowDistanceNM, shadowDistanceNM);
 		
-		dataObject.setShadowDistanceNM(shadowDistanceNM)
-		imageSet.TagGroupSetTagAsNumber("ShadowDistance", shadowDistanceNM); // store in imageSet Tags
+		number shadowDistanceNM, shadowMode;
+		if(targetImageSet.TagGroupGetTagAsNumber("ShadowMode", shadowMode) == 0){
+			result("\n\tImage Set does not have the ShadowMode tag. This is an error.");
+			Throw("Image Set Error: No ShadowMode flag.");
+		}
+		if(targetImageSet.TagGroupGetTagAsNumber("ShadowDistance", shadowDistanceNM) == 0){
+			result("\n\tImage Set does not have the ShadpwDistance tag. This is an error.");
+			Throw("Image Set Error: No ShadowDistance flag.");
+		}
+		if(ShadowMode == 0){ // the shadow distance can be a non-0 value, yet not be used.
+			shadowDistanceNM = 0;
+		}
+		if(ShadowMode==1 && shadowDistanceNM==0){
+			result("\n\tImage Set shadowing distance is set to 0, but the shadow mode option is On.");
+			Throw("Shadow distance not set");
+		}
 		
-		// Create the information for the image of the diffraction pattern. This makes sure BF and DP are paired up later.
+		// Create the information for the image of the centre of the diffraction pattern. This will be used to make the central BF image later.
 		TagGroup CentralImage = imageSetTools.createNewImageForImageSet();
 		CentralImage.TagGroupSetTagAsString("ImageType", "DP");
 		CentralImage.TagGroupSetTagAsNumber("ExposureTime", CameraControlObject.getDPExposure());
@@ -7165,6 +6929,7 @@ class CreateDF360DialogClass : uiframe
 		
 		if(debugMode==true){result("\nCreating ROI List...");}
 		if(debugMode==true){result("\n\tROIs present: " + totalROI);}
+		// use an image to store ROI data, since this is an easy way to make an array of numbers.
 		image ROIData := IntegerImage("ROI ID List", 4, 0, totalROI, 2);
 		number i
 		for(i=0;i<totalROI;i++){
@@ -7176,25 +6941,40 @@ class CreateDF360DialogClass : uiframe
 			setPixel(ROIData, i , 1, i);
 		}
 		if(debugMode==true){result("\nROI List created.");}
+		
+		// Do I need to save the ROI list for future use now that I have image sets to hold data?
 		dataobject.setROIList(ROIData);
 		if(debugMode==true){result("\nROI List loaded to DataObject.");}
+
 		
-		image ROIList = dataObject.getROIList();
-		// For each ROI...
-		if(debugMode==true){result("\nBeginning to move to and store ROIs...");}
+		if(debugMode==true){result("\nGenerating tilt coordinates for these ROIs...");}
 		for(i=0; i < totalROI; i++)
 		{
 			result("\n\tROI " + (i+1) + " of " + totalROI);
 			if(debugMode==true){result("\nROI " + (i+1) + " of " + totalROI +  " has index ");}
-			number indexValue = getPixel(ROIList, i, 1);
+			number indexValue = getPixel(ROIData, i, 1);
 			if(debugMode==true){result(indexValue);}
 			dataObject.setROITracker(indexValue); // Set ROI tracker number
-			self.moveToCurrentROI(); // Go there.
-			self.storeTiltCoord(shadowDistanceNM, 0); // Store it in the system + Shadow.
+			
+			ROI ROItoMoveTo = viewDisplay.ImageDisplayGetROI( indexValue );
+			number xPixel, yPixel, xTiltTarget, yTiltTarget;
+			if(ROItoMoveTo.ROIIsPoint() != 1){
+				if(debugMode==true){result("\n\tROI #" + indexValue + " is not a point. Skipping over it.");}
+				continue;
+			}
+
+			ROItoMoveTo.ROIGetPoint(xPixel, yPixel);
+			if(debugMode==1){result("\n\txPixel = " + xPixel + " yPixel = " + yPixel);}
+			// void pixelToTilt(object dataObject, number xPixel, number yPixel, number &xTiltTarget, number &yTiltTarget,
+			//			number isViewWindow, number tiltShiftOnly, number pixelShiftOnly, number binningMultiplier)
+			number binningMultiplier = CameraControlObject.getBinningMultiplier();
+			dataObject.pixelToTilt(xPixel, yPixel, xTiltTarget, yTiltTarget, 1, 0, 0, binningMultiplier);
+			if(debugMode==1){result("\n\txTiltTarget = " + xTiltTarget + " yTiltTarget = " + yTiltTarget);}
+
+			self.storeTiltCoord(xTiltTarget, yTiltTarget, shadowDistanceNM); // Store it in the system + Shadow.
 		}
 		if(debugMode==true){result("\nAll ROIs stored.");}
 		OkDialog("All ROI have been stored. You may now begin imaging.");
-		self.beamCentre();
 		if(debugMode==true){
 			imageSetTools.showImageSets();
 		}
