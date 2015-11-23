@@ -823,38 +823,23 @@ class CreateDF360DialogClass : uiframe
 	// IMAGING PROCESSES
 	//****************************************************
 	 
-	/* Function to store tilt values and record the spot for later recall
+	/* Function to store tilt values and record the spot for later recall in the current Image Set
+		xTilt, yTilt = the tilt coordinates (not relative values) of the intended spot.
 		shadowDistance = distance from the central point (in 1/nm) to perform shadowing. 0 = no shadowing.
-		saveImages (0/1) will auto-save the images to the auto-save directory
-		displayImages(0/1) will show the images created on the screen.
-			If saveImages and displayImages are set to 0 then storeTiltOnly variable will switch to 1
+		Does not store images or move anything.
 	*/
-	void storeTiltCoord (object self, number shadowDistance, number saveImages, number displayImages) {
-		// Check to see if the EM is in diffraction mode.
-		if ( (EMGetImagingOpticsMode() == "SAMAG") || (EMGetImagingOpticsMode() == "IMAGING")  || (EMGetImagingOpticsMode() == "MAG1") || (EMGetImagingOpticsMode() == "MAG2")) {
-			if (!ContinueCancelDialog( "Switch to diffraction mode before continuing." )){
-				Throw( "User aborted process." );
-			}
-		}
-		number storeTiltOnly = 0;
-		if(saveImages == 0 && displayImages == 0){
-			storeTiltOnly = 1;
-		}
-		Number xTilt, yTilt;
-		EMGetBeamTilt(xTilt, yTilt); //Get the current tilt values.
-		
+	
+	void storeTiltCoord (object self, number xTilt, number yTilt, number shadowDistance) {
 		number xTiltCenter = dataObject.getCentreXTilt();
 		number yTiltCenter = dataObject.getCentreYTilt();
 		number spotTracker = dataObject.getSpotTracker();
 		number tracker = dataObject.getTracker();
 		number DPExposure = CameraControlObject.getDPExposure();
-		image dataArray := dataObject.getDataArray();
 		image ReferenceDP = dataObject.getReferenceDP();
 		
 		if(debugMode==true)
 		{
 			result("\nStoring the tilt coordinate. Shadowing distance is set to " + shadowDistance + "(1/nm)");
-			result("\nstoreTiltOnly = " + storeTiltOnly);
 			positionDebugWindow(debugMode);
 		}
 		
@@ -877,8 +862,90 @@ class CreateDF360DialogClass : uiframe
 		image1Data.TagGroupSetTagAsNumber("ShadowValue", 1);
 
 		imageSetTools.addImageDataToCurrentSpot(image1Data, "Middle"); // this is the middle image and is added to that tag in the spot taggroup
+
+		// For images with Shadowing activated...
 		
-		/* old file name generation system is old. adapt it to use the tag lists */
+		if(shadowDistance!=0)
+		{
+			if(debugMode==true){result("\nFinding Shadowing Coordinates.");}
+			//void tiltToPixel(dataObject, number xTilt, number yTilt, number &xPixelShift, number &yPixelShift, number isViewWindow)
+			number xPixelShift, yPixelShift, NMDistance;
+			dataObject.tiltToPixel(xTiltRelative, yTiltRelative, xPixelShift, yPixelShift, 0, 1);
+			if(debugMode==true){result("\n\tTilt -> Pixel Shift = (" + xTiltShift + ", " + yTiltShift\
+					+ ") -> (" + xPixelShift + ", " + yPixelShift + ")px");}
+			NMDistance = distance(yPixelShift, xPixelShift) * dataObject.getRefScale();
+			number shadowMultiplier = shadowDistance / NMDistance;
+			if(shadowMultiplier.isNaN()){ // checks to see if the shadow multiplier is a real number
+				throw("Shadow Distance is not a number");
+			}
+			if(debugMode==true){result("\n\tNMDistance = " + NMDistance);}
+			if(debugMode==true){result("\n\tShadowMultiplier = " + shadowMultiplier);}
+			
+			// Need centre -> Tilt, not just tilt value.
+			number shadowXshift = xTiltRelative * shadowMultiplier;
+			number shadowYshift = yTiltRelative * shadowMultiplier;
+			if(debugMode==true){result("\n\tShadowXShift (tilt) = " + shadowXshift);}
+			if(debugMode==true){result("\n\tShadowYShift (tilt) = " + shadowYshift);}
+			
+			xTilt = xTilt + shadowXshift;
+			yTilt = yTilt + shadowYshift;
+			
+			if(debugMode==1){result("\n\tBeam tilt caclulated for 1st shadow point.");}
+			// Store new beam tilt.
+			xTiltRelative = xTilt - xTiltCenter;
+			yTiltRelative = yTilt - yTiltCenter;
+			
+			TagGroup image2Data = imageSetTools.createNewImageForImageSet();
+			tracker = tracker + 1
+			image2Data.TagGroupSetTagAsString("ImageType", "DP");
+			image2Data.TagGroupSetTagAsNumber("ExposureTime", DPExposure);
+			image2Data.TagGroupSetTagAsNumber("xTiltRelative", xTiltRelative);
+			image2Data.TagGroupSetTagAsNumber("yTiltRelative", yTiltRelative);
+			image2Data.TagGroupSetTagAsNumber("xTiltValue", xTilt);
+			image2Data.TagGroupSetTagAsNumber("yTiltValue", yTilt);
+			image2Data.TagGroupSetTagAsNumber("ShadowDistance", shadowDistance);
+			image2Data.TagGroupSetTagAsNumber("ShadowValue", 2);
+			imageSetTools.addImageDataToCurrentSpot(image2Data, "Higher");
+						
+			// Second shadowing point
+		
+			xTilt = xTilt - (2 * shadowXshift);
+			yTilt = yTilt - (2 * shadowYshift);
+			
+			xTiltRelative = xTilt - xTiltCenter;
+			yTiltRelative = yTilt - yTiltCenter;
+			if(debugMode==1){result("\n\tBeam tilt calculated for 2nd shadow point.");}
+			
+			TagGroup image3Data = imageSetTools.createNewImageForImageSet();
+			tracker = tracker + 1;
+			image3Data.TagGroupSetTagAsString("ImageType", "DP");
+			image3Data.TagGroupSetTagAsNumber("ExposureTime", CameraControlObject.getDPExposure());
+			image3Data.TagGroupSetTagAsNumber("xTiltRelative", xTiltRelative);
+			image3Data.TagGroupSetTagAsNumber("yTiltRelative", yTiltRelative);
+			image3Data.TagGroupSetTagAsNumber("xTiltValue", xTilt);
+			image3Data.TagGroupSetTagAsNumber("yTiltValue", yTilt);
+			image3Data.TagGroupSetTagAsNumber("ShadowDistance", shadowDistance);
+			image3Data.TagGroupSetTagAsNumber("ShadowValue", 3);
+			imageSetTools.addImageDataToCurrentSpot(image3Data, "Lower");
+
+			// All shadow coordinates are now stored
+		}
+		dataObject.setTracker(tracker);
+		dataObject.setSpotTracker(spotTracker);
+	}
+
+	/* 
+		Image DP code from old store tilt function
+	*/
+	number DPImageCode(){
+	
+	// Check to see if the EM is in diffraction mode.
+		if ( (EMGetImagingOpticsMode() == "SAMAG") || (EMGetImagingOpticsMode() == "IMAGING")  || (EMGetImagingOpticsMode() == "MAG1") || (EMGetImagingOpticsMode() == "MAG2")) {
+			if (!ContinueCancelDialog( "Switch to diffraction mode before continuing." )){
+				Throw( "User aborted process." );
+			}
+		}
+	/* old file name generation system is old. adapt it to use the tag lists */
 		string fileName, spotID, filePath, timeString;
 		timeString = constructTimeStamp();
 		fileName = "DP_" + spotTracker + "_" + timeString + "_MIDDLE";
@@ -958,57 +1025,12 @@ class CreateDF360DialogClass : uiframe
 				CloseImage(newDPImage);
 			}
 		}
-
-		// For images with Shadowing activated...
 		
-		if(shadowDistance!=0)
-		{
-			if(debugMode==true){result("\nBeginning Shadowing.");}
-			//void tiltToPixel(dataObject, number xTilt, number yTilt, number &xPixelShift, number &yPixelShift, number isViewWindow)
-			number xTiltShift = xTilt - dataObject.getCentreXTilt();
-			number yTiltShift = yTilt - dataObject.getCentreYTilt();
-			number xPixelShift, yPixelShift, NMDistance;
-			dataObject.tiltToPixel(xTiltShift, yTiltShift, xPixelShift, yPixelShift, 0, 1);
-			if(debugMode==true){result("\n\tTilt -> Pixel Shift = (" + xTiltShift + ", " + yTiltShift\
-					+ ") -> (" + xPixelShift + ", " + yPixelShift + ")px");}
-			NMDistance = distance(yPixelShift, xPixelShift) * dataObject.getRefScale();
-			number shadowMultiplier = shadowDistance / NMDistance;
-			if(shadowMultiplier.isNaN()){ // checks to see if the shadow multiplier is a real number
-				throw("Shadow Distance is not a number");
-			}
-			if(debugMode==true){result("\n\tNMDistance = " + NMDistance);}
-			if(debugMode==true){result("\n\tShadowMultiplier = " + shadowMultiplier);}
-			
-			// Need centre -> Tilt, not just tilt value.
-			number shadowXshift = xTiltShift * shadowMultiplier;
-			number shadowYshift = yTiltShift * shadowMultiplier;
-			if(debugMode==true){result("\n\tShadowXShift (tilt) = " + shadowXshift);}
-			if(debugMode==true){result("\n\tShadowYShift (tilt) = " + shadowYshift);}
-			
-			string fileNameHigher, fileNameLower
-			fileNameHigher = "DP_" + spotTracker + "_" + timeString + "_HIGHER";
-			fileNameLower = "DP_" + spotTracker + "_" + timeString + "_LOWER";
-			
-			EMChangeTilt(shadowXshift, shadowYshift);
-			if(debugMode==1){result("\n\tBeam tilt moved to 1st shadow point.");}
-			// Store new beam tilt.
-			EMGetBeamTilt(xTilt, yTilt)
-			xTiltRelative = xTilt - xTiltCenter;
-			yTiltRelative = yTilt - yTiltCenter;
-			
-			TagGroup image2Data = imageSetTools.createNewImageForImageSet();
-			tracker = tracker + 1
-			image2Data.TagGroupSetTagAsString("ImageType", "DP");
-			image2Data.TagGroupSetTagAsNumber("ExposureTime", DPExposure);
-			image2Data.TagGroupSetTagAsNumber("xTiltRelative", xTiltRelative);
-			image2Data.TagGroupSetTagAsNumber("yTiltRelative", yTiltRelative);
-			image2Data.TagGroupSetTagAsNumber("xTiltValue", xTilt);
-			image2Data.TagGroupSetTagAsNumber("yTiltValue", yTilt);
-			image2Data.TagGroupSetTagAsNumber("ShadowDistance", shadowDistance);
-			image2Data.TagGroupSetTagAsNumber("ShadowValue", 2);
-			imageSetTools.addImageDataToCurrentSpot(image2Data, "Higher");
-			
-			number OSTickCount = GetOSTickCount();
+		string fileNameHigher, fileNameLower
+		fileNameHigher = "DP_" + spotTracker + "_" + timeString + "_HIGHER";
+		fileNameLower = "DP_" + spotTracker + "_" + timeString + "_LOWER";
+		
+		number OSTickCount = GetOSTickCount();
 			number OSTicksPerSecond = GetOSTicksPerSecond();
 			number targetTick = OSTickCount + (OSTicksPerSecond * DPExposure);
 			if(debugMode==true){result("\n\tTickCount = " + OSTickCount + "  TicksperSec = " + OSTicksPerSecond);}
@@ -1085,29 +1107,6 @@ class CreateDF360DialogClass : uiframe
 					result("\nDiffraction Pattern recorded for " + fileNameHigher + ". Tilt value stored (" + xTilt + ", " + yTilt + ")");
 				}
 			}
-			
-			// Second shadowing point
-		
-			EMChangeTilt((-2 * shadowXshift), (-2 * shadowYshift));
-			if(debugMode==1){result("\n\tBeam tilt moved to 2nd shadow point.");}
-			// Store new beam tilt
-			EMGetBeamTilt(xTilt, yTilt)
-			tracker = tracker + 1
-			xTiltRelative = xTilt - xTiltCenter;
-			yTiltRelative = yTilt - yTiltCenter;
-			
-			TagGroup image3Data = imageSetTools.createNewImageForImageSet();
-			tracker = tracker + 1
-			image3Data.TagGroupSetTagAsString("ImageType", "DP");
-			image3Data.TagGroupSetTagAsNumber("ExposureTime", CameraControlObject.getDPExposure());
-			image3Data.TagGroupSetTagAsNumber("xTiltRelative", xTiltRelative);
-			image3Data.TagGroupSetTagAsNumber("yTiltRelative", yTiltRelative);
-			image3Data.TagGroupSetTagAsNumber("xTiltValue", xTilt);
-			image3Data.TagGroupSetTagAsNumber("yTiltValue", yTilt);
-			image3Data.TagGroupSetTagAsNumber("ShadowDistance", shadowDistance);
-			image3Data.TagGroupSetTagAsNumber("ShadowValue", 3);
-			imageSetTools.addImageDataToCurrentSpot(image3Data, "Lower");
-			
 			if(storeTiltOnly != 1)
 			{
 				OSTickCount = GetOSTickCount();
@@ -1180,14 +1179,10 @@ class CreateDF360DialogClass : uiframe
 				}
 				
 			}
-			// All shadow images are now stored
-		}
-		// All images are now stored
-		dataObject.setTracker(tracker);
-		dataObject.setSpotTracker(spotTracker);
-
+		
 	}
-
+	
+	
 	/* Will take a number of images of the DP moved to values in the list of stored points.
 		This is to test the tilt calibration and alignment.
 	 */
@@ -2220,6 +2215,7 @@ class CreateDF360DialogClass : uiframe
 	
 	
 	// This button saves the current tilt setting for the current ImageSet with the storeTiltCoord() function.
+	// Does not create any images or move the beam.
 	void StoreDPButtonPress (object self)
 	{
 		if(CameraControlObject.getAllowControl() != true){
@@ -2250,21 +2246,22 @@ class CreateDF360DialogClass : uiframe
 		}
 		
 		// storeTiltCoord (object self, number shadowDistance, number saveImages, number displayImages)
-		number shadowDistanceNM, saveImages, displayImages;
-		if(targetImageSet.TagGroupGetTagAsNumber("ShadowDistance", shadowDistanceNM) == 0){
-			result("\n\tImage Set does not have the ShadpwDistance tag. This is an error.");
-			Throw("Image Set Error: No ShadowDistance flag.");
+		number xTilt, yTilt
+		EMGetBeamTilt(xTilt, yTilt);
+		number shadowDistanceNM, shadowMode;
+		if(targetImageSet.TagGroupGetTagAsNumber("ShadowMode", shadowMode) == 0){
+			result("\n\tImage Set does not have the ShadowMode tag. This is an error.");
+			Throw("Image Set Error: No ShadowMode flag.");
+			if(targetImageSet.TagGroupGetTagAsNumber("ShadowDistance", shadowDistanceNM) == 0){
+				result("\n\tImage Set does not have the ShadpwDistance tag. This is an error.");
+				Throw("Image Set Error: No ShadowDistance flag.");
+			}
 		}
-		if(targetImageSet.TagGroupGetTagAsNumber("AutoSaveImages", saveImages) == 0){
-			result("\n\tImage Set does not have the AutoSaveImages tag. This is an error.");
-			Throw("Image Set Error: No AutoSaveImages flag.");
+		if(ShadowMode == 0){ // the shadow distance can be a non-0 value, yet not be used.
+			shadowDistanceNM = 0;
 		}
-		if(targetImageSet.TagGroupGetTagAsNumber("AutoDisplayImages", displayImages) == 0){
-			result("\n\tImage Set does not have the AutoDisplayImages tag. This is an error.");
-			Throw("Image Set Error: No AutoDisplayImages flag.");
-		}
-		
-		self.storeTiltCoord ( shadowDistanceNM, saveImages, displayImages );
+		// void storeTiltCoord (object self, number xTilt, number yTilt, number shadowDistance)
+		self.storeTiltCoord ( xTilt, yTilt, shadowDistanceNM );
 	}
 		
 	void storeROIButtonPress (object self)
