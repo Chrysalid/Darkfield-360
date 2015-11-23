@@ -512,7 +512,7 @@ class CreateDF360DialogClass : uiframe
 		panel2.dlgaddelement(storePointButton)
 		TagGroup DarkFieldROIButton = DLGCreatePushButton("Add All ROI", "storeROIButtonPress")
 		panel2.dlgaddelement(DarkFieldROIButton)
-		TagGroup TakeDPImagesButton = DLGCreatePushButton("Save Image Set Targets", "TakeDPImagesButtonPress")
+		TagGroup TakeDPImagesButton = DLGCreatePushButton("Finalise Image Set", "TakeDPImagesButtonPress")
 		panel2.dlgaddelement(TakeDPImagesButton)
 		
 		// Panel 3 is for controlling the Marker Ring
@@ -2167,6 +2167,53 @@ class CreateDF360DialogClass : uiframe
 
 		
 	/* IMAGE PANEL BUTTON FUNCTIONS */
+	
+	void EditImageSetButtonPress (object self)
+	{
+		if(CameraControlObject.getAllowControl() != true){
+			result("\nToolkit Controls are offline. Ensure there is a live view window active and has been captured.")
+			exit(0);
+		}
+		number useValues;
+		TagGroup ImageSet
+		if( ImageSetTools.getCurrentImageSet(ImageSet) == 0){
+			// There is no current image set, so we must make a new one.
+			useValues = ImageConfigDialog.inputNewCalibration("New");
+		} else {
+			// There is an existing image set, so use that one or make a new one.
+			if ( TwoButtonDialog( "Do you wish to edit the existing Image Set?", "Yes", "No, make a new one" ) == 0){
+				// Do not use existing one...
+				useValues = ImageConfigDialog.inputNewCalibration("New");
+			} else {
+				// Use existing one... 
+				string imageSetID;
+				if(ImageSetTools.getImageSetID(ImageSet, imageSetID) == 1){
+					// If the imageSet has a valid ID
+					useValues = ImageConfigDialog.inputNewCalibration(imageSetID);
+				} else {
+					// If no valid ID is found...
+					result("\nImageSetID not found inside existing ImageSet tag group. Creating New Image Set.")
+					useValues = ImageConfigDialog.inputNewCalibration("New");
+				}
+			}
+		}
+		
+		// We now have an image set stored in the ImageConfig dialog object, but not here. If useValues is 1, the user pressed okay. The image set needs adding to the current list of imagesets or the existing set needs updating.
+		// Determning which is needed is up to the ImageSetTools function, not here, since the Toolkit should not have any of its own imageSet tools.
+		
+		if( useValues == 1){
+			if(debugMode==true){result("\nUser made or changed an image set. Updating imageset list.");}
+			ImageConfigDialog.addImageSetToImageList();
+			return;
+		} else {
+			if(debugMode==true){result("\nUser cancelled image set creation/edit. No changes made.");}
+			return;
+		}
+		
+		
+	
+	}
+	
 	void StoreDPButtonPress (object self)
 	{
 		if(CameraControlObject.getAllowControl() != true){

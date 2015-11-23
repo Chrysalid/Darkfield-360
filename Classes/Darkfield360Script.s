@@ -2505,6 +2505,45 @@ class ImageSetTools
 		TagGroupOpenBrowserWindow(imageSets, 0);
 	}
 	
+	/* Returns the image set id string for a given image set tag group. Used to simplify using image sets in external functions.*/
+	number getImageSetID(object self, TagGroup ImageSet, string &ImageSetIDvariable){
+		string value;
+		if (ImageSet.TagGroupGetTagAsString( "ImageSetID", ImageSetIDvariable ) == 0){
+			result("\nNo ImageSetID found in tag group");
+			return 0;
+		}
+		if(debugMode == true){result("\n\tgetImageSetID() reports the image set ID is " + ImageSetIDvariable);}
+		return 1;
+	}
+	
+	/* Get ImageSet tag group based on the ID of the set. Returns 1/0 for success/fail */
+	number getImageSetByID(object self, string theImageSetID, TagGroup &targetImageSet){
+		number totalImageSets = imageSets.TagGroupCountTags();
+		if(totalImageSets <= 0){
+			result("\nWhen attempting to get Image Set " + theImageSetID + " no image sets were found at all.")
+			return 0;
+		}
+		number i
+		for(i=0; i < totalImageSets; i++){
+			TagGroup ThisImageSet;
+			if (ImageSets.TagGroupGetIndexedTagAsTagGroup(i, ThisImageSet) == 0){
+				result("\nWhen attempting to get Image Set " + theImageSetID + " there was an error returning Image Set index " + i);
+				return 0;
+			}
+			string ThisImageSetID;
+			if(ThisImageSet.TagGroupGetTagAsString("ImageSetID", ThisImageSetID) == 0){
+				result("\nWhen attempting to get Image Set " + theImageSetID + " there was an error returning the Image Set index " + i + " ID string");
+				return 0;
+			}
+			if(ThisImageSetID == theImageSetID){ // match found
+				targetImageSet = ThisImageSet;
+				return 1;
+			}
+		}
+		result("\nWhen attempting to get Image Set " + theImageSetID + " no matching IDs were found.");
+		return 0;
+	}
+	
 	/* Function used to generate a 10 digit random number string for use in imageSet naming */
 	string getRandomTenDigits(object self){
 		string randomString = "i";
@@ -2603,12 +2642,33 @@ class ImageSetTools
 		currentSpotIndex = value;
 	}
 	
-	/* Add an imageSet to the ImageSets list and select it as the current open imageSet */
+	/* Add an imageSet to the ImageSets list and select it as the current open imageSet
+		if the image set all ready exists then it will update the existing tag group rather than add a new one.
+	*/
 	void addImageSet(object self, TagGroup imageSet){
-		if(debugMode == true){result("\nAdding an image set to the imageSet store.");}
-		imageSets.TagGroupAddTagGroupAtEnd(imageSet)
-		currentImageSetIndex = (imageSets.TagGroupCountTags() - 1);
-		if(debugMode == true){result("\ncurrentImageSetIndex is now " + currentImageSetIndex);}
+		TagGroup ExistingImageSet
+		string imageSetID
+		if(debugMode == true){result("\nRunning addImageSet() function...");}
+		if (self.getImageSetID(imageSet, imageSetID) == 1) { // get the new imageset ID
+			if(debugMode == true){result("\n\tgetImageSetID() succeded: " + imageSetID);}
+			if( self.getImageSetByID(imageSetID, ExistingImageSet) == 1 ){
+				if(debugMode == true){result("\n\tLoading Existing Image Set...");}
+				// if image set exists all ready, it must be the current imageset, so that does not require changing.
+				ExistingImageSet = NULL; // over-writing the old image set with the new one.
+				ExistingImageSet = imageSet;
+				if(debugMode == true){result("\nImage Set configuration updated");}
+			} else {
+				// image set does not exist all ready...
+				if(debugMode == true){result("\nAdding an image set to the imageSet store.");}
+				imageSets.TagGroupAddTagGroupAtEnd(imageSet)
+				currentImageSetIndex = (imageSets.TagGroupCountTags() - 1); // Set this image set as the current image set.
+				if(debugMode == true){result("\ncurrentImageSetIndex is now " + currentImageSetIndex);}
+			}
+		} else {
+			result("\nERROR: No image set ID found when adding the image set to list (or updating one).")
+			return;
+		}
+		
 	}
 	
 	/* Adds a new spot to the current image set at the end of the Spots taglist and returns the Spot Tag group. */
@@ -2787,34 +2847,6 @@ class ImageSetTools
 		return 1;
 	}
 	
-	/* Get ImageSet tag group based on the ID of the set. Returns 1/0 for success/fail */
-	number getImageSetByID(object self, string theImageSetID, TagGroup &targetImageSet){
-		number totalImageSets = imageSets.TagGroupCountTags();
-		if(totalImageSets <= 0){
-			result("\nWhen attempting to get Image Set " + theImageSetID + " no image sets were found at all.")
-			return 0;
-		}
-		number i
-		for(i=0; i < totalImageSets; i++){
-			TagGroup ThisImageSet;
-			if (ImageSets.TagGroupGetIndexedTagAsTagGroup(i, ThisImageSet) == 0){
-				result("\nWhen attempting to get Image Set " + theImageSetID + " there was an error returning Image Set index " + i);
-				return 0;
-			}
-			string ThisImageSetID;
-			if(ThisImageSet.TagGroupGetTagAsString("ImageSetID", ThisImageSetID) == 0){
-				result("\nWhen attempting to get Image Set " + theImageSetID + " there was an error returning the Image Set index " + i + " ID string");
-				return 0;
-			}
-			if(ThisImageSetID == theImageSetID){ // match found
-				targetImageSet = ThisImageSet;
-				return 1;
-			}
-		}
-		result("\nWhen attempting to get Image Set " + theImageSetID + " no matching IDs were found.");
-		return 0;
-	}
-	
 	/* Get a TagList containing all of the stored ImageSets ID strings */
 	number getImageSetIDList(object self, TagGroup &targetList){
 		TagGroup imageSetIDList = NewTagList();
@@ -2886,16 +2918,6 @@ class ImageSetTools
 		
 		number fileLoaded = TagGroupLoadFromFile( LoadedImageSet, path );
 		if(fileLoaded == 0){
-			return 0;
-		}
-		return 1;
-	}
-	
-	/* Returns the image set id string for a given image set tag group. Used to simplify using image sets in external functions.*/
-	number getImageSetID(object self, TagGroup ImageSet, string &ImageSetIDvariable){
-		string value;
-		if (ImageSet.TagGroupGetTagAsString( "ImageSetID", ImageSetIDvariable ) == 0){
-			result("\nNo ImageSetID found in tag group");
 			return 0;
 		}
 		return 1;
@@ -3606,6 +3628,12 @@ class ImageConfiguration : uiframe
 		returnedSettings = settingsGroup;
 	}
 	
+	// Uses the LocalImageSet with the Image Tool function addImageSet().
+	// The Image Tool function decides what to do with the data, so it does not matter to the Image Config function what Tag group is sent forwards.
+	void addImageSetToImageList(){
+		GetScriptObjectFromID(ImageSetToolsID).addImageSet(LocalImageSet);
+	}
+	
 	// Tells the dialog what Toolkit it belongs to and which dataObject to use.
 	// Uses Weak Referencing so it can go out of scope once the Toolkit is destroyed.
 	void initialise(object self, number theToolkitID, number theDataObjectID, number theImageSetToolsID)
@@ -3628,7 +3656,7 @@ class ImageConfiguration : uiframe
 		box.dlgexternalpadding(5,3).dlginternalpadding(12,5)
 		
 		// Get the variables...
-		string imageSetNameString, imageSetID;
+		string imageSetNameString, imageSetID, imageSetNotes;
 		number RingMode, NumberOfRingPoints, RingDSpacing, DegreeStep, IntegratedImage, NumberOfIntegrations;
 		number AutoSaveNonInt, AutoDisplayNonInt, shadowMode, ShadowDistance, AutoSaveImages, AutoDisplayImages;
 		
@@ -3652,7 +3680,8 @@ class ImageConfiguration : uiframe
 		LocalImageSet.TagGroupGetTagAsNumber("AutoSaveImages", AutoSaveImages);
 		LocalImageSet.TagGroupGetTagAsNumber("AutoDisplayImages", AutoDisplayImages);
 		LocalImageSet.TagGroupGetTagAsString("SetName", imageSetNameString);
-		LocalImageSet.TagGroupGetTagAsString("ImageSetID", imageSetID)
+		LocalImageSet.TagGroupGetTagAsString("ImageSetID", imageSetID);
+		LocalImageSet.TagGroupGetTagAsString("ImageNotes", imageSetNotes);
 		
 		number ImagesTaken, DPsTaken;
 		LocalImageSet.TagGroupGetTagAsNumber("ImagesTaken", ImagesTaken);
@@ -3699,7 +3728,7 @@ class ImageConfiguration : uiframe
 		TagGroup displayImagesMode = DLGCreateCheckBox( "Display Images", AutoDisplayImages, "changedDisplayImagesMode" ).dlgidentifier("DisplayImagesModeCheckBox");
 		TagGroup FileArea = dlggroupitems(autoSaveMode, displayImagesMode).dlgtablelayout(1,2,0);
  
-		TagGroup ImageNotes = DLGCreateTextBox( 50, 5, 2048 ).dlgidentifier("ImageNotesTextBox");
+		TagGroup ImageNotes = DLGCreateStringField( imageSetNotes, 20, "changedImageSetNotes" ).dlgidentifier("ImageNotesTextBox");
 		
 		box_items.DLGAddElement(ImageSetTitle);
 		box_items.DLGAddElement(IntegrationArea);
@@ -3786,10 +3815,12 @@ class ImageConfiguration : uiframe
 		ImageSet.TagGroupGetTagAsNumber("AutoSaveImages", AutoSaveImages);
 		ImageSet.TagGroupGetTagAsNumber("AutoDisplayImages", AutoDisplayImages);
 		
-		string imageSetNameString;
+		string imageSetNameString, imageSetNotes;
 		ImageSet.TagGroupGetTagAsString("SetName", imageSetNameString);
+		ImageSet.TagGroupGetTagAsString("ImageNotes", imageSetNotes);
 		
 		self.SetElementIsEnabled("ImageSetIDField", 0); // this is always auto-generated
+		self.SetElementIsEnabled("ImageNotesTextBox", 1); // this is always available for editing.
 		
 		if(IntegratedImage==1){ // can always change these values, as it does not affect the others.
 			self.SetElementIsEnabled("SaveNonIntImagesCheckBox", 1);
@@ -3829,6 +3860,12 @@ class ImageConfiguration : uiframe
 	void changedImageSetName(object self, tagGroup tg){ // tg is the source of the call
 		string theValue = tg.DLGGetStringValue();
 		LocalImageSet.TagGroupSetTagAsString("SetName", theValue);
+		self.updateDialog(LocalImageSet);
+	}
+	
+	void changedImageSetNotes(object self, tagGroup tg){ // tg is the source of the call
+		string theValue = tg.DLGGetStringValue();
+		LocalImageSet.TagGroupSetTagAsString("ImageNotes", theValue);
 		self.updateDialog(LocalImageSet);
 	}
 	
@@ -3939,26 +3976,8 @@ class ImageConfiguration : uiframe
 		childDialog.generateDialog(); // Make the dialog for this copy
 		if(debugMode==1){result("\nShowing child dialog");}
 		number useValues = childDialog.showImageSettingsDialog();	// Display the child with Pose() system
-		if(useValues == 1){
-			// the imageset is stored in LocalImageSet. It was pushed there by the child dialog.
-			TagGroup targetImageSet;
-			string theImageSetID;
-			if( GetScriptObjectFromID(ImageSetToolsID).getImageSetID(LocalImageSet, theImageSetID) == 0){
-				result("\nThe image set returned by the Image Set Configuration dialog does not have an ID. Exiting.")
-				childDialog = NULL; // NULL the childDialog so it will always go out of scope.
-				return 0;
-			}
-			if( GetScriptObjectFromID(ImageSetToolsID).getImageSetByID(theImageSetID, targetImageSet) == 1 ){
-				// It is an existing image set
-				result("\nUpdating image set " + theImageSetID + " with new configuration options." );
-			} else {	
-				// it is a new image set
-				GetScriptObjectFromID(ImageSetToolsID).addImageSet(LocalImageSet);
-				result("\nAdding Image set " + theImageSetID + " to the active image set list." );
-			}
-		}
 		childDialog = NULL; // NULL the childDialog so it will always go out of scope.
-		return useValues;
+		return useValues; // Note, the image set will be stored in LocalImageSet. It will either be an updated one, a new one or maybe nothing.
 	}
 
 	// The constructor
@@ -5327,7 +5346,7 @@ class CreateDF360DialogClass : uiframe
 		panel2.dlgaddelement(storePointButton)
 		TagGroup DarkFieldROIButton = DLGCreatePushButton("Add All ROI", "storeROIButtonPress")
 		panel2.dlgaddelement(DarkFieldROIButton)
-		TagGroup TakeDPImagesButton = DLGCreatePushButton("Save Image Set Targets", "TakeDPImagesButtonPress")
+		TagGroup TakeDPImagesButton = DLGCreatePushButton("Finalise Image Set", "TakeDPImagesButtonPress")
 		panel2.dlgaddelement(TakeDPImagesButton)
 		
 		// Panel 3 is for controlling the Marker Ring
@@ -6982,6 +7001,53 @@ class CreateDF360DialogClass : uiframe
 
 		
 	/* IMAGE PANEL BUTTON FUNCTIONS */
+	
+	void EditImageSetButtonPress (object self)
+	{
+		if(CameraControlObject.getAllowControl() != true){
+			result("\nToolkit Controls are offline. Ensure there is a live view window active and has been captured.")
+			exit(0);
+		}
+		number useValues;
+		TagGroup ImageSet
+		if( ImageSetTools.getCurrentImageSet(ImageSet) == 0){
+			// There is no current image set, so we must make a new one.
+			useValues = ImageConfigDialog.inputNewCalibration("New");
+		} else {
+			// There is an existing image set, so use that one or make a new one.
+			if ( TwoButtonDialog( "Do you wish to edit the existing Image Set?", "Yes", "No, make a new one" ) == 0){
+				// Do not use existing one...
+				useValues = ImageConfigDialog.inputNewCalibration("New");
+			} else {
+				// Use existing one... 
+				string imageSetID;
+				if(ImageSetTools.getImageSetID(ImageSet, imageSetID) == 1){
+					// If the imageSet has a valid ID
+					useValues = ImageConfigDialog.inputNewCalibration(imageSetID);
+				} else {
+					// If no valid ID is found...
+					result("\nImageSetID not found inside existing ImageSet tag group. Creating New Image Set.")
+					useValues = ImageConfigDialog.inputNewCalibration("New");
+				}
+			}
+		}
+		
+		// We now have an image set stored in the ImageConfig dialog object, but not here. If useValues is 1, the user pressed okay. The image set needs adding to the current list of imagesets or the existing set needs updating.
+		// Determning which is needed is up to the ImageSetTools function, not here, since the Toolkit should not have any of its own imageSet tools.
+		
+		if( useValues == 1){
+			if(debugMode==true){result("\nUser made or changed an image set. Updating imageset list.");}
+			ImageConfigDialog.addImageSetToImageList();
+			return;
+		} else {
+			if(debugMode==true){result("\nUser cancelled image set creation/edit. No changes made.");}
+			return;
+		}
+		
+		
+	
+	}
+	
 	void StoreDPButtonPress (object self)
 	{
 		if(CameraControlObject.getAllowControl() != true){

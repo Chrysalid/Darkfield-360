@@ -47,6 +47,45 @@ class ImageSetTools
 		TagGroupOpenBrowserWindow(imageSets, 0);
 	}
 	
+	/* Returns the image set id string for a given image set tag group. Used to simplify using image sets in external functions.*/
+	number getImageSetID(object self, TagGroup ImageSet, string &ImageSetIDvariable){
+		string value;
+		if (ImageSet.TagGroupGetTagAsString( "ImageSetID", ImageSetIDvariable ) == 0){
+			result("\nNo ImageSetID found in tag group");
+			return 0;
+		}
+		if(debugMode == true){result("\n\tgetImageSetID() reports the image set ID is " + ImageSetIDvariable);}
+		return 1;
+	}
+	
+	/* Get ImageSet tag group based on the ID of the set. Returns 1/0 for success/fail */
+	number getImageSetByID(object self, string theImageSetID, TagGroup &targetImageSet){
+		number totalImageSets = imageSets.TagGroupCountTags();
+		if(totalImageSets <= 0){
+			result("\nWhen attempting to get Image Set " + theImageSetID + " no image sets were found at all.")
+			return 0;
+		}
+		number i
+		for(i=0; i < totalImageSets; i++){
+			TagGroup ThisImageSet;
+			if (ImageSets.TagGroupGetIndexedTagAsTagGroup(i, ThisImageSet) == 0){
+				result("\nWhen attempting to get Image Set " + theImageSetID + " there was an error returning Image Set index " + i);
+				return 0;
+			}
+			string ThisImageSetID;
+			if(ThisImageSet.TagGroupGetTagAsString("ImageSetID", ThisImageSetID) == 0){
+				result("\nWhen attempting to get Image Set " + theImageSetID + " there was an error returning the Image Set index " + i + " ID string");
+				return 0;
+			}
+			if(ThisImageSetID == theImageSetID){ // match found
+				targetImageSet = ThisImageSet;
+				return 1;
+			}
+		}
+		result("\nWhen attempting to get Image Set " + theImageSetID + " no matching IDs were found.");
+		return 0;
+	}
+	
 	/* Function used to generate a 10 digit random number string for use in imageSet naming */
 	string getRandomTenDigits(object self){
 		string randomString = "i";
@@ -145,12 +184,33 @@ class ImageSetTools
 		currentSpotIndex = value;
 	}
 	
-	/* Add an imageSet to the ImageSets list and select it as the current open imageSet */
+	/* Add an imageSet to the ImageSets list and select it as the current open imageSet
+		if the image set all ready exists then it will update the existing tag group rather than add a new one.
+	*/
 	void addImageSet(object self, TagGroup imageSet){
-		if(debugMode == true){result("\nAdding an image set to the imageSet store.");}
-		imageSets.TagGroupAddTagGroupAtEnd(imageSet)
-		currentImageSetIndex = (imageSets.TagGroupCountTags() - 1);
-		if(debugMode == true){result("\ncurrentImageSetIndex is now " + currentImageSetIndex);}
+		TagGroup ExistingImageSet
+		string imageSetID
+		if(debugMode == true){result("\nRunning addImageSet() function...");}
+		if (self.getImageSetID(imageSet, imageSetID) == 1) { // get the new imageset ID
+			if(debugMode == true){result("\n\tgetImageSetID() succeded: " + imageSetID);}
+			if( self.getImageSetByID(imageSetID, ExistingImageSet) == 1 ){
+				if(debugMode == true){result("\n\tLoading Existing Image Set...");}
+				// if image set exists all ready, it must be the current imageset, so that does not require changing.
+				ExistingImageSet = NULL; // over-writing the old image set with the new one.
+				ExistingImageSet = imageSet;
+				if(debugMode == true){result("\nImage Set configuration updated");}
+			} else {
+				// image set does not exist all ready...
+				if(debugMode == true){result("\nAdding an image set to the imageSet store.");}
+				imageSets.TagGroupAddTagGroupAtEnd(imageSet)
+				currentImageSetIndex = (imageSets.TagGroupCountTags() - 1); // Set this image set as the current image set.
+				if(debugMode == true){result("\ncurrentImageSetIndex is now " + currentImageSetIndex);}
+			}
+		} else {
+			result("\nERROR: No image set ID found when adding the image set to list (or updating one).")
+			return;
+		}
+		
 	}
 	
 	/* Adds a new spot to the current image set at the end of the Spots taglist and returns the Spot Tag group. */
@@ -329,34 +389,6 @@ class ImageSetTools
 		return 1;
 	}
 	
-	/* Get ImageSet tag group based on the ID of the set. Returns 1/0 for success/fail */
-	number getImageSetByID(object self, string theImageSetID, TagGroup &targetImageSet){
-		number totalImageSets = imageSets.TagGroupCountTags();
-		if(totalImageSets <= 0){
-			result("\nWhen attempting to get Image Set " + theImageSetID + " no image sets were found at all.")
-			return 0;
-		}
-		number i
-		for(i=0; i < totalImageSets; i++){
-			TagGroup ThisImageSet;
-			if (ImageSets.TagGroupGetIndexedTagAsTagGroup(i, ThisImageSet) == 0){
-				result("\nWhen attempting to get Image Set " + theImageSetID + " there was an error returning Image Set index " + i);
-				return 0;
-			}
-			string ThisImageSetID;
-			if(ThisImageSet.TagGroupGetTagAsString("ImageSetID", ThisImageSetID) == 0){
-				result("\nWhen attempting to get Image Set " + theImageSetID + " there was an error returning the Image Set index " + i + " ID string");
-				return 0;
-			}
-			if(ThisImageSetID == theImageSetID){ // match found
-				targetImageSet = ThisImageSet;
-				return 1;
-			}
-		}
-		result("\nWhen attempting to get Image Set " + theImageSetID + " no matching IDs were found.");
-		return 0;
-	}
-	
 	/* Get a TagList containing all of the stored ImageSets ID strings */
 	number getImageSetIDList(object self, TagGroup &targetList){
 		TagGroup imageSetIDList = NewTagList();
@@ -428,16 +460,6 @@ class ImageSetTools
 		
 		number fileLoaded = TagGroupLoadFromFile( LoadedImageSet, path );
 		if(fileLoaded == 0){
-			return 0;
-		}
-		return 1;
-	}
-	
-	/* Returns the image set id string for a given image set tag group. Used to simplify using image sets in external functions.*/
-	number getImageSetID(object self, TagGroup ImageSet, string &ImageSetIDvariable){
-		string value;
-		if (ImageSet.TagGroupGetTagAsString( "ImageSetID", ImageSetIDvariable ) == 0){
-			result("\nNo ImageSetID found in tag group");
 			return 0;
 		}
 		return 1;

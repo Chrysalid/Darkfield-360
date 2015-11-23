@@ -23,6 +23,12 @@ class ImageConfiguration : uiframe
 		returnedSettings = settingsGroup;
 	}
 	
+	// Uses the LocalImageSet with the Image Tool function addImageSet().
+	// The Image Tool function decides what to do with the data, so it does not matter to the Image Config function what Tag group is sent forwards.
+	void addImageSetToImageList(object self){
+		GetScriptObjectFromID(ImageSetToolsID).addImageSet(LocalImageSet);
+	}
+	
 	// Tells the dialog what Toolkit it belongs to and which dataObject to use.
 	// Uses Weak Referencing so it can go out of scope once the Toolkit is destroyed.
 	void initialise(object self, number theToolkitID, number theDataObjectID, number theImageSetToolsID)
@@ -45,7 +51,7 @@ class ImageConfiguration : uiframe
 		box.dlgexternalpadding(5,3).dlginternalpadding(12,5)
 		
 		// Get the variables...
-		string imageSetNameString, imageSetID;
+		string imageSetNameString, imageSetID, imageSetNotes;
 		number RingMode, NumberOfRingPoints, RingDSpacing, DegreeStep, IntegratedImage, NumberOfIntegrations;
 		number AutoSaveNonInt, AutoDisplayNonInt, shadowMode, ShadowDistance, AutoSaveImages, AutoDisplayImages;
 		
@@ -69,7 +75,8 @@ class ImageConfiguration : uiframe
 		LocalImageSet.TagGroupGetTagAsNumber("AutoSaveImages", AutoSaveImages);
 		LocalImageSet.TagGroupGetTagAsNumber("AutoDisplayImages", AutoDisplayImages);
 		LocalImageSet.TagGroupGetTagAsString("SetName", imageSetNameString);
-		LocalImageSet.TagGroupGetTagAsString("ImageSetID", imageSetID)
+		LocalImageSet.TagGroupGetTagAsString("ImageSetID", imageSetID);
+		LocalImageSet.TagGroupGetTagAsString("ImageNotes", imageSetNotes);
 		
 		number ImagesTaken, DPsTaken;
 		LocalImageSet.TagGroupGetTagAsNumber("ImagesTaken", ImagesTaken);
@@ -116,7 +123,7 @@ class ImageConfiguration : uiframe
 		TagGroup displayImagesMode = DLGCreateCheckBox( "Display Images", AutoDisplayImages, "changedDisplayImagesMode" ).dlgidentifier("DisplayImagesModeCheckBox");
 		TagGroup FileArea = dlggroupitems(autoSaveMode, displayImagesMode).dlgtablelayout(1,2,0);
  
-		TagGroup ImageNotes = DLGCreateTextBox( 50, 5, 2048 ).dlgidentifier("ImageNotesTextBox");
+		TagGroup ImageNotes = DLGCreateStringField( imageSetNotes, 20, "changedImageSetNotes" ).dlgidentifier("ImageNotesTextBox");
 		
 		box_items.DLGAddElement(ImageSetTitle);
 		box_items.DLGAddElement(IntegrationArea);
@@ -203,10 +210,12 @@ class ImageConfiguration : uiframe
 		ImageSet.TagGroupGetTagAsNumber("AutoSaveImages", AutoSaveImages);
 		ImageSet.TagGroupGetTagAsNumber("AutoDisplayImages", AutoDisplayImages);
 		
-		string imageSetNameString;
+		string imageSetNameString, imageSetNotes;
 		ImageSet.TagGroupGetTagAsString("SetName", imageSetNameString);
+		ImageSet.TagGroupGetTagAsString("ImageNotes", imageSetNotes);
 		
 		self.SetElementIsEnabled("ImageSetIDField", 0); // this is always auto-generated
+		self.SetElementIsEnabled("ImageNotesTextBox", 1); // this is always available for editing.
 		
 		if(IntegratedImage==1){ // can always change these values, as it does not affect the others.
 			self.SetElementIsEnabled("SaveNonIntImagesCheckBox", 1);
@@ -246,6 +255,12 @@ class ImageConfiguration : uiframe
 	void changedImageSetName(object self, tagGroup tg){ // tg is the source of the call
 		string theValue = tg.DLGGetStringValue();
 		LocalImageSet.TagGroupSetTagAsString("SetName", theValue);
+		self.updateDialog(LocalImageSet);
+	}
+	
+	void changedImageSetNotes(object self, tagGroup tg){ // tg is the source of the call
+		string theValue = tg.DLGGetStringValue();
+		LocalImageSet.TagGroupSetTagAsString("ImageNotes", theValue);
 		self.updateDialog(LocalImageSet);
 	}
 	
@@ -356,26 +371,8 @@ class ImageConfiguration : uiframe
 		childDialog.generateDialog(); // Make the dialog for this copy
 		if(debugMode==1){result("\nShowing child dialog");}
 		number useValues = childDialog.showImageSettingsDialog();	// Display the child with Pose() system
-		if(useValues == 1){
-			// the imageset is stored in LocalImageSet. It was pushed there by the child dialog.
-			TagGroup targetImageSet;
-			string theImageSetID;
-			if( GetScriptObjectFromID(ImageSetToolsID).getImageSetID(LocalImageSet, theImageSetID) == 0){
-				result("\nThe image set returned by the Image Set Configuration dialog does not have an ID. Exiting.")
-				childDialog = NULL; // NULL the childDialog so it will always go out of scope.
-				return 0;
-			}
-			if( GetScriptObjectFromID(ImageSetToolsID).getImageSetByID(theImageSetID, targetImageSet) == 1 ){
-				// It is an existing image set
-				result("\nUpdating image set " + theImageSetID + " with new configuration options." );
-			} else {	
-				// it is a new image set
-				GetScriptObjectFromID(ImageSetToolsID).addImageSet(LocalImageSet);
-				result("\nAdding Image set " + theImageSetID + " to the active image set list." );
-			}
-		}
 		childDialog = NULL; // NULL the childDialog so it will always go out of scope.
-		return useValues;
+		return useValues; // Note, the image set will be stored in LocalImageSet. It will either be an updated one, a new one or maybe nothing.
 	}
 
 	// The constructor
