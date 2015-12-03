@@ -287,6 +287,72 @@ class ImageSetTools
 		return imageData;
 	}	
 	
+	/* Function to create a new set of image tags for the imageSet records (NOT PERSISTANT IMAGE TAGS)
+		This version is for images taken from a dataset (either DP or DF)
+			ImageTags is a set of tags structured as defined in the persistent Tags for Images, under Darkfield360.
+	*/
+	TagGroup createNewImageForImageSet(object self, TagGroup imageTags){
+		TagGroup imageData = newTagGroup(); // make blank labels
+		imageData.TagGroupCreateNewLabeledTag("ImageID"); // Unique imageID number
+		imageData.TagGroupCreateNewLabeledTag("FileName"); // Name of saved file if present.
+		imageData.TagGroupCreateNewLabeledTag("ImageMode");
+		imageData.TagGroupCreateNewLabeledTag("ImageType"); // Options are DP, DF, BF, Bin
+		imageData.TagGroupCreateNewLabeledTag("ExposureTime");
+		imageData.TagGroupCreateNewLabeledTag("xTiltValue");
+		imageData.TagGroupCreateNewLabeledTag("yTiltValue");
+		imageData.TagGroupCreateNewLabeledTag("xTiltRelative");
+		imageData.TagGroupCreateNewLabeledTag("yTiltRelative");
+		imageData.TagGroupCreateNewLabeledTag("xShift");
+		imageData.TagGroupCreateNewLabeledTag("yShift");
+		imageData.TagGroupCreateNewLabeledTag("DSpacingAng");
+		imageData.TagGroupCreateNewLabeledTag("ShadowValue");
+		imageData.TagGroupCreateNewLabeledTag("ShadowDistance");
+		
+		imageData.TagGroupCreateNewLabeledTag("SavedAsFile") //<Has image been saved as a file? 0/1>
+		imageData.TagGroupSetTagAsNumber("SavedAsFile", 0 );
+
+		imageData.TagGroupCreateNewLabeledTag("CreationTime") //<time image was created>
+		number time = GetCurrentTime();
+		number dateFormat = 2
+		number timeFormat = 2
+		number format = dateFormat + 16 * timeFormat
+		string theTime = FormatTimeString( time, format );
+		imageData.TagGroupSetTagAsString("CreationTime", theTime );
+		
+		string ImageID, ImageMode, ImageType;
+		number ExposureTime, xTiltValue, yTiltValue, xTiltRelative, yTiltRelative, xShift, yShift, DSpacingAng, ShadowValue, ShadowDistance;
+		
+		imageTags.TagGroupGetTagAsString("ImageID", ImageID);
+		imageTags.TagGroupGetTagAsString("ImageMode", ImageMode);
+		imageTags.TagGroupGetTagAsString("ImageType", ImageType);
+		imageTags.TagGroupGetTagAsNumber("ExposureTime", ExposureTime);
+		imageTags.TagGroupGetTagAsNumber("xTiltValue", xTiltValue);
+		imageTags.TagGroupGetTagAsNumber("yTiltValue", yTiltValue);
+		imageTags.TagGroupGetTagAsNumber("xTiltRelative", xTiltRelative);
+		imageTags.TagGroupGetTagAsNumber("yTiltRelative", yTiltRelative);
+		imageTags.TagGroupGetTagAsNumber("xShift", xShift);
+		imageTags.TagGroupGetTagAsNumber("yShift", yShift);
+		imageTags.TagGroupGetTagAsNumber("DSpacingAng", DSpacingAng);
+		imageTags.TagGroupGetTagAsNumber("ShadowValue", ShadowValue);
+		imageTags.TagGroupGetTagAsNumber("ShadowDistance", ShadowDistance);
+		
+		imageData.TagGroupSetTagAsString("ImageID", ImageID);
+		imageData.TagGroupSetTagAsString("ImageMode", ImageMode);
+		imageData.TagGroupSetTagAsString("ImageType", ImageType);
+		imageData.TagGroupSetTagAsNumber("ExposureTime", ExposureTime);
+		imageData.TagGroupSetTagAsNumber("xTiltValue", xTiltValue);
+		imageData.TagGroupSetTagAsNumber("yTiltValue", yTiltValue);
+		imageData.TagGroupSetTagAsNumber("xTiltRelative", xTiltRelative);
+		imageData.TagGroupSetTagAsNumber("yTiltRelative", yTiltRelative);
+		imageData.TagGroupSetTagAsNumber("xShift", xShift);
+		imageData.TagGroupSetTagAsNumber("yShift", yShift);
+		imageData.TagGroupSetTagAsNumber("DSpacingAng", DSpacingAng);
+		imageData.TagGroupSetTagAsNumber("ShadowValue", ShadowValue);
+		imageData.TagGroupSetTagAsNumber("ShadowDistance", ShadowDistance);
+		
+		return imageData;
+	}	
+	
 	/* Get the currently open imageSet Taggroup. Returns 1/0 for success/fail */
 	number getCurrentImageSet(object self, TagGroup &targetImageSet){
 		TagGroup currentImageSet = NewTagGroup();
@@ -466,14 +532,11 @@ class ImageSetTools
 	}
 	
 	
-	/* Function to create the persistent image tags to store information. Requires a lot of inputs.
+	/* Function to create the persistent image tags to store information. Returns a blank set of tags to be filled.
 		createImageTags( imageSetID, imageSpotID, ImageType, ImageMode,	ringMode, integratedImage, NumberOfIntegrations,\
 		DegreeStep, shadowDistance,	shadowValue, DSpacingAng, xTilt, yTilt, exposureTime )
 	*/
-	/*
-	TagGroup createImageTags(object self, number imageSetID, number imageSpotID, string ImageType, string ImageMode,\
-	number ringMode, number integratedImage, number NumberOfIntegrations, number DegreeStep, number shadowDistance,\
-	number shadowValue, number DSpacingAng, number xTilt, number yTilt, number exposureTime ){
+	TagGroup createImageTags(object self){
 		if(debugMode==1){result("\nGenerating an image tag group...");}
 		TagGroup persistentTG = NewTagGroup();
 		persistentTG.TagGroupCreateNewLabeledTag("Toolkit Version");
@@ -481,31 +544,20 @@ class ImageSetTools
 		
 		TagGroup tiltCalibrationData = NewTagGroup();
 		tiltCalibrationData.TagGroupCreateNewLabeledTag("xTiltx");
-		tiltCalibrationData.TagGroupSetTagAsNumber("xTiltx", xTiltVectorX);
 		tiltCalibrationData.TagGroupCreateNewLabeledTag("xTilty");
-		tiltCalibrationData.TagGroupSetTagAsNumber("xTilty", xTiltVectorY);
 		tiltCalibrationData.TagGroupCreateNewLabeledTag("yTiltx");
-		tiltCalibrationData.TagGroupSetTagAsNumber("yTiltx", yTiltVectorX);
 		tiltCalibrationData.TagGroupCreateNewLabeledTag("yTilty");
-		tiltCalibrationData.TagGroupSetTagAsNumber("yTilty", yTiltVectorX);
 		persistentTG.taggroupaddlabeledtaggroup("TiltCalibration", tiltCalibrationData);
 		
 		persistentTG.TagGroupCreateNewLabeledTag("CameraLength");
-		persistentTG.TagGroupSetTagAsString("CameraLength", cameraLength);
 				
 		persistentTG.TagGroupCreateNewLabeledTag("XTiltValue");
 		persistentTG.TagGroupCreateNewLabeledTag("YTiltValue");
-		persistentTG.TagGroupSetTagAsNumber("XTiltValue", xTilt);
-		persistentTG.TagGroupSetTagAsNumber("YTiltValue", yTilt);
 		
 		persistentTG.TagGroupCreateNewLabeledTag("ImageSetID");
 		persistentTG.TagGroupCreateNewLabeledTag("ImageSpotID");
 		persistentTG.TagGroupCreateNewLabeledTag("ImageType");
 		persistentTG.TagGroupCreateNewLabeledTag("ImageMode");
-		persistentTG.TagGroupSetTagAsNumber("ImageSetID", imageSetID);
-		persistentTG.TagGroupSetTagAsNumber("ImageSpotID", imageSpotID);
-		persistentTG.TagGroupSetTagAsString("ImageType", imageType);
-		persistentTG.TagGroupSetTagAsString("ImageMode", imageMode);
 		
 		persistentTG.TagGroupCreateNewLabeledTag("RingMode");
 		persistentTG.TagGroupCreateNewLabeledTag("IntegratedImage");
@@ -516,17 +568,8 @@ class ImageSetTools
 		persistentTG.TagGroupCreateNewLabeledTag("DSpacingAng");
 		persistentTG.TagGroupCreateNewLabeledTag("ExposureTime");
 		
-		persistentTG.TagGroupSetTagAsNumber("RingMode", ringMode);
-		persistentTG.TagGroupSetTagAsNumber("IntegratedImage", integratedImage);
-		persistentTG.TagGroupSetTagAsNumber("NumberOfIntegrations", NumberOfIntegrations);
-		persistentTG.TagGroupSetTagAsNumber("DegreeStep", DegreeStep);
-		persistentTG.TagGroupSetTagAsNumber("ShadowDistance", ShadowDistance);
-		persistentTG.TagGroupSetTagAsNumber("ShadowValue", shadowValue);
-		persistentTG.TagGroupSetTagAsNumber("DSpacingAng", DSpacingAng);
-		persistentTG.TagGroupSetTagAsNumber("ExposureTime", ExposureTime);
-		
 		return persistentTG;
 	}
-	*/
+
 }
 

@@ -40,6 +40,34 @@ class CameraControl
 		}
 	}
 	
+	
+	// Returns 1 if the microscope is in imaging mode. 0 could mean anything.
+	number isImagingMode(object self)
+	{
+		string opticsMode = EMGetImagingOpticsMode();
+		// Known imaging mode values: "SAMAG", "IMAGING", "MAG1", "MAG2"
+		// will make this configurable later
+		if( opticsMode == "SAMAG" || opticsMode == "IMAGING" || opticsMode == "MAG1" || opticsMode == "MAG2" ){
+			return 1;
+		} else {
+			return 0;
+		}
+	}
+	
+	// Returns 1 if the microscope is in diffraction mode. 0 could mean anything.
+	number isDiffractionMode(object self)
+	{
+		string opticsMode = EMGetImagingOpticsMode();
+		// Known diffracton mode values: "DIFFRACTION"
+		// will make this configurable later
+		if( opticsMode == "DIFFRACTION" ){
+			return 1;
+		} else {
+			return 0;
+		}
+	}
+	
+	
 	void initialise(object self, number theToolkitID, number theDataObjectID, number theImageSetToolsID){
 		ToolkitID = theToolkitID;
 		dataObjectID = theDataObjectID;
@@ -142,7 +170,7 @@ class CameraControl
 	}
 	
 	
-		// constructor
+	// constructor
 	CameraControl(object self){
 		CameraControlID = self.ScriptObjectGetID();
 	}

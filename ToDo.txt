@@ -22,16 +22,12 @@ Allow colour selection in createMap()
 
 Cycle through saved tilt settings
 
+Save the central DP and highlight + label the target coordinates in an image set.
 
 
 Currently
 ----------
-Fixed exposure configuration so it doesn't need buttons anymore.
-Make image set notes work
-Sort out when to make new image set and when to ask to use old one.
-	Fix old commands
-		StoreDP
-		StoreROI
-	Add new commands
-		New image set
-		Finalize image set (take DP images)
+Just seperated the tilt calculation part and the DP imaging parts.
+	Need to make function to "finalize" the image set by taking DP images.
+		This will be started with a button press in the DF360Dialog object
+		Will need to update existing image set tag group with imageIDs and data.

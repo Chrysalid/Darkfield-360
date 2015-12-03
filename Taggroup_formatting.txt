@@ -122,6 +122,8 @@ These tags are stored with each image and image display.
 Access them with ImageGetTagGroup()
 
 Darkfield360
+	ImageSetID: <unique ID for each set of images>
+	ImageSpotNumber: <numbered from 0 for each spot in a set, with 2 shadow images possible.>
 	DiffractionScale:<value used>
 	ImageMode:<value reported by scope>
 	ImageType:<value recorded by toolkit> // Options are DP, DF, BF, Bin
@@ -144,6 +146,3 @@ Darkfield360
 		yTiltx: <conversion factor> // number of x pixels moved per 1 unit of yTilt
 		yTilty: <conversion factor> // number of y pixels moved per 1 unit of yTilt
 	DSpacingAng: <value in Angstroms>
-	
-	ImageSetID: <unique ID for each set of images>
-	ImageSpotNumber: <numbered from 0 for each image in a set>

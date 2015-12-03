@@ -182,6 +182,60 @@ class CreateDF360DialogClass : uiframe
 		return imageConfigDialogID;
 	}
 	
+	/*
+	Function to save an image using image set data and to feed those values into the image tags and imageset tags
+		returns 0 on a failure/cancellation, 1 on success.
+		Will save all images for an image set in a subfolder with the imageset ID
+	*/
+	number saveImageInImageSet(object self, image &theImage){
+		TagGroup PersistentTags = theImage.ImageGetTagGroup();
+		string imageSetID
+		PersistentTags.TagGroupGetTagAsString("Darkfield360:ImageSetID", imageSetID)
+		TagGroup ImageSet
+		number imageSetFound = ImageSetTools.getImageSetByID(ImageSetID, ImageSet);
+		if(imageSetFound == false){
+			result("\n\nImage Set with ID " + ImageSetID + " not found when saving an image!")
+			return 0;
+		}
+		string saveDir = GetApplicationDirectory( 1100, 1 );
+		// index 1100 = autosave
+		string imageSetDir = PathConcatenate(saveDir, ImageSetID);
+		number imageSetDirExists = DoesDirectoryExist( imageSetDir );
+		if(imageSetDirExists == false){
+			CreateDirectory( imageSetDir );
+			imageSetDirExists = DoesDirectoryExist( imageSetDir );
+			if(imageSetDirExists == false){
+				result("\n\nCould not find or create a save directory when saving an image!")
+				return 0;
+			}
+		}
+		number ImageSpotNumber, shadowValue;
+		string ImageType, fileName, shadowName;
+		PersistentTags.TagGroupGetTagAsString("Darkfield360:ImageType", ImageType);
+		PersistentTags.TagGroupGetTagAsNumber("Darkfield360:ImageSpotNumber", ImageSpotNumber);
+		PersistentTags.TagGroupGetTagAsNumber("Darkfield360:ShadowValue", shadowValue);
+		
+		fileName = (ImageType == "BF") ? ("Brightfield_" + constructTimeStamp()) : fileName;
+		fileName = (ImageType == "DF") ? ("Darkfield_" + constructTimeStamp() + "spot_" + ImageSpotNumber) : fileName;
+		fileName = (ImageType == "DP") ? ("Diffraction_" + constructTimeStamp() + "spot_" + ImageSpotNumber) : fileName;
+		fileName = (ImageType == "Bin") ? ("Binary_" + constructTimeStamp()) : fileName;
+		
+		shadowName = (shadowValue == 0) ? ("_middle") : shadowName;
+		shadowName = (shadowValue == 1) ? ("_higher") : shadowName;
+		shadowName = (shadowValue == 2) ? ("_lower") : shadowName;
+		
+		fileName = fileName + shadowName;
+		
+		filePath = PathConcatenate(imageSetDir, fileName);
+		SaveAsGatan(theImage, filePath);
+		if(DoesFileExist(filePath)){
+			return 1;
+		} else {
+			result("\n\nFinal save check indicates the file " + filePath + " did not save. You'd better check!")
+			return 0;
+		}
+	}
+	
 	
 	/* Function to draw the lines on the View Window used to centre the beam and pick spots.
 		If updateToolkit = 1, Adds the ring marker and stores it in the toolkit.
@@ -953,15 +1007,32 @@ class CreateDF360DialogClass : uiframe
 			number yTiltTarget = yTiltCenter + getpixel(dataArray, j, 4);
 			moveBeamTilt(xTiltTarget,yTiltTarget);
 			
-			if ( (EMGetImagingOpticsMode() == "SAMAG") || (EMGetImagingOpticsMode() == "IMAGING") || (EMGetImagingOpticsMode() == "MAG1") || (EMGetImagingOpticsMode() == "MAG2")) {
+			string opticsMode = EMGetImagingOpticsMode();
+			// Switch to Diffraction mode manually if it is not in that mode.
+			// "SAMAG" is the name our JEOL2100 uses. VirtualTEM uses "IMAGING". 
+			if ( CameraControlObject.isImagingMode() == true ) {
+				if(debugMode==true){
+					result("\ntakeTestDPImages() called when EM in an imaging mode. Is in mode: " + opticsMode);
+				}
 				if (!ContinueCancelDialog( "Switch to diffraction mode before continuing." )){
 					Throw( "User aborted process." );
 				}
-			}	
-			image DPImage;
-			DPImage := sscUnprocessedAcquire(DPExposure,0,0,cameraWidth,cameraHeight);
-			DPImage.ImageSetName("Alignment Test " + i);
-			showImage(DPImage);
+			}
+			opticsMode = EMGetImagingOpticsMode();
+			if ( CameraControlObject.isDiffractionMode() == false ) {
+				if(debugMode==true){
+					result("\ntakeTestDPImages() called when EM is not in a diffraction mode. It is in mode: " + opticsMode);
+					result("\nIf this mode is a diffraction imaging mode of your microscope then it needs to be added to the DF360 toolkit list of diffraction mode names.");
+				}
+				if (!ContinueCancelDialog( "Switch to diffraction mode before continuing." )){
+					Throw( "User aborted process." );
+				}
+			}
+			opticsMode = EMGetImagingOpticsMode();	
+				image DPImage;
+				DPImage := sscUnprocessedAcquire(DPExposure,0,0,cameraWidth,cameraHeight);
+				DPImage.ImageSetName("Alignment Test " + i);
+				showImage(DPImage);
 		}
 		return;
 	}
@@ -993,14 +1064,17 @@ class CreateDF360DialogClass : uiframe
 		string opticsMode = EMGetImagingOpticsMode();
 		// Switch to imaging manually if it is not in that mode.
 		// "SAMAG" is the name our JEOL2100 uses. VirtualTEM uses "IMAGING". Add your own modes in or replace these ones if your scope is different.
-		if (! ( (opticsMode == "SAMAG") || (opticsMode == "IMAGING")  || (EMGetImagingOpticsMode() == "MAG1") || (EMGetImagingOpticsMode() == "MAG2")) ) {
+		if ( CameraControlObject.isImagingMode() == false ) {
 			if(debugMode==true){
-				result("\nTakeDFImage() called when EM not in imaging mode. Is in mode: " + EMGetImagingOpticsMode());
+				result("\nTakeDFImage() called when EM not in imaging mode. Is in mode: " + opticsMode);
 			}
-			if (!ContinueCancelDialog( "Switch to imaging mode before continuing." )){
+			result("\nIf this mode is an imaging mode of your microscope then it needs to be added to the DF360 toolkit list of imaging mode names.");
+			if (!ContinueCancelDialog( "Switch to an imaging mode before continuing." )){
 				Throw( "User aborted process." );
 			}
 		}
+		opticsMode = EMGetImagingOpticsMode();
+		
 		
 		// Take the  Image
 		number Exposure = CameraControlObject.getDFExposure();
@@ -1039,6 +1113,115 @@ class CreateDF360DialogClass : uiframe
 		return DFImage;
 	}
 
+	/* Function to take a DP image by reading from the ImageSet Tag group
+			imageSet - the image set Tag group to take data from
+			spotID - the spot number of the desired image
+			imageLabel - the label of the image to be taken. Usually "Higher/Lower/Middle"
+			persistentImageTags - variable to return the persistent image tags after they are generated for ease of reference.
+		It will add persistent image tags to the image under the Darkfield360 tag
+	*/
+	
+	image takeDPImage(object self, TagGroup imageSet, number spotID, string imageLabel, TagGroup &persistentImageTags)
+	{
+		TagGroup DPImageTags;
+		string ImageSetID;
+		imageSet.TagGroupGetTagAsString("ImageSetID", ImageSetID)
+		// arguments: (TagGroup tagGroup, String tagPath, TagGroup subGroup )
+		string tagPath = "Spots:" + spotID + ":" + imageLabel;
+		imageSet.TagGroupGetTagAsTagGroup(tagPath, DPImageTags); // Loads the DP image information into this variable for reference.
+	
+		number xTiltTarget, yTiltTarget, relativeXTilt, relativeYTilt;
+		
+		// Read relative xTilt and yTilt from array
+		DPImageTags.TagGroupGetTagAsNumber("xTiltRealtive", relativeXTilt);
+		DPImageTags.TagGroupGetTagAsNumber("yTiltRealtive", relativeYTilt);
+		
+		xTiltTarget = dataObject.getCentreXTilt() + relativeXTilt;
+		yTiltTarget = dataObject.getCentreYTilt() + relativeYTilt;
+		
+		// Move the beam tilt to this value.
+		moveBeamTilt(xTiltTarget,yTiltTarget);
+		string opticsMode = EMGetImagingOpticsMode();
+		// Switch to Diffraction mode manually if it is not in that mode.
+		// "SAMAG" is the name our JEOL2100 uses. VirtualTEM uses "IMAGING". 
+		if ( CameraControlObject.isImagingMode() == true ) {
+			if(debugMode==true){
+				result("\nTakeDPImage() called when EM in an imaging mode. Is in mode: " + opticsMode);
+			}
+			if (!ContinueCancelDialog( "Switch to diffraction mode before continuing." )){
+				Throw( "User aborted process." );
+			}
+		}
+		opticsMode = EMGetImagingOpticsMode();
+		if ( CameraControlObject.isDiffractionMode() == false ) {
+			if(debugMode==true){
+				result("\nTakeDPImage() called when EM is not in a diffraction mode. It is in mode: " + opticsMode);
+				result("\nIf this mode is a diffraction imaging mode of your microscope then it needs to be added to the DF360 toolkit list of diffraction mode names.");
+			}
+			if (!ContinueCancelDialog( "Switch to diffraction mode before continuing." )){
+				Throw( "User aborted process." );
+			}
+		}
+		opticsMode = EMGetImagingOpticsMode();
+		
+		// Take the  Image
+		number Exposure = CameraControlObject.getDPExposure();
+		number cameraWidth = CameraControlObject.getCameraWidth();
+		number cameraHeight = CameraControlObject.getCameraHeight();
+		image DPImage;
+		DPImage := sscUnprocessedAcquire(Exposure,0,0,cameraWidth,cameraHeight);
+		
+		// Create Image Tags to be attached to the image itself (not the image set)
+		TagGroup ImageTags = ImageSetTools.createImageTags();
+
+		// Retrive image values
+		number shadowValue, shadowDistance, DSpacingAng;
+		ImageSet.TagGroupGetTagAsNumber("ShadowValue", shadowValue);
+		ImageSet.TagGroupGetTagAsNumber("shadowDistance", shadowDistance);
+		ImageSet.TagGroupGetTagAsNumber("DSpacingAng", DSpacingAng);
+		// retrive calibration values
+		number xTiltx, xTilty, yTiltx, yTilty;
+		imageSet.TagGroupGetTagAsNumber("TiltCalibration:xTiltx", xTiltx);
+		imageSet.TagGroupGetTagAsNumber("TiltCalibration:xTilty", xTilty);
+		imageSet.TagGroupGetTagAsNumber("TiltCalibration:yTiltx", yTiltx);
+		imageSet.TagGroupGetTagAsNumber("TiltCalibration:yTilty", yTilty);
+		// retrieve settings not used in the DP mode
+		number RingMode, IntegratedImage, NumberOfIntegrations, DegreeStep
+		imageSet.TagGroupGetTagAsNumber("RingMode", RingMode);
+		imageSet.TagGroupGetTagAsNumber("IntegratedImage", IntegratedImage);
+		imageSet.TagGroupGetTagAsNumber("NumberOfIntegrations", NumberOfIntegrations);
+		imageSet.TagGroupGetTagAsNumber("DegreeStep", DegreeStep);
+		
+		// Write values to tag group.
+		ImageTags.TagGroupSetTagAsString("ImageType", "DP");
+		ImageTags.TagGroupSetTagAsString("ImageSetID", ImageSetID);
+		ImageTags.TagGroupSetTagAsNumber("ImageSpotID", spotID);
+		ImageTags.TagGroupSetTagAsString("ImageMode", opticsMode);
+		ImageTags.TagGroupSetTagAsNumber("CameraLength", dataObject.getCameraLength());
+		ImageTags.TagGroupSetTagAsNumber("ExposureTime", Exposure);
+		ImageTags.TagGroupSetTagAsNumber("xTiltRelative", relativeXTilt);
+		ImageTags.TagGroupSetTagAsNumber("yTiltRelative", relativeYTilt);		
+		ImageTags.TagGroupSetTagAsNumber("xTiltValue", xTiltTarget);
+		ImageTags.TagGroupSetTagAsNumber("yTiltValue", yTiltTarget);		
+		ImageTags.TagGroupSetTagAsNumber("ShadowValue", shadowValue);
+		ImageTags.TagGroupSetTagAsNumber("ShadowDistance", shadowDistance);
+		ImageTags.TagGroupSetTagAsNumber("DSpacingAng", DSpacingAng);
+		ImageTags.TagGroupSetTagAsNumber("TiltCalibration:xTiltx", xTiltx);
+		ImageTags.TagGroupSetTagAsNumber("TiltCalibration:xTilty", xTilty);
+		ImageTags.TagGroupSetTagAsNumber("TiltCalibration:yTiltx", yTiltx);
+		ImageTags.TagGroupSetTagAsNumber("TiltCalibration:yTilty", yTilty);
+		ImageTags.TagGroupSetTagAsNumber("RingMode", RingMode);
+		ImageTags.TagGroupSetTagAsNumber("IntegratedImage", IntegratedImage);
+		ImageTags.TagGroupSetTagAsNumber("NumberOfIntegrations", NumberOfIntegrations);
+		ImageTags.TagGroupSetTagAsNumber("DegreeStep", DegreeStep);
+		
+		// attach these tags to the image's Persistent Tag group
+		TagGroup persistentTG = DPImage.ImageGetTagGroup();
+		persistentTG.TagGroupAddLabeledTagGroup("Darkfield360", ImageTags)
+		// Return a copy of the tags for outside functions. Making a copy makes sure they will not be accidentally changed later.
+		persistentImageTags = ImageTags.TagGroupClone();
+		return DPImage;
+	}
 
 	/* Function to generate the file name for a darkfield image and update the DFList taggroup*/
 	string generateDFFileName (object self, number im, number imageID, image dataArray, TagGroup DFList, number shadowing, number debugMode) {
@@ -2189,6 +2372,139 @@ class CreateDF360DialogClass : uiframe
 		self.beamCentre();
 		dataObject.resetTiltStore();
 	}
+	
+	// This function will use the spot data stored in the current image set to create DP images.
+	// It will then update the image set with information about the images being taken.
+	// This step is the final phase before DF imaging begins.
+	// Uses function: image takeDPImage(object self, TagGroup imageSet, number spotID, string imageLabel)
+	
+	void TakeDPImagesButtonPress(object self)
+	{
+		if(debugMode==true){result("\nFinalizing Image Set...");}
+		if(CameraControlObject.getAllowControl() != true){
+			result("\nToolkit Controls are offline. Ensure there is a live view window active and has been captured.")
+			exit(0);
+		}
+		if(isCalibrated == 0){ // Has the system been calibrated?
+			Throw("The system must be calibrated before you store points.");
+		}
+		ImageDisplay viewDisplay
+		if(!returnViewImageDisplay(debugMode, viewDisplay)){
+			throw("No Live View window found");
+		}
+		// Is there an open imageSet?
+		TagGroup targetImageSet
+		number isCurrent = imageSetTools.getCurrentImageSet(targetImageSet)
+		if(isCurrent == 0){
+			Throw("There is no Image Set to finalize. Please create one.");
+		}
+		if(debugMode==true){result("\n\tImage Set found and loaded.");}
+		// Has the imageSet been finalized, and so does not accept new points?
+		// Boolean TagGroupGetTagAsNumber( TagGroup tagGroup, String tagPath, NumberVariable number )
+		number DPsTaken
+		if(targetImageSet.TagGroupGetTagAsNumber("DPsTaken", DPsTaken) == 0){
+			result("\n\tImage Set does not have the DPSTaken tag. This is an error.");
+			Throw("Image Set Error: No DPsTaken flag.");
+		} 
+		if(DPsTaken == 1){
+			result("\n\tImage Set has been finalized all ready.");
+			result("\n\tPlease create a new image set.");
+			throw("Image Set has all ready been finalized.");
+		}
+		// Shadow mode settings check
+		number shadowDistanceNM, shadowMode;
+		if(targetImageSet.TagGroupGetTagAsNumber("ShadowMode", shadowMode) == 0){
+			result("\n\tImage Set does not have the ShadowMode tag. This is an error.");
+			Throw("Image Set Error: No ShadowMode flag.");
+		}
+		if(targetImageSet.TagGroupGetTagAsNumber("ShadowDistance", shadowDistanceNM) == 0){
+			result("\n\tImage Set does not have the ShadpwDistance tag. This is an error.");
+			Throw("Image Set Error: No ShadowDistance flag.");
+		}
+		if(ShadowMode == 0){ // the shadow distance can be a non-0 value, yet not be used.
+			shadowDistanceNM = 0;
+		}
+		if(ShadowMode==1 && shadowDistanceNM==0){
+			result("\n\tImage Set shadowing distance is set to 0, but the shadow mode option is On.");
+			Throw("Shadow distance not set");
+		}
+		// Image save & display settings
+		number AutoSaveImages, AutoDisplayImages;
+		if(targetImageSet.TagGroupGetTagAsNumber("AutoSaveImages", AutoSaveImages) == 0){
+			result("\n\tImage Set does not have the AutoSaveImages tag. This is an error.");
+			Throw("Image Set Error: No AutoSaveImages flag.");
+		}
+		if(targetImageSet.TagGroupGetTagAsNumber("AutoDisplayImages", AutoDisplayImages) == 0){
+			result("\n\tImage Set does not have the AutoDisplayImages tag. This is an error.");
+			Throw("Image Set Error: No AutoDisplayImages flag.");
+		}
+		
+		// Load the spot coordinate tag group and check there are some spots there.
+		if(debugMode==true){result("\n\tRetrieving spot data... ");}
+		TagGroup spots;
+		targetImageSet.TagGroupGetTagAsIndexedTagGroup("Spots", spots);
+		number NumberOfSpots
+		spots.TagGroupCountTags(NumberOfSpots);
+		if(NumberOfSpots == 0){
+			result("\n\tImage Set does not have any spots in it.");
+			Throw("Image Set Error: No spots found.");
+		}
+		if(debugMode==true){result(NumberOfSpots + " spots found.");}
+		
+		// spots are now stored and ready to be imaged. The process for the loop is:
+			// Acquire image/s
+				// Uses function: image takeDPImage(object self, TagGroup imageSet, number spotID, string imageLabel)
+			// Update the DF Images group.
+				// Add DF image information to image set for it to be taken later
+			// Save +/ show images
+			// update image set with image ID or file name for DP image
+			
+		number i;
+		for(i=0; i < NumberOfSpots; i++){
+			TagGroup newDFImageData
+			image DPImage := self.takeDPImage( targetImageSet, i, "Middle", newDFImageData)
+			// Update the DF Images group.
+			TagGroup NewSpotSet = ImageSetTools.addImageToCurrentImageSet(); // creates a new set of 'spots' in the imageset:Images indexed taggroup
+			TagGroup NewMiddleDF = ImageSetTools.createNewImageForImageSet(newDFImageData); // Uses loaded version of createNewImageForImageSet function to fill in a lot of the values before hand.
+			
+			// add the tag group to the new 'image' spot set
+			NewSpotSet.TagGroupAddLabeledTagGroup("Middle", NewMiddleDF);
+			
+			if(ShadowMode == true){
+				TagGroup higherImageData;
+				image DPImageHigher := self.takeDPImage( targetImageSet, i, "Higher", higherImageData);
+				TagGroup NewHigherDF = ImageSetTools.createNewImageForImageSet(higherImageData);
+
+				// add the tag group to the new 'image' spot set
+				NewSpotSet.TagGroupAddLabeledTagGroup("Higher", NewHigherDF);
+				
+				TagGroup lowerImageData;
+				image DPImageLower := self.takeDPImage( targetImageSet, i, "Lower", lowerImageData);
+				TagGroup NewLowerDF = ImageSetTools.createNewImageForImageSet(lowerImageData);
+
+				// add the tag group to the new 'image' spot set
+				NewSpotSet.TagGroupAddLabeledTagGroup("Lower", NewLowerDF);			
+			
+			}
+			
+			if(AutoDisplayImages == true){
+				showImage(DPImage);
+				showImage(DPImageHigher);
+				showImage(DPImageLower);
+			}
+			
+			if(AutoSaveImages == true){
+				self.saveImageInImageSet(DPImage);
+				self.saveImageInImageSet(DPImageHigher);
+				self.saveImageInImageSet(DPImageLower);
+			}
+			
+		} // End of loop
+		// update the image set to show that DP were taken.
+		
+	}
+	
+	
 		
 	/* RING PANEL BUTTON FUNCTIONS*/
 	void RingToggleButtonPress (object self)
@@ -2499,5 +2815,256 @@ class CreateDF360DialogClass : uiframe
 	void saveVariablesToMemoryPress(object self){
 		dataObject.updatePersistent(dataObject.createPersistent(1));
 	}
-}
+	
+	
+	/* 
+		Image DP code from old store tilt function
+	*/
+	
+	/*
+	number DPImageCode(object self){
+	
+	// Check to see if the EM is in diffraction mode.
+		if ( (EMGetImagingOpticsMode() == "SAMAG") || (EMGetImagingOpticsMode() == "IMAGING")  || (EMGetImagingOpticsMode() == "MAG1") || (EMGetImagingOpticsMode() == "MAG2")) {
+			if (!ContinueCancelDialog( "Switch to diffraction mode before continuing." )){
+				Throw( "User aborted process." );
+			}
+		}
+		string fileName, spotID, filePath, timeString;
+		timeString = constructTimeStamp();
+		fileName = "DP_" + spotTracker + "_" + timeString + "_MIDDLE";
+		
+		
+		if(storeTiltOnly == false) // The image creation + storage parts can be ignored if storeTiltOnly parameter is set to true.
+		{
+			// Take new exposure for comparison of pixel movement.
+			number cameraWidth, cameraHeight;
+			cameraWidth = CameraControlObject.getCameraWidth();
+			cameraHeight = CameraControlObject.getCameraHeight();
+			
+			// Wait for the image to stabilize after moving.
+			number OSTickCount = GetOSTickCount();
+			number OSTicksPerSecond = GetOSTicksPerSecond();
+			number targetTick = OSTickCount + (OSTicksPerSecond);
+			while( targetTick > GetOSTickCount()){	// Do nothing
+			}
+			image newDPImage := sscUnprocessedAcquire(DPExposure,0,0,cameraWidth,cameraHeight);
 
+			// Compare to reference image
+			//findImageShift(image refIm, image newIm, number &XShift, number &YShift)
+			number XShift, YShift;
+			findImageShift(referenceDP, newDPImage, XShift, YShift, debugMode);
+			image1Data.TagGroupSetTagAsNumber("xShift", xShift);
+			image1Data.TagGroupSetTagAsNumber("yShift", yShift);
+			
+			// Convert the distance travelled to 1/nm
+			number pixelDistance = distance(XShift, YShift);
+			number scaleX = dataObject.getRefScale();
+			number realDistance = pixelDistance * scaleX;
+			image1Data.TagGroupSetTagAsNumber("DSpacingAng", convertInverseNMToAngstrom(realDistance));
+			
+			if(debugMode==true){Result( "\nPattern Distance Shift (1/nm): " + realDistance);}
+			if(debugMode==true){Result( "\nPattern Distance Shift (Angstroms): " + convertInverseNMToAngstrom(realDistance));}
+			
+			// Add the real distance as text in the image
+			// Add the pixel shift as text in the image
+			string textString = "D-Spacing: " + realDistance + " (1/nm)" + "\nPixel Shift: (" + XShift + ", " + YShift + ")";
+			// Add text annotations and set their colour, display mode and font
+			component textannot=newtextannotation(10,10, textString, 64);
+			textannot.componentsetfillmode(2);
+			textannot.componentsetdrawingmode(2);
+			textannot.componentsetforegroundcolor(1,0,0);
+			textannot.componentsetbackgroundcolor(0,0,0);
+			textannot.componentsetfontfacename("Microsoft Sans Serif");
+			
+			showImage(newDPImage) // Images needs to be shown to give it an ImageDisplay, which is needed for attaching components.
+			ImageDisplay imgDisplay = newDPImage.ImageGetImageDisplay(0)
+			imgDisplay.componentaddchildatend(textannot);
+			ImageDocument thisImageDocument = ImageGetOrCreateImageDocument( newDPImage );
+			
+			self.drawReticle(newDPImage, 0);
+			self.cleanReticle(newDPImage);
+			
+			if(saveImages == true) // If saving the image to hard disk...
+			{
+				string fileDirectory = GetApplicationDirectory("auto_save", 0);
+				filePath = PathConcatenate(fileDirectory, fileName);
+				image1Data.TagGroupSetTagAsString("FileName", fileName);
+				image1Data.TagGroupSetTagAsNumber("SavedAsFile", 1);
+				SaveAsGatan( newDPImage, filePath );
+				result("\nSaved tilt DP as " + fileName);
+			} else { // If not saving the image...
+				image1Data.TagGroupSetTagAsNumber("SavedAsFile", 0);
+			}
+			if(displayImages == true) // If displaying the image...
+			{
+				if(debugMode==true){
+					ImageDocumentClean(thisImageDocument); // So the window can be closed without asking to be saved
+					// Not set by default to avoid accidentally closing the images.
+				}
+				result("\nDiffraction Pattern recorded for " + fileName + ". Tilt value stored (" + xTilt + ", " + yTilt + ")");
+				positionDebugWindow(debugMode); // Return the View window to the front
+			} else { // If not displaying the image, close it.
+				ImageDocumentClean(thisImageDocument); // So the window can be closed without asking to be saved
+				CloseImage(newDPImage);
+			}
+		}
+		
+		string fileNameHigher, fileNameLower
+		fileNameHigher = "DP_" + spotTracker + "_" + timeString + "_HIGHER";
+		fileNameLower = "DP_" + spotTracker + "_" + timeString + "_LOWER";
+		
+		number OSTickCount = GetOSTickCount();
+			number OSTicksPerSecond = GetOSTicksPerSecond();
+			number targetTick = OSTickCount + (OSTicksPerSecond * DPExposure);
+			if(debugMode==true){result("\n\tTickCount = " + OSTickCount + "  TicksperSec = " + OSTicksPerSecond);}
+			ImageDocument higherDPView, lowerDPView
+			
+			if(storeTiltOnly != true)
+			{
+				// Wait for one second to let the ccd be exposed
+				while( targetTick > GetOSTickCount()){	// Do nothing
+				}
+
+				number cameraWidth, cameraHeight;
+				cameraWidth = CameraControlObject.getCameraWidth();
+				cameraHeight = CameraControlObject.getCameraHeight();
+				image newDPImage := sscUnprocessedAcquire(DPExposure,0,0,cameraWidth,cameraHeight);
+
+				// Compare to reference image
+				//findImageShift(image refIm, image newIm, number &XShift, number &YShift)
+				number XShift, YShift;
+				findImageShift(referenceDP, newDPImage, XShift, YShift, debugMode);
+				image2Data.TagGroupSetTagAsNumber("xShift", xShift);
+				image2Data.TagGroupSetTagAsNumber("yShift", yShift);
+				
+				// Convert the distance travelled to 1/nm
+				number pixelDistance = distance(XShift, YShift);
+				number scaleX = dataObject.getRefScale();
+				number realDistance = pixelDistance * scaleX;
+				image2Data.TagGroupSetTagAsNumber("DSpacingAng", convertInverseNMToAngstrom(realDistance));
+				
+				if(debugMode==true){Result( "\nPattern Distance Shift (1/nm): " + realDistance);}
+				if(debugMode==true){Result( "\nPattern Distance Shift (Angstroms): " + convertInverseNMToAngstrom(realDistance));}
+				
+				// Add the real distance as text in the image
+				// Add the pixel shift as text in the image
+				string textString = "D-Spacing: " + realDistance + " (1/nm)" + "\nPixel Shift: (" + XShift + ", " + YShift + ")";
+				// Add text annotations and set their colour, display mode and font
+				component textannot=newtextannotation(10,10, textString, 64);
+				textannot.componentsetfillmode(2);
+				textannot.componentsetdrawingmode(2);
+				textannot.componentsetforegroundcolor(1,0,0);
+				textannot.componentsetbackgroundcolor(0,0,0);
+				textannot.componentsetfontfacename("Microsoft Sans Serif");
+				
+				showImage(newDPImage) // Images needs to be shown to give it an ImageDisplay, which is needed for attaching components.
+				ImageDisplay imgDisplay = newDPImage.ImageGetImageDisplay(0)
+				imgDisplay.componentaddchildatend(textannot);
+				ImageDocument thisImageDocument = ImageGetOrCreateImageDocument( newDPImage );
+				
+				self.drawReticle(newDPImage, 0);
+				self.cleanReticle(newDPImage);
+				
+				if(saveImages == true) // If saving the image to hard disk...
+				{
+					string fileDirectory = GetApplicationDirectory("auto_save", 0);
+					filePath = PathConcatenate(fileDirectory, fileNameHigher);
+					image2Data.TagGroupSetTagAsString("FileName", fileNameHigher);
+					image2Data.TagGroupSetTagAsNumber("SavedAsFile", 1);
+					SaveAsGatan( newDPImage, filePath );
+					result("\nSaved tilt DP as " + fileNameHigher);
+				} else { // If not saving the image...
+					image2Data.TagGroupSetTagAsNumber("SavedAsFile", 0);
+				}
+				if(displayImages == true) // If displaying the image...
+				{
+					if(debugMode==true){
+						ImageDocumentClean(thisImageDocument); // So the window can be closed without asking to be saved
+						// Not set by default to avoid accidentally closing the images.
+					}
+					result("\nDiffraction Pattern shown for " + fileNameHigher + ". Tilt value stored (" + xTilt + ", " + yTilt + ")");
+					positionDebugWindow(debugMode); // Return the View window to the front
+				} else { // If not displaying the image, close it.
+					ImageDocumentClean(thisImageDocument); // So the window can be closed without asking to be saved
+					CloseImage(newDPImage);
+					result("\nDiffraction Pattern recorded for " + fileNameHigher + ". Tilt value stored (" + xTilt + ", " + yTilt + ")");
+				}
+			}
+			if(storeTiltOnly != 1)
+			{
+				OSTickCount = GetOSTickCount();
+				number targetTick = OSTickCount + (OSTicksPerSecond * DPExposure);
+				while( targetTick > GetOSTickCount())	{ // Do nothing
+				}
+				number cameraWidth, cameraHeight;
+				cameraWidth = CameraControlObject.getCameraWidth();
+				cameraHeight = CameraControlObject.getCameraHeight();
+				image newDPImage := sscUnprocessedAcquire(DPExposure,0,0,cameraWidth,cameraHeight);
+				
+				// Compare to reference image
+				//findImageShift(image refIm, image newIm, number &XShift, number &YShift)
+				number XShift, YShift;
+				findImageShift(referenceDP, newDPImage, XShift, YShift, debugMode);
+				image3Data.TagGroupSetTagAsNumber("xShift", xShift);
+				image3Data.TagGroupSetTagAsNumber("yShift", yShift);
+				
+				// Convert the distance travelled to 1/nm
+				number pixelDistance = distance(XShift, YShift);
+				number scaleX = dataObject.getRefScale();
+				number realDistance = pixelDistance * scaleX;
+				image3Data.TagGroupSetTagAsNumber("DSpacingAng", convertInverseNMToAngstrom(realDistance));
+				
+				if(debugMode==true){Result( "\nPattern Distance Shift (1/nm): " + realDistance);}
+				if(debugMode==true){Result( "\nPattern Distance Shift (Angstroms): " + convertInverseNMToAngstrom(realDistance));}
+				
+				// Add the real distance as text in the image
+				// Add the pixel shift as text in the image
+				string textString = "D-Spacing: " + realDistance + " (1/nm)" + "\nPixel Shift: (" + XShift + ", " + YShift + ")";
+				// Add text annotations and set their colour, display mode and font
+				component textannot=newtextannotation(10,10, textString, 64);
+				textannot.componentsetfillmode(2);
+				textannot.componentsetdrawingmode(2);
+				textannot.componentsetforegroundcolor(1,0,0);
+				textannot.componentsetbackgroundcolor(0,0,0);
+				textannot.componentsetfontfacename("Microsoft Sans Serif");
+				
+				showImage(newDPImage) // Images needs to be shown to give it an ImageDisplay, which is needed for attaching components.
+				ImageDisplay imgDisplay = newDPImage.ImageGetImageDisplay(0)
+				imgDisplay.componentaddchildatend(textannot);
+				ImageDocument thisImageDocument = ImageGetOrCreateImageDocument( newDPImage );
+				
+				self.drawReticle(newDPImage, 0);
+				self.cleanReticle(newDPImage);
+				
+				if(saveImages == true) // If saving the image to hard disk...
+				{
+					string fileDirectory = GetApplicationDirectory("auto_save", 0);
+					filePath = PathConcatenate(fileDirectory, fileNameLower);
+					image3Data.TagGroupSetTagAsString("FileName", fileNameLower);
+					image3Data.TagGroupSetTagAsNumber("SavedAsFile", 1);
+					SaveAsGatan( newDPImage, filePath );
+					result("\nSaved Diffraction Pattern for " + fileNameLower);
+				} else { // If not saving the image...
+					image3Data.TagGroupSetTagAsNumber("SavedAsFile", 0);
+				}
+				if(displayImages == true) // If displaying the image...
+				{
+					if(debugMode==true){
+						ImageDocumentClean(thisImageDocument); // So the window can be closed without asking to be saved
+						// Not set by default to avoid accidentally closing the images.
+					}
+					result("\nDiffraction Pattern shown for " + fileNameLower + ". Tilt value stored (" + xTilt + ", " + yTilt + ")");
+					positionDebugWindow(debugMode); // Return the View window to the front
+				} else { // If not displaying the image, close it.
+					ImageDocumentClean(thisImageDocument); // So the window can be closed without asking to be saved
+					CloseImage(newDPImage);
+					// No result here since it is not possible to neither saveImages or displayImages
+				}
+				
+			}
+		
+	} */
+	
+	
+}
