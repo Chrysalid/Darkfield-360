@@ -226,7 +226,7 @@ class CreateDF360DialogClass : uiframe
 		
 		fileName = fileName + shadowName;
 		
-		filePath = PathConcatenate(imageSetDir, fileName);
+		string filePath = PathConcatenate(imageSetDir, fileName);
 		SaveAsGatan(theImage, filePath);
 		if(DoesFileExist(filePath)){
 			return 1;
@@ -1197,7 +1197,7 @@ class CreateDF360DialogClass : uiframe
 		ImageTags.TagGroupSetTagAsString("ImageSetID", ImageSetID);
 		ImageTags.TagGroupSetTagAsNumber("ImageSpotID", spotID);
 		ImageTags.TagGroupSetTagAsString("ImageMode", opticsMode);
-		ImageTags.TagGroupSetTagAsNumber("CameraLength", dataObject.getCameraLength());
+		ImageTags.TagGroupSetTagAsString("CameraLength", dataObject.getCameraLength());
 		ImageTags.TagGroupSetTagAsNumber("ExposureTime", Exposure);
 		ImageTags.TagGroupSetTagAsNumber("xTiltRelative", relativeXTilt);
 		ImageTags.TagGroupSetTagAsNumber("yTiltRelative", relativeYTilt);		
@@ -1223,6 +1223,143 @@ class CreateDF360DialogClass : uiframe
 		return DPImage;
 	}
 
+	// This function will use the spot data stored in the current image set to create DP images.
+	// It will then update the image set with information about the images being taken.
+	// This step is the final phase before DF imaging begins.
+	// Uses function: image takeDPImage(object self, TagGroup imageSet, number spotID, string imageLabel)
+	
+	void finalizeImageSet(object self){
+		if(debugMode==true){result("\nFinalizing Image Set...");}
+		if(CameraControlObject.getAllowControl() != true){
+			result("\nToolkit Controls are offline. Ensure there is a live view window active and has been captured.")
+			exit(0);
+		}
+		if(isCalibrated == 0){ // Has the system been calibrated?
+			Throw("The system must be calibrated before you store points.");
+		}
+		ImageDisplay viewDisplay
+		if(!returnViewImageDisplay(debugMode, viewDisplay)){
+			throw("No Live View window found");
+		}
+		// Is there an open imageSet?
+		TagGroup targetImageSet
+		number isCurrent = imageSetTools.getCurrentImageSet(targetImageSet)
+		if(isCurrent == 0){
+			Throw("There is no Image Set to finalize. Please create one.");
+		}
+		if(debugMode==true){result("\n\tImage Set found and loaded.");}
+		// Has the imageSet been finalized, and so does not accept new points?
+		// Boolean TagGroupGetTagAsNumber( TagGroup tagGroup, String tagPath, NumberVariable number )
+		number DPsTaken
+		if(targetImageSet.TagGroupGetTagAsNumber("DPsTaken", DPsTaken) == 0){
+			result("\n\tImage Set does not have the DPSTaken tag. This is an error.");
+			Throw("Image Set Error: No DPsTaken flag.");
+		} 
+		if(DPsTaken == 1){
+			result("\n\tImage Set has been finalized all ready.");
+			result("\n\tPlease create a new image set.");
+			throw("Image Set has all ready been finalized.");
+		}
+		// Shadow mode settings check
+		number shadowDistanceNM, shadowMode;
+		if(targetImageSet.TagGroupGetTagAsNumber("ShadowMode", shadowMode) == 0){
+			result("\n\tImage Set does not have the ShadowMode tag. This is an error.");
+			Throw("Image Set Error: No ShadowMode flag.");
+		}
+		if(targetImageSet.TagGroupGetTagAsNumber("ShadowDistance", shadowDistanceNM) == 0){
+			result("\n\tImage Set does not have the ShadpwDistance tag. This is an error.");
+			Throw("Image Set Error: No ShadowDistance flag.");
+		}
+		if(ShadowMode == 0){ // the shadow distance can be a non-0 value, yet not be used.
+			shadowDistanceNM = 0;
+		}
+		if(ShadowMode==1 && shadowDistanceNM==0){
+			result("\n\tImage Set shadowing distance is set to 0, but the shadow mode option is On.");
+			Throw("Shadow distance not set");
+		}
+		// Image save & display settings
+		number AutoSaveImages, AutoDisplayImages;
+		if(targetImageSet.TagGroupGetTagAsNumber("AutoSaveImages", AutoSaveImages) == 0){
+			result("\n\tImage Set does not have the AutoSaveImages tag. This is an error.");
+			Throw("Image Set Error: No AutoSaveImages flag.");
+		}
+		if(targetImageSet.TagGroupGetTagAsNumber("AutoDisplayImages", AutoDisplayImages) == 0){
+			result("\n\tImage Set does not have the AutoDisplayImages tag. This is an error.");
+			Throw("Image Set Error: No AutoDisplayImages flag.");
+		}
+		
+		// Load the spot coordinate tag group and check there are some spots there.
+		if(debugMode==true){result("\n\tRetrieving spot data... ");}
+		TagGroup spots;
+		targetImageSet.TagGroupGetTagAsTagGroup("Spots", spots);
+		number NumberOfSpots = spots.TagGroupCountTags();
+		if(NumberOfSpots == 0){
+			result("\n\tImage Set does not have any spots in it.");
+			Throw("Image Set Error: No spots found.");
+		}
+		if(debugMode==true){result(NumberOfSpots + " spots found.");}
+		
+		// spots are now stored and ready to be imaged. The process for the loop is:
+			// Acquire image/s
+				// Uses function: image takeDPImage(object self, TagGroup imageSet, number spotID, string imageLabel)
+			// Update the DF Images group.
+				// Add DF image information to image set for it to be taken later
+			// Save +/ show images
+			// update image set with image ID or file name for DP image
+			
+		number i;
+		for(i=0; i < NumberOfSpots; i++){
+			TagGroup newDFImageData
+			image DPImage := self.takeDPImage( targetImageSet, i, "Middle", newDFImageData)
+			image DPImageLower, DPImageHigher;
+			// Update the DF Images group.
+			TagGroup NewSpotSet = ImageSetTools.addImageToCurrentImageSet(); // creates a new set of 'spots' in the imageset:Images indexed taggroup
+			TagGroup NewMiddleDF = ImageSetTools.createNewImageForImageSet(newDFImageData); // Uses loaded version of createNewImageForImageSet function to fill in a lot of the values before hand.
+			
+			// add the tag group to the new 'image' spot set
+			NewSpotSet.TagGroupAddLabeledTagGroup("Middle", NewMiddleDF);
+			
+			if(ShadowMode == true){
+				TagGroup higherImageData;
+				DPImageHigher := self.takeDPImage( targetImageSet, i, "Higher", higherImageData);
+				TagGroup NewHigherDF = ImageSetTools.createNewImageForImageSet(higherImageData);
+
+				// add the tag group to the new 'image' spot set
+				NewSpotSet.TagGroupAddLabeledTagGroup("Higher", NewHigherDF);
+				
+				TagGroup lowerImageData;
+				DPImageLower := self.takeDPImage( targetImageSet, i, "Lower", lowerImageData);
+				TagGroup NewLowerDF = ImageSetTools.createNewImageForImageSet(lowerImageData);
+
+				// add the tag group to the new 'image' spot set
+				NewSpotSet.TagGroupAddLabeledTagGroup("Lower", NewLowerDF);			
+			
+			}
+			
+			if(AutoDisplayImages == true){
+				showImage(DPImage);
+				if(ShadowMode == true){
+					showImage(DPImageHigher);
+					showImage(DPImageLower);
+				}
+			}
+			
+			if(AutoSaveImages == true){
+				self.saveImageInImageSet(DPImage);
+				if(ShadowMode == true){
+					self.saveImageInImageSet(DPImageHigher);
+					self.saveImageInImageSet(DPImageLower);
+				}
+			}
+			
+		} // End of loop
+		// update the image set to show that DP were taken.
+		targetImageSet.TagGroupSetTagAsNumber("DPsTaken", 1);
+		
+	
+	
+	}
+	
 	/* Function to generate the file name for a darkfield image and update the DFList taggroup*/
 	string generateDFFileName (object self, number im, number imageID, image dataArray, TagGroup DFList, number shadowing, number debugMode) {
 		number spotID = getpixel(dataArray, im, 0);
@@ -2372,136 +2509,10 @@ class CreateDF360DialogClass : uiframe
 		self.beamCentre();
 		dataObject.resetTiltStore();
 	}
-	
-	// This function will use the spot data stored in the current image set to create DP images.
-	// It will then update the image set with information about the images being taken.
-	// This step is the final phase before DF imaging begins.
-	// Uses function: image takeDPImage(object self, TagGroup imageSet, number spotID, string imageLabel)
-	
+		
 	void TakeDPImagesButtonPress(object self)
 	{
-		if(debugMode==true){result("\nFinalizing Image Set...");}
-		if(CameraControlObject.getAllowControl() != true){
-			result("\nToolkit Controls are offline. Ensure there is a live view window active and has been captured.")
-			exit(0);
-		}
-		if(isCalibrated == 0){ // Has the system been calibrated?
-			Throw("The system must be calibrated before you store points.");
-		}
-		ImageDisplay viewDisplay
-		if(!returnViewImageDisplay(debugMode, viewDisplay)){
-			throw("No Live View window found");
-		}
-		// Is there an open imageSet?
-		TagGroup targetImageSet
-		number isCurrent = imageSetTools.getCurrentImageSet(targetImageSet)
-		if(isCurrent == 0){
-			Throw("There is no Image Set to finalize. Please create one.");
-		}
-		if(debugMode==true){result("\n\tImage Set found and loaded.");}
-		// Has the imageSet been finalized, and so does not accept new points?
-		// Boolean TagGroupGetTagAsNumber( TagGroup tagGroup, String tagPath, NumberVariable number )
-		number DPsTaken
-		if(targetImageSet.TagGroupGetTagAsNumber("DPsTaken", DPsTaken) == 0){
-			result("\n\tImage Set does not have the DPSTaken tag. This is an error.");
-			Throw("Image Set Error: No DPsTaken flag.");
-		} 
-		if(DPsTaken == 1){
-			result("\n\tImage Set has been finalized all ready.");
-			result("\n\tPlease create a new image set.");
-			throw("Image Set has all ready been finalized.");
-		}
-		// Shadow mode settings check
-		number shadowDistanceNM, shadowMode;
-		if(targetImageSet.TagGroupGetTagAsNumber("ShadowMode", shadowMode) == 0){
-			result("\n\tImage Set does not have the ShadowMode tag. This is an error.");
-			Throw("Image Set Error: No ShadowMode flag.");
-		}
-		if(targetImageSet.TagGroupGetTagAsNumber("ShadowDistance", shadowDistanceNM) == 0){
-			result("\n\tImage Set does not have the ShadpwDistance tag. This is an error.");
-			Throw("Image Set Error: No ShadowDistance flag.");
-		}
-		if(ShadowMode == 0){ // the shadow distance can be a non-0 value, yet not be used.
-			shadowDistanceNM = 0;
-		}
-		if(ShadowMode==1 && shadowDistanceNM==0){
-			result("\n\tImage Set shadowing distance is set to 0, but the shadow mode option is On.");
-			Throw("Shadow distance not set");
-		}
-		// Image save & display settings
-		number AutoSaveImages, AutoDisplayImages;
-		if(targetImageSet.TagGroupGetTagAsNumber("AutoSaveImages", AutoSaveImages) == 0){
-			result("\n\tImage Set does not have the AutoSaveImages tag. This is an error.");
-			Throw("Image Set Error: No AutoSaveImages flag.");
-		}
-		if(targetImageSet.TagGroupGetTagAsNumber("AutoDisplayImages", AutoDisplayImages) == 0){
-			result("\n\tImage Set does not have the AutoDisplayImages tag. This is an error.");
-			Throw("Image Set Error: No AutoDisplayImages flag.");
-		}
-		
-		// Load the spot coordinate tag group and check there are some spots there.
-		if(debugMode==true){result("\n\tRetrieving spot data... ");}
-		TagGroup spots;
-		targetImageSet.TagGroupGetTagAsIndexedTagGroup("Spots", spots);
-		number NumberOfSpots
-		spots.TagGroupCountTags(NumberOfSpots);
-		if(NumberOfSpots == 0){
-			result("\n\tImage Set does not have any spots in it.");
-			Throw("Image Set Error: No spots found.");
-		}
-		if(debugMode==true){result(NumberOfSpots + " spots found.");}
-		
-		// spots are now stored and ready to be imaged. The process for the loop is:
-			// Acquire image/s
-				// Uses function: image takeDPImage(object self, TagGroup imageSet, number spotID, string imageLabel)
-			// Update the DF Images group.
-				// Add DF image information to image set for it to be taken later
-			// Save +/ show images
-			// update image set with image ID or file name for DP image
-			
-		number i;
-		for(i=0; i < NumberOfSpots; i++){
-			TagGroup newDFImageData
-			image DPImage := self.takeDPImage( targetImageSet, i, "Middle", newDFImageData)
-			// Update the DF Images group.
-			TagGroup NewSpotSet = ImageSetTools.addImageToCurrentImageSet(); // creates a new set of 'spots' in the imageset:Images indexed taggroup
-			TagGroup NewMiddleDF = ImageSetTools.createNewImageForImageSet(newDFImageData); // Uses loaded version of createNewImageForImageSet function to fill in a lot of the values before hand.
-			
-			// add the tag group to the new 'image' spot set
-			NewSpotSet.TagGroupAddLabeledTagGroup("Middle", NewMiddleDF);
-			
-			if(ShadowMode == true){
-				TagGroup higherImageData;
-				image DPImageHigher := self.takeDPImage( targetImageSet, i, "Higher", higherImageData);
-				TagGroup NewHigherDF = ImageSetTools.createNewImageForImageSet(higherImageData);
-
-				// add the tag group to the new 'image' spot set
-				NewSpotSet.TagGroupAddLabeledTagGroup("Higher", NewHigherDF);
-				
-				TagGroup lowerImageData;
-				image DPImageLower := self.takeDPImage( targetImageSet, i, "Lower", lowerImageData);
-				TagGroup NewLowerDF = ImageSetTools.createNewImageForImageSet(lowerImageData);
-
-				// add the tag group to the new 'image' spot set
-				NewSpotSet.TagGroupAddLabeledTagGroup("Lower", NewLowerDF);			
-			
-			}
-			
-			if(AutoDisplayImages == true){
-				showImage(DPImage);
-				showImage(DPImageHigher);
-				showImage(DPImageLower);
-			}
-			
-			if(AutoSaveImages == true){
-				self.saveImageInImageSet(DPImage);
-				self.saveImageInImageSet(DPImageHigher);
-				self.saveImageInImageSet(DPImageLower);
-			}
-			
-		} // End of loop
-		// update the image set to show that DP were taken.
-		
+		self.finalizeImageSet();
 	}
 	
 	
