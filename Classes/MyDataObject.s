@@ -404,7 +404,7 @@ class MyDataObject
 		return tiltDistance;
 	}
 
-	/* Function to convert Pixel COORDINATES to Tilt Coordinates.
+	/* Function to convert Pixel COORDINATES to Tilt Values that will bring that point into the centre of the screen.
 		isViewWindow parameter is 0 or 1.
 		tiltShiftOnly = 1 will return only the RELATIVE values of tilt. Basically, it assumes beam centre is (0tilt,0tilt)
 				Since all beam movement functions are defined by relative shifts, this might be helpful.
@@ -415,6 +415,26 @@ class MyDataObject
 	void pixelToTilt(object self, number xPixel, number yPixel, number &xTiltTarget, number &yTiltTarget,\
 			number isViewWindow, number tiltShiftOnly, number pixelShiftOnly, number binningMultiplier)
 	{
+	
+	/* --------
+			A lot of confusion is that pixel axis have their origin in the top left corner, not bottom left as in natural axis.
+			Converting between is:
+				X(natural) = X(pixel)
+				Y(natural) = Y(max) - Y(pixel)
+				
+			The testbed tilt vectors in pixel space are
+				xTx = 1000, xTy = 0 because +1 xTilt moves the pattern to the right.
+				yTx = 0, yTy = -1000 because +1 yTilt moves the pattern upwards, which is -ve for pixel space.
+				
+			In natural space they are 
+				xTx = 1000, xTy = 0 because +1 xTilt moves the pattern to the right.
+				yTx = 0, yTy = 1000 because +1 yTilt moves the pattern upwards, which is +ve for natural space.
+				
+			The function converts from the pixel coordinates of a given point to the tilt values required to bring that point to teh centre of the screen.
+		
+	 -------- */
+	
+	
 		number xTx, xTy, yTx, yTy;
 		self.getTiltVectors(xTx, xTy, yTx, yTy);
 		// Starting values needed for calculations
@@ -432,13 +452,17 @@ class MyDataObject
 		beamCentreXPixel = width / 2;
 		beamCentreYPixel = height / 2;
 
+		// convert the pixel coordinates into natural coordinates.
+		number xPixelNatural = xPixel;
+		number yPixelNatural = height - yPixel;
+		
 		number xPixelChange, yPixelChange;
 		if(pixelShiftOnly != 1){
-			xPixelChange = xPixel - beamCentreXPixel;
-			yPixelChange = yPixel - beamCentreYPixel;
+			xPixelChange = beamCentreXPixel - xPixelNatural;
+			yPixelChange = beamCentreYPixel - yPixelNatural;
 		} else {
-			xPixelChange = xPixel;
-			yPixelChange = yPixel;
+			xPixelChange = xPixelNatural;
+			yPixelChange = yPixelNatural;
 		}
 
 		// For a Desired Pixel Shift = X,Y. We are rotating the coordinate axis and then scaling the values.
@@ -446,9 +470,10 @@ class MyDataObject
 		number alpha, Tx, Ty, newX, newY
 		alpha = atan2(xTy, xTx);
 		
-		// This finds the coordinates in terms of tilt, but WITHOUT SCALING, which must be done afterwards.
+		// This finds the vectors to make up the new Tilt coordinates, and therefore do not have SCALING, which must be done afterwards.
+		// These formula are standard for converting between rotated coordinate systems for natural axis (origin in bottom left, +ve x and +ve y)
 		newX = xPixelChange * cos(alpha) + yPixelChange * sin(alpha);
-		newY = -xPixelChange * sin(alpha) + yPixelChange * cos(alpha);
+		newY = - xPixelChange * sin(alpha) + yPixelChange * cos(alpha);
 		
 		// The coordinates are then scaled using the tilt vectors.
 		Tx = newX * (1 / distance(xTx, xTy))

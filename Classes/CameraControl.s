@@ -74,6 +74,10 @@ class CameraControl
 		imageSetToolsID = theImageSetToolsID;
 		
 		self.updateEMstatus(); // set the AllowControl variable asap.
+		
+		DFExposure = 30; // # of seconds to expose the camera for taking DarkField images.
+		DPExposure = 1; // # of seconds to expose the camera for taking Diffraction Pattern images.
+		BFExposure = 0.5; // # of seconds to expose the camera for taking BrightField images.
 	}
 
 	void setDebugMode(object self, number input)

@@ -13,7 +13,7 @@ object startToolkit () {
 	result("\nSetting Variables.")
 	// Set Variables
 	dataObject.setMaxDeviation(0.2); // difference (in 1/nm) allowed during pattern matching operations
-	image dataArray; // Array of values that are stored for future reference.
+	//image dataArray; // Array of values that are stored for future reference.
 	
 	result("\nLoading Image Set Tools...")
 	object theImageSetTools = alloc(ImageSetTools);

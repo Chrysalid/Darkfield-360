@@ -1874,7 +1874,7 @@ class MyDataObject
 		return tiltDistance;
 	}
 
-	/* Function to convert Pixel COORDINATES to Tilt Coordinates.
+	/* Function to convert Pixel COORDINATES to Tilt Values that will bring that point into the centre of the screen.
 		isViewWindow parameter is 0 or 1.
 		tiltShiftOnly = 1 will return only the RELATIVE values of tilt. Basically, it assumes beam centre is (0tilt,0tilt)
 				Since all beam movement functions are defined by relative shifts, this might be helpful.
@@ -1885,6 +1885,29 @@ class MyDataObject
 	void pixelToTilt(object self, number xPixel, number yPixel, number &xTiltTarget, number &yTiltTarget,\
 			number isViewWindow, number tiltShiftOnly, number pixelShiftOnly, number binningMultiplier)
 	{
+	
+	/* --------
+			This maths is providing endless problems. At the moment it is the y-tilt that seems to be off.
+			In the test-bed system I will only ever get a +ve yTilt value regardless of the y-shift in pixels.
+			
+			A lot of the confusion is that pixel axis have their origin in the top left corner, not bottom left as in natural axis.
+			Converting between is:
+				X(natural) = X(pixel)
+				Y(natural) = Y(max) - Y(pixel)
+				
+			The testbed tilt vectors in pixel space are
+				xTx = 1000, xTy = 0 because +1 xTilt moves the pattern to the right.
+				yTx = 0, yTy = -1000 because +1 yTilt moves the pattern upwards, which is -ve for pixel space.
+				
+			In natural space they are 
+				xTx = 1000, xTy = 0 because +1 xTilt moves the pattern to the right.
+				yTx = 0, yTy = 1000 because +1 yTilt moves the pattern upwards, which is +ve for natural space.
+				
+			Let's try using the natural coordinates for a change. Maybe it will be more clear.
+		
+	 -------- */
+	
+	
 		number xTx, xTy, yTx, yTy;
 		self.getTiltVectors(xTx, xTy, yTx, yTy);
 		// Starting values needed for calculations
@@ -1902,13 +1925,17 @@ class MyDataObject
 		beamCentreXPixel = width / 2;
 		beamCentreYPixel = height / 2;
 
+		// convert the pixel coordinates into natural coordinates.
+		number xPixelNatural = xPixel;
+		number yPixelNatural = height - yPixel;
+		
 		number xPixelChange, yPixelChange;
 		if(pixelShiftOnly != 1){
-			xPixelChange = xPixel - beamCentreXPixel;
-			yPixelChange = yPixel - beamCentreYPixel;
+			xPixelChange = beamCentreXPixel - xPixelNatural;
+			yPixelChange = beamCentreYPixel - yPixelNatural;
 		} else {
-			xPixelChange = xPixel;
-			yPixelChange = yPixel;
+			xPixelChange = xPixelNatural;
+			yPixelChange = yPixelNatural;
 		}
 
 		// For a Desired Pixel Shift = X,Y. We are rotating the coordinate axis and then scaling the values.
@@ -1916,9 +1943,10 @@ class MyDataObject
 		number alpha, Tx, Ty, newX, newY
 		alpha = atan2(xTy, xTx);
 		
-		// This finds the coordinates in terms of tilt, but WITHOUT SCALING, which must be done afterwards.
+		// This finds the vectors to make up the new Tilt coordinates, and therefore do not have SCALING, which must be done afterwards.
+		// Currently struggling to produce -ve NewY values.
 		newX = xPixelChange * cos(alpha) + yPixelChange * sin(alpha);
-		newY = -xPixelChange * sin(alpha) + yPixelChange * cos(alpha);
+		newY = - xPixelChange * sin(alpha) + yPixelChange * cos(alpha);
 		
 		// The coordinates are then scaled using the tilt vectors.
 		Tx = newX * (1 / distance(xTx, xTy))
@@ -2727,12 +2755,12 @@ class ImageSetTools
 		imageData.TagGroupCreateNewLabeledTag("ImageMode");
 		imageData.TagGroupCreateNewLabeledTag("ImageType"); // Options are DP, DF, BF, Bin
 		imageData.TagGroupCreateNewLabeledTag("ExposureTime");
-		imageData.TagGroupCreateNewLabeledTag("xTiltValue");
-		imageData.TagGroupCreateNewLabeledTag("yTiltValue");
-		imageData.TagGroupCreateNewLabeledTag("xTiltRelative");
-		imageData.TagGroupCreateNewLabeledTag("yTiltRelative");
-		imageData.TagGroupCreateNewLabeledTag("xShift");
-		imageData.TagGroupCreateNewLabeledTag("yShift");
+		imageData.TagGroupCreateNewLabeledTag("XTiltValue");
+		imageData.TagGroupCreateNewLabeledTag("YTiltValue");
+		imageData.TagGroupCreateNewLabeledTag("XTiltRelative");
+		imageData.TagGroupCreateNewLabeledTag("YTiltRelative");
+		imageData.TagGroupCreateNewLabeledTag("XShift");
+		imageData.TagGroupCreateNewLabeledTag("YShift");
 		imageData.TagGroupCreateNewLabeledTag("DSpacingAng");
 		imageData.TagGroupCreateNewLabeledTag("ShadowValue");
 		imageData.TagGroupCreateNewLabeledTag("ShadowDistance");
@@ -2762,12 +2790,12 @@ class ImageSetTools
 		imageData.TagGroupCreateNewLabeledTag("ImageMode");
 		imageData.TagGroupCreateNewLabeledTag("ImageType"); // Options are DP, DF, BF, Bin
 		imageData.TagGroupCreateNewLabeledTag("ExposureTime");
-		imageData.TagGroupCreateNewLabeledTag("xTiltValue");
-		imageData.TagGroupCreateNewLabeledTag("yTiltValue");
-		imageData.TagGroupCreateNewLabeledTag("xTiltRelative");
-		imageData.TagGroupCreateNewLabeledTag("yTiltRelative");
-		imageData.TagGroupCreateNewLabeledTag("xShift");
-		imageData.TagGroupCreateNewLabeledTag("yShift");
+		imageData.TagGroupCreateNewLabeledTag("XTiltValue");
+		imageData.TagGroupCreateNewLabeledTag("YTiltValue");
+		imageData.TagGroupCreateNewLabeledTag("XTiltRelative");
+		imageData.TagGroupCreateNewLabeledTag("YTiltRelative");
+		imageData.TagGroupCreateNewLabeledTag("XShift");
+		imageData.TagGroupCreateNewLabeledTag("YShift");
 		imageData.TagGroupCreateNewLabeledTag("DSpacingAng");
 		imageData.TagGroupCreateNewLabeledTag("ShadowValue");
 		imageData.TagGroupCreateNewLabeledTag("ShadowDistance");
@@ -2790,12 +2818,12 @@ class ImageSetTools
 		imageTags.TagGroupGetTagAsString("ImageMode", ImageMode);
 		imageTags.TagGroupGetTagAsString("ImageType", ImageType);
 		imageTags.TagGroupGetTagAsNumber("ExposureTime", ExposureTime);
-		imageTags.TagGroupGetTagAsNumber("xTiltValue", xTiltValue);
-		imageTags.TagGroupGetTagAsNumber("yTiltValue", yTiltValue);
-		imageTags.TagGroupGetTagAsNumber("xTiltRelative", xTiltRelative);
-		imageTags.TagGroupGetTagAsNumber("yTiltRelative", yTiltRelative);
-		imageTags.TagGroupGetTagAsNumber("xShift", xShift);
-		imageTags.TagGroupGetTagAsNumber("yShift", yShift);
+		imageTags.TagGroupGetTagAsNumber("XTiltValue", xTiltValue);
+		imageTags.TagGroupGetTagAsNumber("YTiltValue", yTiltValue);
+		imageTags.TagGroupGetTagAsNumber("XTiltRelative", xTiltRelative);
+		imageTags.TagGroupGetTagAsNumber("YTiltRelative", yTiltRelative);
+		imageTags.TagGroupGetTagAsNumber("XShift", xShift);
+		imageTags.TagGroupGetTagAsNumber("YShift", yShift);
 		imageTags.TagGroupGetTagAsNumber("DSpacingAng", DSpacingAng);
 		imageTags.TagGroupGetTagAsNumber("ShadowValue", ShadowValue);
 		imageTags.TagGroupGetTagAsNumber("ShadowDistance", ShadowDistance);
@@ -2804,12 +2832,12 @@ class ImageSetTools
 		imageData.TagGroupSetTagAsString("ImageMode", ImageMode);
 		imageData.TagGroupSetTagAsString("ImageType", ImageType);
 		imageData.TagGroupSetTagAsNumber("ExposureTime", ExposureTime);
-		imageData.TagGroupSetTagAsNumber("xTiltValue", xTiltValue);
-		imageData.TagGroupSetTagAsNumber("yTiltValue", yTiltValue);
-		imageData.TagGroupSetTagAsNumber("xTiltRelative", xTiltRelative);
-		imageData.TagGroupSetTagAsNumber("yTiltRelative", yTiltRelative);
-		imageData.TagGroupSetTagAsNumber("xShift", xShift);
-		imageData.TagGroupSetTagAsNumber("yShift", yShift);
+		imageData.TagGroupSetTagAsNumber("XTiltValue", xTiltValue);
+		imageData.TagGroupSetTagAsNumber("YTiltValue", yTiltValue);
+		imageData.TagGroupSetTagAsNumber("XTiltRelative", xTiltRelative);
+		imageData.TagGroupSetTagAsNumber("YTiltRelative", yTiltRelative);
+		imageData.TagGroupSetTagAsNumber("XShift", xShift);
+		imageData.TagGroupSetTagAsNumber("YShift", yShift);
 		imageData.TagGroupSetTagAsNumber("DSpacingAng", DSpacingAng);
 		imageData.TagGroupSetTagAsNumber("ShadowValue", ShadowValue);
 		imageData.TagGroupSetTagAsNumber("ShadowDistance", ShadowDistance);
@@ -2931,7 +2959,7 @@ class ImageSetTools
 		for(i=0; i < totalImageSets; i++){
 			TagGroup ThisImageSet;
 			if (ImageSets.TagGroupGetIndexedTagAsTagGroup(i, ThisImageSet) == 0){
-				result("\nWhen attempting to create an imageSet ID list there was an error returning Image Set index " + i);
+				result("\nWhen attempting to create an imageSet ID list there was an error returning Image Set with index " + i);
 				return 0;
 			}
 			string ThisImageSetID;
@@ -2956,10 +2984,10 @@ class ImageSetTools
 		string tagPath = "Darkfield360";
 		number doesExist = TagGroupDoesTagExist(persistentTG, tagPath);
 		if(doesExist == 0){
-			if(debugMode==1){result("\nDarkfield image tag group not found.");}
+			if(debugMode==1){result("\nDarkfield 360 image tag group not found.");}
 			return 0;
 		}
-		if(debugMode==1){result("\nDarkfield image tag group found.");}
+		if(debugMode==1){result("\nDarkfield 360 image tag group found.");}
 		return 1;
 	}
 	
@@ -2997,8 +3025,7 @@ class ImageSetTools
 	
 	
 	/* Function to create the persistent image tags to store information. Returns a blank set of tags to be filled.
-		createImageTags( imageSetID, imageSpotID, ImageType, ImageMode,	ringMode, integratedImage, NumberOfIntegrations,\
-		DegreeStep, shadowDistance,	shadowValue, DSpacingAng, xTilt, yTilt, exposureTime )
+
 	*/
 	TagGroup createImageTags(object self){
 		if(debugMode==1){result("\nGenerating an image tag group...");}
@@ -3019,7 +3046,7 @@ class ImageSetTools
 		persistentTG.TagGroupCreateNewLabeledTag("YTiltValue");
 		
 		persistentTG.TagGroupCreateNewLabeledTag("ImageSetID");
-		persistentTG.TagGroupCreateNewLabeledTag("ImageSpotID");
+		persistentTG.TagGroupCreateNewLabeledTag("ImageSpotNumber");
 		persistentTG.TagGroupCreateNewLabeledTag("ImageType");
 		persistentTG.TagGroupCreateNewLabeledTag("ImageMode");
 		
@@ -3573,6 +3600,10 @@ class CameraControl
 		imageSetToolsID = theImageSetToolsID;
 		
 		self.updateEMstatus(); // set the AllowControl variable asap.
+		
+		DFExposure = 30; // # of seconds to expose the camera for taking DarkField images.
+		DPExposure = 1; // # of seconds to expose the camera for taking Diffraction Pattern images.
+		BFExposure = 0.5; // # of seconds to expose the camera for taking BrightField images.
 	}
 
 	void setDebugMode(object self, number input)
@@ -5099,6 +5130,7 @@ class CreateDF360DialogClass : uiframe
 		Will save all images for an image set in a subfolder with the imageset ID
 	*/
 	number saveImageInImageSet(object self, image &theImage){
+		if(debugmode==true){result("\nSaving Image " + theImage.ImageGetID());}
 		TagGroup PersistentTags = theImage.ImageGetTagGroup();
 		string imageSetID
 		PersistentTags.TagGroupGetTagAsString("Darkfield360:ImageSetID", imageSetID)
@@ -5127,19 +5159,22 @@ class CreateDF360DialogClass : uiframe
 		PersistentTags.TagGroupGetTagAsNumber("Darkfield360:ShadowValue", shadowValue);
 		
 		fileName = (ImageType == "BF") ? ("Brightfield_" + constructTimeStamp()) : fileName;
-		fileName = (ImageType == "DF") ? ("Darkfield_" + constructTimeStamp() + "spot_" + ImageSpotNumber) : fileName;
-		fileName = (ImageType == "DP") ? ("Diffraction_" + constructTimeStamp() + "spot_" + ImageSpotNumber) : fileName;
+		fileName = (ImageType == "DF") ? ("Darkfield_" + constructTimeStamp() + "_spot_" + ImageSpotNumber) : fileName;
+		fileName = (ImageType == "DP") ? ("Diffraction_" + constructTimeStamp() + "_spot_" + ImageSpotNumber) : fileName;
 		fileName = (ImageType == "Bin") ? ("Binary_" + constructTimeStamp()) : fileName;
 		
 		shadowName = (shadowValue == 0) ? ("_middle") : shadowName;
-		shadowName = (shadowValue == 1) ? ("_higher") : shadowName;
-		shadowName = (shadowValue == 2) ? ("_lower") : shadowName;
+		shadowName = (shadowValue == 1) ? ("_middle") : shadowName;
+		shadowName = (shadowValue == 2) ? ("_higher") : shadowName;
+		shadowName = (shadowValue == 3) ? ("_lower") : shadowName;
 		
 		fileName = fileName + shadowName;
 		
 		string filePath = PathConcatenate(imageSetDir, fileName);
 		SaveAsGatan(theImage, filePath);
-		if(DoesFileExist(filePath)){
+		
+		if(DoesFileExist(filePath + ".dm4") || DoesFileExist(filePath + ".dm3")){
+			result("\n" + filePath + " saved.")
 			return 1;
 		} else {
 			result("\n\nFinal save check indicates the file " + filePath + " did not save. You'd better check!")
@@ -5230,7 +5265,7 @@ class CreateDF360DialogClass : uiframe
 		component newRingRadiusText;
 		newRingRadiusText=newtextannotation(10,height - 32, textString, 16);
 		newRingRadiusText.componentsetfillmode(2);
-		newRingRadiusText.componentsetdrawingmode(2)			;
+		newRingRadiusText.componentsetdrawingmode(2);
 		newRingRadiusText.componentsetforegroundcolor(1,0,0);
 		newRingRadiusText.componentsetbackgroundcolor(0,0,0);
 		newRingRadiusText.componentsetfontfacename("Microsoft Sans Serif");
@@ -5273,15 +5308,15 @@ class CreateDF360DialogClass : uiframe
 		
 		image viewImage;
 		if(!returnViewImage(debugMode, viewImage)){
-			result("\nNo View Image detected when capturing Live View Window.")
+			result("\nNo View Image detected when capturing Live View Window.");
 			exit(0);
 		}
 		self.drawReticle(viewImage, 1);
 		if(debugMode==1){result("\n\tReticle added to View window.");}
 		
-		imageDisplay frontdisp
+		imageDisplay frontdisp;
 		if(returnViewImageDisplay(debugMode, frontdisp) != true){
-			result("\nNo View Display found.")
+			result("\nNo View Display found.");
 			exit(0);	
 		}
 		
@@ -5291,7 +5326,7 @@ class CreateDF360DialogClass : uiframe
 		
 		number scaleX = ImageGetDimensionScale( viewImage, 0 );
 		dataObject.setOriginalScale(scaleX);
-		string scaleString = ImageGetDimensionUnitString( viewImage, 0 )
+		string scaleString = ImageGetDimensionUnitString( viewImage, 0 );
 		dataObject.setOriginalScaleString(scaleString);
 		if(debugMode==1){result("\n\tThe View window scale was initially set to " + dataObject.getOriginalScale() + " " + dataObject.getOriginalScaleString());}
 		
@@ -5819,12 +5854,20 @@ class CreateDF360DialogClass : uiframe
 		tracker = tracker + 1
 		image1Data.TagGroupSetTagAsString("ImageType", "DP");
 		image1Data.TagGroupSetTagAsNumber("ExposureTime", CameraControlObject.getDPExposure());
-		image1Data.TagGroupSetTagAsNumber("xTiltRelative", xTiltRelative);
-		image1Data.TagGroupSetTagAsNumber("yTiltRelative", yTiltRelative);
-		image1Data.TagGroupSetTagAsNumber("xTiltValue", xTilt);
-		image1Data.TagGroupSetTagAsNumber("yTiltValue", yTilt);
+		image1Data.TagGroupSetTagAsNumber("XTiltRelative", xTiltRelative);
+		image1Data.TagGroupSetTagAsNumber("YTiltRelative", yTiltRelative);
+		image1Data.TagGroupSetTagAsNumber("XTiltValue", xTilt);
+		image1Data.TagGroupSetTagAsNumber("YTiltValue", yTilt);
 		image1Data.TagGroupSetTagAsNumber("ShadowDistance", shadowDistance);
 		image1Data.TagGroupSetTagAsNumber("ShadowValue", 1);
+		number xPixelShift, yPixelShift, NMDistance;
+		dataObject.tiltToPixel(xTiltRelative, yTiltRelative, xPixelShift, yPixelShift, 0, 1);
+		// NMDistance is the D-spacing of the spot in units of 1/NM
+		NMDistance = distance(yPixelShift, xPixelShift) * dataObject.getRefScale();
+		number DSpacingAng = convertInverseNMToAngstrom(NMDistance);
+		image1Data.TagGroupSetTagAsNumber("DSpacingAng", DSpacingAng);
+		image1Data.TagGroupSetTagAsNumber("XShift", xPixelShift);
+		image1Data.TagGroupSetTagAsNumber("YShift", yPixelShift);
 
 		imageSetTools.addImageDataToCurrentSpot(image1Data, "Middle"); // this is the middle image and is added to that tag in the spot taggroup
 
@@ -5834,10 +5877,10 @@ class CreateDF360DialogClass : uiframe
 		{
 			if(debugMode==true){result("\nFinding Shadowing Coordinates.");}
 			//void tiltToPixel(dataObject, number xTilt, number yTilt, number &xPixelShift, number &yPixelShift, number isViewWindow)
-			number xPixelShift, yPixelShift, NMDistance;
 			dataObject.tiltToPixel(xTiltRelative, yTiltRelative, xPixelShift, yPixelShift, 0, 1);
 			if(debugMode==true){result("\n\tTilt -> Pixel Shift = (" + xTiltRelative + ", " + yTiltRelative\
 					+ ") -> (" + xPixelShift + ", " + yPixelShift + ")px");}
+			// NMDistance is the D-spacing of the spot in units of 1/NM
 			NMDistance = distance(yPixelShift, xPixelShift) * dataObject.getRefScale();
 			number shadowMultiplier = shadowDistance / NMDistance;
 			if(shadowMultiplier.isNaN()){ // checks to see if the shadow multiplier is a real number
@@ -5864,12 +5907,15 @@ class CreateDF360DialogClass : uiframe
 			tracker = tracker + 1
 			image2Data.TagGroupSetTagAsString("ImageType", "DP");
 			image2Data.TagGroupSetTagAsNumber("ExposureTime", DPExposure);
-			image2Data.TagGroupSetTagAsNumber("xTiltRelative", xTiltRelative);
-			image2Data.TagGroupSetTagAsNumber("yTiltRelative", yTiltRelative);
-			image2Data.TagGroupSetTagAsNumber("xTiltValue", xTilt);
-			image2Data.TagGroupSetTagAsNumber("yTiltValue", yTilt);
+			image2Data.TagGroupSetTagAsNumber("XTiltRelative", xTiltRelative);
+			image2Data.TagGroupSetTagAsNumber("YTiltRelative", yTiltRelative);
+			image2Data.TagGroupSetTagAsNumber("XTiltValue", xTilt);
+			image2Data.TagGroupSetTagAsNumber("YTiltValue", yTilt);
 			image2Data.TagGroupSetTagAsNumber("ShadowDistance", shadowDistance);
 			image2Data.TagGroupSetTagAsNumber("ShadowValue", 2);
+			image2Data.TagGroupSetTagAsNumber("DSpacingAng", DSpacingAng);
+			image2Data.TagGroupSetTagAsNumber("XShift", xPixelShift);
+			image2Data.TagGroupSetTagAsNumber("YShift", yPixelShift);
 			imageSetTools.addImageDataToCurrentSpot(image2Data, "Higher");
 						
 			// Second shadowing point
@@ -5885,12 +5931,15 @@ class CreateDF360DialogClass : uiframe
 			tracker = tracker + 1;
 			image3Data.TagGroupSetTagAsString("ImageType", "DP");
 			image3Data.TagGroupSetTagAsNumber("ExposureTime", CameraControlObject.getDPExposure());
-			image3Data.TagGroupSetTagAsNumber("xTiltRelative", xTiltRelative);
-			image3Data.TagGroupSetTagAsNumber("yTiltRelative", yTiltRelative);
-			image3Data.TagGroupSetTagAsNumber("xTiltValue", xTilt);
-			image3Data.TagGroupSetTagAsNumber("yTiltValue", yTilt);
+			image3Data.TagGroupSetTagAsNumber("XTiltRelative", xTiltRelative);
+			image3Data.TagGroupSetTagAsNumber("YTiltRelative", yTiltRelative);
+			image3Data.TagGroupSetTagAsNumber("XTiltValue", xTilt);
+			image3Data.TagGroupSetTagAsNumber("YTiltValue", yTilt);
 			image3Data.TagGroupSetTagAsNumber("ShadowDistance", shadowDistance);
 			image3Data.TagGroupSetTagAsNumber("ShadowValue", 3);
+			image3Data.TagGroupSetTagAsNumber("DSpacingAng", DSpacingAng);
+			image3Data.TagGroupSetTagAsNumber("XShift", xPixelShift);
+			image3Data.TagGroupSetTagAsNumber("YShift", yPixelShift);
 			imageSetTools.addImageDataToCurrentSpot(image3Data, "Lower");
 
 			// All shadow coordinates are now stored
@@ -5900,9 +5949,9 @@ class CreateDF360DialogClass : uiframe
 	}
 	
 	
-	/* Will take a number of images of the DP moved to values in the list of stored points.
-		This is to test the tilt calibration and alignment.
-	 */
+	// Will take a number of images of the DP moved to values in the list of stored points.
+		//This is to test the tilt calibration and alignment.
+	 
 	void takeTestDPImages (object self, number tracker, image dataArray, number DPExposure, number cameraWidth, number cameraHeight, number xTiltCenter, number yTiltCenter){
 		number alignmentDPToTake = 6;
 		getnumber("How many points should be checked?", alignmentDPToTake, alignmentDPToTake);
@@ -5964,8 +6013,8 @@ class CreateDF360DialogClass : uiframe
 		number xTiltTarget, yTiltTarget, relativeXTilt, relativeYTilt;
 		
 		// Read relative xTilt and yTilt from array
-		DPImageTags.TagGroupGetTagAsNumber("xTiltRealtive", relativeXTilt);
-		DPImageTags.TagGroupGetTagAsNumber("yTiltRealtive", relativeYTilt);
+		DPImageTags.TagGroupGetTagAsNumber("XTiltRelative", relativeXTilt);
+		DPImageTags.TagGroupGetTagAsNumber("YTiltRelative", relativeYTilt);
 		
 		xTiltTarget = dataObject.getCentreXTilt() + relativeXTilt;
 		yTiltTarget = dataObject.getCentreYTilt() + relativeYTilt;
@@ -6007,10 +6056,10 @@ class CreateDF360DialogClass : uiframe
 		// ImageTags.TagGroupSetTagAsNumber("ImageID"); // Unique imageID number
 		ImageTags.TagGroupSetTagAsString("ImageType", "DF");
 		ImageTags.TagGroupSetTagAsNumber("ExposureTime", Exposure);
-		ImageTags.TagGroupSetTagAsNumber("xTiltRelative", relativeXTilt);
-		ImageTags.TagGroupSetTagAsNumber("yTiltRelative", relativeYTilt);		
-		ImageTags.TagGroupSetTagAsNumber("xTiltValue", xTiltTarget);
-		ImageTags.TagGroupSetTagAsNumber("yTiltValue", yTiltTarget);		
+		ImageTags.TagGroupSetTagAsNumber("XTiltRelative", relativeXTilt);
+		ImageTags.TagGroupSetTagAsNumber("YTiltRelative", relativeYTilt);		
+		ImageTags.TagGroupSetTagAsNumber("XTiltValue", xTiltTarget);
+		ImageTags.TagGroupSetTagAsNumber("YTiltValue", yTiltTarget);		
 		ImageTags.TagGroupSetTagAsNumber("ShadowValue", shadowValue);
 		ImageTags.TagGroupSetTagAsNumber("ShadowDistance", shadowDistance);
 		ImageTags.TagGroupSetTagAsNumber("DSpacingAng", DSpacingAng);
@@ -6034,23 +6083,32 @@ class CreateDF360DialogClass : uiframe
 	
 	image takeDPImage(object self, TagGroup imageSet, number spotID, string imageLabel, TagGroup &persistentImageTags)
 	{
-		TagGroup DPImageTags;
+		if(debugMode==true){result("\n takeDPImage function started...");}
+		TagGroup DPImageTags, SpotData, targetSpotData;
 		string ImageSetID;
-		imageSet.TagGroupGetTagAsString("ImageSetID", ImageSetID)
+		{result("\n\t recalling ImageSetID");}
+		imageSet.TagGroupGetTagAsString("ImageSetID", ImageSetID);
 		// arguments: (TagGroup tagGroup, String tagPath, TagGroup subGroup )
-		string tagPath = "Spots:" + spotID + ":" + imageLabel;
-		imageSet.TagGroupGetTagAsTagGroup(tagPath, DPImageTags); // Loads the DP image information into this variable for reference.
+		{result("\n\t generating spot tag group address");}
+		string tagPath = "Spots";
+		{result("\n\t Loading all spot information into tag group");}
+		imageSet.TagGroupGetTagAsTagGroup(tagPath, SpotData);
+		{result("\n\t Loading Spot " + SpotID);}
+		SpotData.TagGroupGetIndexedTagAsTagGroup(SpotID, targetSpotData);
+		{result("\n\t Loading Middle/Higher/Lower DP setting");}
+		targetSpotData.TagGroupGetTagAsTagGroup(imageLabel, DPImageTags); // Loads the DP image information into this variable for reference.
 	
 		number xTiltTarget, yTiltTarget, relativeXTilt, relativeYTilt;
 		
-		// Read relative xTilt and yTilt from array
-		DPImageTags.TagGroupGetTagAsNumber("xTiltRealtive", relativeXTilt);
-		DPImageTags.TagGroupGetTagAsNumber("yTiltRealtive", relativeYTilt);
+		// Read relative xTilt and yTilt from Tag group
+		DPImageTags.TagGroupGetTagAsNumber("XTiltRelative", relativeXTilt);
+		DPImageTags.TagGroupGetTagAsNumber("YTiltRelative", relativeYTilt);
 		
 		xTiltTarget = dataObject.getCentreXTilt() + relativeXTilt;
 		yTiltTarget = dataObject.getCentreYTilt() + relativeYTilt;
 		
 		// Move the beam tilt to this value.
+		{result("\n\t moving beam tilt to spot");}
 		moveBeamTilt(xTiltTarget,yTiltTarget);
 		string opticsMode = EMGetImagingOpticsMode();
 		// Switch to Diffraction mode manually if it is not in that mode.
@@ -6079,6 +6137,7 @@ class CreateDF360DialogClass : uiframe
 		number Exposure = CameraControlObject.getDPExposure();
 		number cameraWidth = CameraControlObject.getCameraWidth();
 		number cameraHeight = CameraControlObject.getCameraHeight();
+		{result("\n\t taking image of DP.");}
 		image DPImage;
 		DPImage := sscUnprocessedAcquire(Exposure,0,0,cameraWidth,cameraHeight);
 		
@@ -6087,9 +6146,9 @@ class CreateDF360DialogClass : uiframe
 
 		// Retrive image values
 		number shadowValue, shadowDistance, DSpacingAng;
-		ImageSet.TagGroupGetTagAsNumber("ShadowValue", shadowValue);
-		ImageSet.TagGroupGetTagAsNumber("shadowDistance", shadowDistance);
-		ImageSet.TagGroupGetTagAsNumber("DSpacingAng", DSpacingAng);
+		DPImageTags.TagGroupGetTagAsNumber("ShadowValue", ShadowValue);
+		DPImageTags.TagGroupGetTagAsNumber("ShadowDistance", ShadowDistance);
+		DPImageTags.TagGroupGetTagAsNumber("DSpacingAng", DSpacingAng);
 		// retrive calibration values
 		number xTiltx, xTilty, yTiltx, yTilty;
 		imageSet.TagGroupGetTagAsNumber("TiltCalibration:xTiltx", xTiltx);
@@ -6106,14 +6165,14 @@ class CreateDF360DialogClass : uiframe
 		// Write values to tag group.
 		ImageTags.TagGroupSetTagAsString("ImageType", "DP");
 		ImageTags.TagGroupSetTagAsString("ImageSetID", ImageSetID);
-		ImageTags.TagGroupSetTagAsNumber("ImageSpotID", spotID);
+		ImageTags.TagGroupSetTagAsNumber("ImageSpotNumber", spotID);
 		ImageTags.TagGroupSetTagAsString("ImageMode", opticsMode);
 		ImageTags.TagGroupSetTagAsString("CameraLength", dataObject.getCameraLength());
 		ImageTags.TagGroupSetTagAsNumber("ExposureTime", Exposure);
-		ImageTags.TagGroupSetTagAsNumber("xTiltRelative", relativeXTilt);
-		ImageTags.TagGroupSetTagAsNumber("yTiltRelative", relativeYTilt);		
-		ImageTags.TagGroupSetTagAsNumber("xTiltValue", xTiltTarget);
-		ImageTags.TagGroupSetTagAsNumber("yTiltValue", yTiltTarget);		
+		ImageTags.TagGroupSetTagAsNumber("XTiltRelative", relativeXTilt);
+		ImageTags.TagGroupSetTagAsNumber("YTiltRelative", relativeYTilt);		
+		ImageTags.TagGroupSetTagAsNumber("XTiltValue", xTiltTarget);
+		ImageTags.TagGroupSetTagAsNumber("YTiltValue", yTiltTarget);		
 		ImageTags.TagGroupSetTagAsNumber("ShadowValue", shadowValue);
 		ImageTags.TagGroupSetTagAsNumber("ShadowDistance", shadowDistance);
 		ImageTags.TagGroupSetTagAsNumber("DSpacingAng", DSpacingAng);
@@ -6126,11 +6185,14 @@ class CreateDF360DialogClass : uiframe
 		ImageTags.TagGroupSetTagAsNumber("NumberOfIntegrations", NumberOfIntegrations);
 		ImageTags.TagGroupSetTagAsNumber("DegreeStep", DegreeStep);
 		
+		{result("\n\t attaching Darkfield360 tags to image's persistent tags");}
 		// attach these tags to the image's Persistent Tag group
 		TagGroup persistentTG = DPImage.ImageGetTagGroup();
 		persistentTG.TagGroupAddLabeledTagGroup("Darkfield360", ImageTags)
 		// Return a copy of the tags for outside functions. Making a copy makes sure they will not be accidentally changed later.
+		{result("\n\t making copy of image tags.");}
 		persistentImageTags = ImageTags.TagGroupClone();
+		{result("\n returning DPImage. End of function.");}
 		return DPImage;
 	}
 
@@ -6220,55 +6282,71 @@ class CreateDF360DialogClass : uiframe
 			
 		number i;
 		for(i=0; i < NumberOfSpots; i++){
+			if(debugMode==true){result("\n\t Recording spot " + i + " (Middle)...");}
 			TagGroup newDFImageData
 			image DPImage := self.takeDPImage( targetImageSet, i, "Middle", newDFImageData)
+			if(debugMode==true){result("\n\t Exposure done.");}
 			image DPImageLower, DPImageHigher;
 			// Update the DF Images group.
+			if(debugMode==true){result("\n\t Creating Spot in ImageSet:Images ...");}
 			TagGroup NewSpotSet = ImageSetTools.addImageToCurrentImageSet(); // creates a new set of 'spots' in the imageset:Images indexed taggroup
+			if(debugMode==true){result(" done.");}
+			
+			if(debugMode==true){result("\n\t Creating image settings for ImageSet:Images[spot index]:Middle ...");}
 			TagGroup NewMiddleDF = ImageSetTools.createNewImageForImageSet(newDFImageData); // Uses loaded version of createNewImageForImageSet function to fill in a lot of the values before hand.
+			NewMiddleDF.TagGroupSetTagAsString("ImageType", "DF");
+			NewMiddleDF.TagGroupSetTagAsNumber("ExposureTime", CameraControlObject.getDFExposure());
+			if(debugMode==true){result(" done.");}
 			
+			if(debugMode==true){result("\n\t Adding image settings to ImageSet:Images[spot index]:Middle ...");}
 			// add the tag group to the new 'image' spot set
-			NewSpotSet.TagGroupAddLabeledTagGroup("Middle", NewMiddleDF);
+			NewSpotSet.TagGroupSetTagAsTagGroup("Middle", NewMiddleDF);
+			if(debugMode==true){result(" done.");}
 			
-			if(ShadowMode == true){
+			if(ShadowMode == true && (i > 0) ){
+				if(debugMode==true){result("\n\t Shadowing spot " + i + " (Higher)...");}
 				TagGroup higherImageData;
 				DPImageHigher := self.takeDPImage( targetImageSet, i, "Higher", higherImageData);
 				TagGroup NewHigherDF = ImageSetTools.createNewImageForImageSet(higherImageData);
-
+				NewHigherDF.TagGroupSetTagAsString("ImageType", "DF");
+				NewHigherDF.TagGroupSetTagAsNumber("ExposureTime", CameraControlObject.getDFExposure());
 				// add the tag group to the new 'image' spot set
-				NewSpotSet.TagGroupAddLabeledTagGroup("Higher", NewHigherDF);
+				NewSpotSet.TagGroupSetTagAsTagGroup("Higher", NewHigherDF);
 				
+				if(debugMode==true){result("\n\t Shadowing spot " + i + " (Lower)...");}
 				TagGroup lowerImageData;
 				DPImageLower := self.takeDPImage( targetImageSet, i, "Lower", lowerImageData);
 				TagGroup NewLowerDF = ImageSetTools.createNewImageForImageSet(lowerImageData);
-
+				NewLowerDF.TagGroupSetTagAsString("ImageType", "DF");
+				NewLowerDF.TagGroupSetTagAsNumber("ExposureTime", CameraControlObject.getDFExposure());
 				// add the tag group to the new 'image' spot set
-				NewSpotSet.TagGroupAddLabeledTagGroup("Lower", NewLowerDF);			
+				NewSpotSet.TagGroupSetTagAsTagGroup("Lower", NewLowerDF);			
 			
 			}
 			
+			if(debugMode==true){result("\n\t Images taken.");}
 			if(AutoDisplayImages == true){
+				if(debugMode==true){result("\n\t Displaying images.");}
 				showImage(DPImage);
-				if(ShadowMode == true){
+				if(ShadowMode == true && (i > 0)){
 					showImage(DPImageHigher);
 					showImage(DPImageLower);
 				}
 			}
 			
-			if(AutoSaveImages == true){
+			if(AutoSaveImages == true ){
+				if(debugMode==true){result("\n\t Saving images.");}
 				self.saveImageInImageSet(DPImage);
-				if(ShadowMode == true){
+				if(ShadowMode == true && (i > 0)){
 					self.saveImageInImageSet(DPImageHigher);
 					self.saveImageInImageSet(DPImageLower);
 				}
 			}
 			
 		} // End of loop
+		if(debugMode==true){result("\n\t All spots imaged. Setting DPsTaken flag. to 1");}
 		// update the image set to show that DP were taken.
 		targetImageSet.TagGroupSetTagAsNumber("DPsTaken", 1);
-		
-	
-	
 	}
 	
 	/* Function to generate the file name for a darkfield image and update the DFList taggroup*/
@@ -6418,10 +6496,10 @@ class CreateDF360DialogClass : uiframe
 		}
 		BFImageTags.TagGroupSetTagAsString("ImageType", "BF");
 		BFImageTags.TagGroupSetTagAsNumber("ExposureTime", BFExposure);
-		BFImageTags.TagGroupSetTagAsNumber("xTiltRelative", 0);
-		BFImageTags.TagGroupSetTagAsNumber("yTiltRelative", 0);		
-		BFImageTags.TagGroupSetTagAsNumber("xTiltValue", xTiltCenter);
-		BFImageTags.TagGroupSetTagAsNumber("yTiltValue", yTiltCenter);
+		BFImageTags.TagGroupSetTagAsNumber("XTiltRelative", 0);
+		BFImageTags.TagGroupSetTagAsNumber("YTiltRelative", 0);		
+		BFImageTags.TagGroupSetTagAsNumber("XTiltValue", xTiltCenter);
+		BFImageTags.TagGroupSetTagAsNumber("YTiltValue", yTiltCenter);
 		BFImageTags.TagGroupSetTagAsNumber("ShadowValue", 1);
 		BFImageTags.TagGroupSetTagAsNumber("ShadowDistance", 0);
 		BFImageTags.TagGroupSetTagAsNumber("DSpacingAng", 0);
@@ -6585,10 +6663,10 @@ class CreateDF360DialogClass : uiframe
 		}
 		EndBFImageTags.TagGroupSetTagAsString("ImageType", "BF");
 		EndBFImageTags.TagGroupSetTagAsNumber("ExposureTime", BFExposure);
-		EndBFImageTags.TagGroupSetTagAsNumber("xTiltRelative", 0);
-		EndBFImageTags.TagGroupSetTagAsNumber("yTiltRelative", 0);		
-		EndBFImageTags.TagGroupSetTagAsNumber("xTiltValue", xTiltCenter);
-		EndBFImageTags.TagGroupSetTagAsNumber("yTiltValue", yTiltCenter);
+		EndBFImageTags.TagGroupSetTagAsNumber("XTiltRelative", 0);
+		EndBFImageTags.TagGroupSetTagAsNumber("YTiltRelative", 0);		
+		EndBFImageTags.TagGroupSetTagAsNumber("XTiltValue", xTiltCenter);
+		EndBFImageTags.TagGroupSetTagAsNumber("YTiltValue", yTiltCenter);
 		EndBFImageTags.TagGroupSetTagAsNumber("ShadowValue", 1);
 		EndBFImageTags.TagGroupSetTagAsNumber("ShadowDistance", 0);
 		EndBFImageTags.TagGroupSetTagAsNumber("DSpacingAng", 0);
@@ -6912,10 +6990,10 @@ class CreateDF360DialogClass : uiframe
 			TagGroup thisImage = ImageSetTools.createNewImageForImageSet();
 			thisImage.TagGroupSetTagAsString("ImageType", "DP");
 			thisImage.TagGroupSetTagAsNumber("ExposureTime", DPExposure);
-			thisImage.TagGroupSetTagAsNumber("xTiltRelative", xTiltRelative);
-			thisImage.TagGroupSetTagAsNumber("yTiltRelative", xTiltRelative);		
-			thisImage.TagGroupSetTagAsNumber("xTiltValue", tiltX);
-			thisImage.TagGroupSetTagAsNumber("yTiltValue", tiltY);
+			thisImage.TagGroupSetTagAsNumber("XTiltRelative", xTiltRelative);
+			thisImage.TagGroupSetTagAsNumber("YTiltRelative", yTiltRelative);		
+			thisImage.TagGroupSetTagAsNumber("XTiltValue", tiltX);
+			thisImage.TagGroupSetTagAsNumber("YTiltValue", tiltY);
 			thisImage.TagGroupSetTagAsNumber("ShadowValue", 1);
 			thisImage.TagGroupSetTagAsNumber("ShadowDistance", shadowDistanceNM);
 			thisImage.TagGroupSetTagAsNumber("DSpacingAng", dataObject.convertPixelDistanceToNM(radiusPX, 0, binning));
@@ -6963,11 +7041,11 @@ class CreateDF360DialogClass : uiframe
 			// Load coordinates 
 			TagGroup thisDP
 			spots.TagGroupGetIndexedTagAsTagGroup(j, thisDP);
-			number xTiltRealtive, yTiltRealtive;
-			thisDP.TagGroupGetTagAsNumber("xTiltRelative", xTiltRealtive);
-			thisDP.TagGroupGetTagAsNumber("yTiltRelative", yTiltRealtive);
+			number XTiltRelative, YTiltRelative;
+			thisDP.TagGroupGetTagAsNumber("XTiltRelative", XTiltRelative);
+			thisDP.TagGroupGetTagAsNumber("YTiltRelative", YTiltRelative);
 			// Move there
-			moveBeamTilt( xTiltRealtive + beamCentreX, yTiltRealtive + beamCentreY );
+			moveBeamTilt( XTiltRelative + beamCentreX, YTiltRelative + beamCentreY );
 			// Take image
 			image DPImage := sscUnprocessedAcquire(DPExposure,0,0,cameraWidth,cameraHeight);
 			string angleName = " ";
@@ -7308,10 +7386,10 @@ class CreateDF360DialogClass : uiframe
 		TagGroup CentralImage = imageSetTools.createNewImageForImageSet();
 		CentralImage.TagGroupSetTagAsString("ImageType", "DP");
 		CentralImage.TagGroupSetTagAsNumber("ExposureTime", CameraControlObject.getDPExposure());
-		CentralImage.TagGroupSetTagAsNumber("xTiltRelative", 0);
-		CentralImage.TagGroupSetTagAsNumber("yTiltRelative", 0);
-		CentralImage.TagGroupSetTagAsNumber("xTiltValue", dataObject.getCentreXTilt());
-		CentralImage.TagGroupSetTagAsNumber("yTiltValue", dataObject.getCentreYTilt());
+		CentralImage.TagGroupSetTagAsNumber("XTiltRelative", 0);
+		CentralImage.TagGroupSetTagAsNumber("YTiltRelative", 0);
+		CentralImage.TagGroupSetTagAsNumber("XTiltValue", dataObject.getCentreXTilt());
+		CentralImage.TagGroupSetTagAsNumber("YTiltValue", dataObject.getCentreYTilt());
 		CentralImage.TagGroupSetTagAsNumber("ShadowValue", 0);
 		CentralImage.TagGroupSetTagAsNumber("DSpacingAng", 0);
 		
@@ -8005,7 +8083,7 @@ object startToolkit () {
 	result("\nSetting Variables.")
 	// Set Variables
 	dataObject.setMaxDeviation(0.2); // difference (in 1/nm) allowed during pattern matching operations
-	image dataArray; // Array of values that are stored for future reference.
+	//image dataArray; // Array of values that are stored for future reference.
 	
 	result("\nLoading Image Set Tools...")
 	object theImageSetTools = alloc(ImageSetTools);

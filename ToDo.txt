@@ -8,11 +8,14 @@ Tag group save methods
 	
 Put image acquisition in its own thread that can be stopped.
 
-Bug Fixes
+Bugs
 ---------
-D-Spacing tag record is always 0
 ImageProcessing processDarkFieldImages() uses camera size, not image sizes.
 StartDPStoring / calibration does not update any current image sets yet
+
+ImageSetName is being stored in image sets, but the variable is just SetName.
+pixelToTilt function always gives a -ve/+ve tilt change? Y is certainly affected.
+Storing ROI does not set ShiftX and ShiftY values, which would be useful.
 
 Desired Features
 ----------------

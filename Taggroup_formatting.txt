@@ -83,15 +83,15 @@ ImageSets
 					ImageMode:<value reported by scope>
 					ImageType:<value recorded by toolkit> // Options are DP, DF, BF, Bin
 					ExposureTime: <value>
-					xTiltValue: <value>
-					yTiltValue: <value>
-					xTiltRealtive: <value>
-					yTiltRelative: <value>
+					XTiltValue: <value>
+					YTiltValue: <value>
+					XTiltRealtive: <value>
+					YTiltRelative: <value>
 					DSpacingAng: <value in Angstroms>
 					ShadowValue: <1/2/3> (0=no shadowing, 1= middle, 2= higher or low, 3= lower or high)
 					ShadowDistance: <0/value in (1/nm)>
-					xShift: <value of shift in pixels>
-					yShift: <value of shift in pixels>
+					XShift: <value of shift in pixels>
+					YShift: <value of shift in pixels>
 		Images (darkfield images)
 			[0] (spot numbers) 0 = BF image.
 			[1] 
@@ -108,13 +108,15 @@ ImageSets
 				ImageMode:<value reported by scope>
 				ImageType:<value recorded by toolkit> // Options are DP, DF, BF, Bin
 				ExposureTime: <value>
-				xTiltValue: <value>
-				yTiltValue: <value>
-				xTiltRealtive: <value>
-				yTiltRelative: <value>
+				XTiltValue: <value>
+				YTiltValue: <value>
+				XTiltRealtive: <value>
+				YTiltRelative: <value>
 				DSpacingAng: <value in Angstroms>
 				ShadowValue: <1/2/3> (0=no shadowing, 1= middle, 2= higher or low, 3= lower or high)
-				ShadowDistance: <0/value in (1/nm)>	
+				ShadowDistance: <0/value in (1/nm)>
+				XShift: <value of shift in pixels>
+				YShift: <value of shift in pixels>
 			
 Image Tags
 ----------
@@ -136,10 +138,14 @@ Darkfield360
 	DegreeStep: 0/value // if ring mode is used each 'step' is a certain number of degrees apart.
 	
 	ShadowDistance: 0/value
-	ShadowValue: 0/1/2 // If shadowing is happening then 1 = higher D-spacing, 2 = lower D-spacing
+	ShadowValue: 0/1/2/3 // 0 = middle no shadowing. If shadowing is happening then 1 = middle, 2 = higher D-spacing, 3 = lower D-spacing
 
-	xTiltValue: <value>
-	yTiltValue: <value>
+	XTiltValue: <value>
+	YTiltValue: <value>
+	XTiltRelative: <value>
+	YTiltRelative: <value>
+	XShift: <value of shift in pixels>
+	YShift: <value of shift in pixels>
 	TiltCalibration
 		xTiltx: <conversion factor> // number of x pixels moved per 1 unit of xTilt
 		xTilty: <conversion factor> // number of y pixels moved per 1 unit of xTilt
