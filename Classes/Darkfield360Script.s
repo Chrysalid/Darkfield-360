@@ -1887,10 +1887,7 @@ class MyDataObject
 	{
 	
 	/* --------
-			This maths is providing endless problems. At the moment it is the y-tilt that seems to be off.
-			In the test-bed system I will only ever get a +ve yTilt value regardless of the y-shift in pixels.
-			
-			A lot of the confusion is that pixel axis have their origin in the top left corner, not bottom left as in natural axis.
+			A lot of confusion is that pixel axis have their origin in the top left corner, not bottom left as in natural axis.
 			Converting between is:
 				X(natural) = X(pixel)
 				Y(natural) = Y(max) - Y(pixel)
@@ -1903,7 +1900,7 @@ class MyDataObject
 				xTx = 1000, xTy = 0 because +1 xTilt moves the pattern to the right.
 				yTx = 0, yTy = 1000 because +1 yTilt moves the pattern upwards, which is +ve for natural space.
 				
-			Let's try using the natural coordinates for a change. Maybe it will be more clear.
+			The function converts from the pixel coordinates of a given point to the tilt values required to bring that point to teh centre of the screen.
 		
 	 -------- */
 	
@@ -1944,7 +1941,7 @@ class MyDataObject
 		alpha = atan2(xTy, xTx);
 		
 		// This finds the vectors to make up the new Tilt coordinates, and therefore do not have SCALING, which must be done afterwards.
-		// Currently struggling to produce -ve NewY values.
+		// These formula are standard for converting between rotated coordinate systems for natural axis (origin in bottom left, +ve x and +ve y)
 		newX = xPixelChange * cos(alpha) + yPixelChange * sin(alpha);
 		newY = - xPixelChange * sin(alpha) + yPixelChange * cos(alpha);
 		
@@ -2597,7 +2594,7 @@ class ImageSetTools
 		imageSetData.TagGroupCreateNewLabeledTag("ImageSetID");
 		imageSetData.TagGroupSetTagAsString("ImageSetID", imageSetID);
 		
-		imageSetData.TagGroupCreateNewLabeledTag("ImageSetName") // A name for the image set provided by the user
+		imageSetData.TagGroupCreateNewLabeledTag("SetName") // A name for the image set provided by the user
 		imageSetData.TagGroupCreateNewLabeledTag("CreationTime") //<time in milliseconds image set tag was created>
 		imageSetData.TagGroupCreateNewLabeledTag("ImagesTaken") // 0/1; // if the image set has been taken (1) or if it is waiting to be taken.
 		imageSetData.TagGroupCreateNewLabeledTag("DPsTaken"); // 0/1; // if the diffraction patterns for each point have been taken.
@@ -6349,67 +6346,6 @@ class CreateDF360DialogClass : uiframe
 		targetImageSet.TagGroupSetTagAsNumber("DPsTaken", 1);
 	}
 	
-	/* Function to generate the file name for a darkfield image and update the DFList taggroup*/
-	string generateDFFileName (object self, number im, number imageID, image dataArray, TagGroup DFList, number shadowing, number debugMode) {
-		number spotID = getpixel(dataArray, im, 0);
-		if(debugMode){result("\nGenerating File name " + im);}
-		string longSpotID;
-		string filename;
-		if(im == 0){ // The first 0000 image is always the bright field image
-			fileName = "BrightField_" + constructTimeStamp();
-			DFList.TagGroupSetTagAsNumber( "BaseImage" , imageID );
-			return filename;
-		}
-		if(shadowing == 0){ // Normal way of naming files. Sequential.
-			if(debugMode){result("\n\tShadowing is OFF");}
-			longSpotID = PadWithZeroes(SpotID, 4);
-			fileName = "DarkField_" + longSpotID + "_" + constructTimeStamp();
-			// Update the DFList
-			string tagPath = "Spot" + longSpotID
-			DFList.TagGroupSetTagAsNumber( (tagPath + ":MIDDLE") , imageID )
-			return filename;
-		}
-		else
-		{
-			 // Shadowing has been selected, so the files will be named after their 'group' and if they are higher or lower.
-			if(debugMode==1){result("\nShadowing is ON");}
-			number pointNumber, rem;
-			pointNumber = floor((im-1) / 3) + 1;
-			if(debugMode==1){result("\nPoint Number is " + pointNumber);}
-			longSpotID = PadWithZeroes(pointNumber, 4);
-			if(debugMode==1){result("\nlongSpotID with 0s: " + longSpotID);}
-			
-			string tagPath = "Spot" + longSpotID;
-			if(!TagGroupDoesTagExist( DFList, tagPath )){
-				TagGroup SpotGroup = NewTagGroup(); // the tagGroup that will hold this data and then be attached to the DFList.
-				TagGroupCreateNewLabeledTag( SpotGroup, "LOWER" ); // Creates the tag for LOWER data
-				TagGroupCreateNewLabeledTag( SpotGroup, "HIGHER" ); // Creates the tag for HIGHER data
-				TagGroupCreateNewLabeledTag( SpotGroup, "MIDDLE" ); // Creates the tag for MIDDLE data
-				TagGroupAddLabeledTagGroup( DFList, tagPath, SpotGroup );
-			}
-			
-			rem = remainder(im, 3); // 1 for central peak, -1 for higher, 0 for low
-			if(debugMode==1){result("\nim is " + im);result("\nRemainder is " + rem);}
-			if(rem==(-1)){
-				longSpotID = longSpotID + "_HIGHER";
-				DFList.TagGroupSetTagAsNumber( (tagPath + ":HIGHER") , imageID ); // sets the ImageID within the HIGHER/LOWER tag
-			}
-			else if(rem==0)
-			{
-				longSpotID = longSpotID + "_LOWER";
-				DFList.TagGroupSetTagAsNumber( (tagPath + ":LOWER") , imageID ); // sets the ImageID within the HIGHER/LOWER tag
-			} else 
-			{
-				DFList.TagGroupSetTagAsNumber( (tagPath + ":MIDDLE") , imageID ); // sets the ImageID within the MIDDLE tag
-			}
-			fileName = "DarkField_" + longSpotID + "_" + constructTimeStamp();
-			return filename;
-		}
-		result("\n\ngenerateDFFileName has developed a fault")
-		filename = "file " + im;
-		return filename;	
-	}
-
 	/* Function will use the stored Tilt values to take darkfield images. 1st Image (0000) will be Bright Field of site.
 		ImageSet = the image set tag group
 		saveNonIntegrated = 0/1 for if non-integrated images should be saved as well as teh integrated images. Will take a lot more disk space.

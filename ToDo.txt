@@ -1,6 +1,12 @@
 Required Features
 -----------------
 Update image gathering functions to update imageSet values and image tags
+Update darkFieldImage to use ImageSet values for things.
+Update loadRingPoints to use image sets properly
+Update imageRingDP to write persistant image tags and use TakeDPImage function.
+Update DarkFieldImageButtonPress to work with image sets at all.
+
+
 
 Tag group save methods
 	- Save image information for processing
@@ -8,14 +14,15 @@ Tag group save methods
 	
 Put image acquisition in its own thread that can be stopped.
 
+Make 'reticle' component objects identifiable so that cleaning the reticle from an image does not affect other components.
+	~CreateDF360DialogClass also has this problem.
+Update moveToCurrentROI to something more useful.
+
 Bugs
 ---------
 ImageProcessing processDarkFieldImages() uses camera size, not image sizes.
 StartDPStoring / calibration does not update any current image sets yet
 
-ImageSetName is being stored in image sets, but the variable is just SetName.
-pixelToTilt function always gives a -ve/+ve tilt change? Y is certainly affected.
-Storing ROI does not set ShiftX and ShiftY values, which would be useful.
 
 Desired Features
 ----------------
@@ -30,7 +37,7 @@ Save the central DP and highlight + label the target coordinates in an image set
 
 Currently
 ----------
-Just seperated the tilt calculation part and the DP imaging parts.
-	Need to make function to "finalize" the image set by taking DP images.
-		This will be started with a button press in the DF360Dialog object
-		Will need to update existing image set tag group with imageIDs and data.
+Making Finalize Images function work with
+	Ring mode
+	Integrated images
+	
