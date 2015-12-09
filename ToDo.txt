@@ -6,6 +6,8 @@ Update loadRingPoints to use image sets properly
 Update imageRingDP to write persistant image tags and use TakeDPImage function.
 Update DarkFieldImageButtonPress to work with image sets at all.
 
+Make saveImageInImageSet() record the SaveAsFile tag and Filename string in the imageSet.
+Make a function to produce persistent Image tags for integrated images
 
 
 Tag group save methods
