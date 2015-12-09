@@ -1205,6 +1205,70 @@ class CreateDF360DialogClass : uiframe
 		return DPImage;
 	}
 
+	/* Function to take a Brightfield Image for an ImageSet
+		Mostly the same as the TakeDF function with a few tweaks and no shadowing.
+	*/
+	image takeBFImage (object self, TagGroup imageSet, TagGroup &ImageTags ){
+
+		TagGroup ImageSetTags, BFImageTags, SpotTags;
+		imageSet.TagGroupGetTagAsTagGroup("Images", ImageSetTags);
+		ImageSetTags.TagGroupGetIndexedTagAsTagGroup(0, SpotTags);
+		SpotTags.TagGroupGetTagAsTagGroup("Middle", BFImageTags); // Loads the BF image information into this variable for reference.
+	
+		number xTiltTarget, yTiltTarget, relativeXTilt, relativeYTilt;
+		
+		// Read relative xTilt and yTilt from array. Should be 0 for both
+		BFImageTags.TagGroupGetTagAsNumber("XTiltRelative", relativeXTilt);
+		BFImageTags.TagGroupGetTagAsNumber("YTiltRelative", relativeYTilt);
+		
+		if(relativeXTilt != 0 || relativeYTilt !=0 ){
+			Throw("Relative X/Y Tilts are not 0. ImageSet misconfigured.")
+		}
+		
+		xTiltTarget = dataObject.getCentreXTilt() + relativeXTilt;
+		yTiltTarget = dataObject.getCentreYTilt() + relativeYTilt;
+		
+		// Move the beam tilt to this value.
+		moveBeamTilt(xTiltTarget,yTiltTarget);
+		string opticsMode = EMGetImagingOpticsMode();
+		// Switch to imaging manually if it is not in that mode.
+		// "SAMAG" is the name our JEOL2100 uses. VirtualTEM uses "IMAGING". Add your own modes in or replace these ones if your scope is different.
+		if ( CameraControlObject.isImagingMode() == false ) {
+			if(debugMode==true){
+				result("\nTakeBFImage() called when EM not in imaging mode. Is in mode: " + opticsMode);
+			}
+			result("\nIf this mode is an imaging mode of your microscope then it needs to be added to the DF360 toolkit list of imaging mode names.");
+			if (!ContinueCancelDialog( "Switch to an imaging mode before continuing." )){
+				Throw( "User aborted process." );
+			}
+		}
+		opticsMode = EMGetImagingOpticsMode();
+		
+		
+		// Take the  Image
+		number Exposure = CameraControlObject.getBFExposure();
+		number cameraWidth = CameraControlObject.getCameraWidth();
+		number cameraHeight = CameraControlObject.getCameraHeight();
+		image BFImage;
+		BFImage := sscUnprocessedAcquire(Exposure,0,0,cameraWidth,cameraHeight);
+		
+		// Create Image Tags...
+		ImageTags = ImageSetTools.createNewImageForImageSet();
+		// ImageTags.TagGroupSetTagAsNumber("ImageID"); // Unique imageID number
+		ImageTags.TagGroupSetTagAsString("ImageType", "BF");
+		ImageTags.TagGroupSetTagAsNumber("ExposureTime", Exposure);
+		ImageTags.TagGroupSetTagAsNumber("XTiltRelative", relativeXTilt);
+		ImageTags.TagGroupSetTagAsNumber("YTiltRelative", relativeYTilt);		
+		ImageTags.TagGroupSetTagAsNumber("XTiltValue", xTiltTarget);
+		ImageTags.TagGroupSetTagAsNumber("YTiltValue", yTiltTarget);		
+		ImageTags.TagGroupSetTagAsNumber("ShadowValue", 0);
+		ImageTags.TagGroupSetTagAsNumber("ShadowDistance", 0);
+		ImageTags.TagGroupSetTagAsNumber("DSpacingAng", 0);
+
+		return BFImage;
+	}
+	
+	
 	/* This function will use the spot data stored in the current image set to create DP images.
 			It will then update the image set with information about the images being taken.
 			This step is the final phase before DF imaging begins.
@@ -1361,14 +1425,11 @@ class CreateDF360DialogClass : uiframe
 	
 	/* Function will use the stored Tilt values to take darkfield images. 1st Image (0000) will be Bright Field of site.
 		ImageSet = the image set tag group
-		saveNonIntegrated = 0/1 for if non-integrated images should be saved as well as teh integrated images. Will take a lot more disk space.
-		displayNonIntegrated = 0/1 for if non-integrated images should be displayed. Will take a hell of a lot of RAM
-		saveImages = 0/1 for if images should be automatically saved
-		displayImages = 0/1 for if images should be displayed on screen or closed after use.
 	*/
-	number darkFieldImage (object self, TagGroup ImageSet, number saveNonIntegrated, number saveImages, number displayNonIntegrated, number displayImages){
-		if(saveImages == 0 && displayImages == 0){
-			throw("Images must be shown, saved or both.");
+	number darkFieldImage (object self, TagGroup ImageSet){
+		
+		if(ImageSet.TagGroupIsValid() == false){
+			throw("ImageSet Taggroup is Invalid or does not exist.")
 		}
 		
 		number DPExposure = CameraControlObject.getDPExposure();
@@ -1381,13 +1442,19 @@ class CreateDF360DialogClass : uiframe
 		number yTiltCenter = dataObject.getCentreYTilt();
 		
 		image ReferenceDP = dataObject.getReferenceDP();
-
-		image startBFImage;
-		image middleIntegratedImage, higherIntegratedImage, lowerIntegratedImage;
-		image middleSumImage, higherSumImage, lowerSumImage;
 		
 		if(debugMode==true){result("\nLoading the variables for this image set for DF imaging..");}
-		// Load values from the imageSet data
+		
+		number saveNonIntegrated, saveImages, displaynonintegrated, displayImages;
+		ImageSet.TagGroupGetTagAsNumber("AutoSaveNonInt", saveNonIntegrated);
+		ImageSet.TagGroupGetTagAsNumber("AutoSaveImages", saveImages);
+		ImageSet.TagGroupGetTagAsNumber("AutoDisplayNonInt", displaynonintegrated);
+		ImageSet.TagGroupGetTagAsNumber("AutoDisplayImages", displayImages);
+
+		if(saveImages == 0 && displayImages == 0){
+			throw("Images must be shown, saved or both.");
+		}
+		
 		number integration
 		ImageSet.TagGroupGetTagAsNumber("IntegratedImage", integration);
 		if(debugMode==true){result("\n\t integration is " + integration);}
@@ -1395,6 +1462,10 @@ class CreateDF360DialogClass : uiframe
 		number ringMode
 		ImageSet.TagGroupGetTagAsNumber("RingMode", ringMode);
 		if(debugMode==true){result("\n\t RingMode is " + RingMode);}
+		
+		number shadowMode
+		ImageSet.TagGroupGetTagAsNumber("ShadowMode", shadowMode);
+		if(debugMode==true){result("\n\t ShadowMode is " + shadowMode);}
 		
 		number numberOfIntegrations
 		ImageSet.TagGroupGetTagAsNumber("NumberOfIntegrations", NumberOfIntegrations);
@@ -1407,6 +1478,10 @@ class CreateDF360DialogClass : uiframe
 		number shadowDistance
 		ImageSet.TagGroupGetTagAsNumber("ShadowDistance", ShadowDistance);
 		if(debugMode==true){result("\n\t shadowDistance is " + shadowDistance);}
+		
+		image startBFImage;
+		image middleIntegratedImage, higherIntegratedImage, lowerIntegratedImage;
+		image middleSumImage, higherSumImage, lowerSumImage;
 		
 		if(integration == 1){
 			if(debugMode==true){result("\nCreating Integrated Images to populate...");}
@@ -1424,10 +1499,16 @@ class CreateDF360DialogClass : uiframe
 			lowerSumImage = RealImage( "Sum of all lower", 4, cameraWidth, cameraHeight );
 			lowerSumImage = lowerSumImage * 0;
 		}
-
-		number tracker = dataObject.getTracker();
+		
+		TagGroup DFImages;
+		if (ImageSet.TagGroupGetTagAsTagGroup("Images", DFImages) == false){
+			throw("An Error was encountered when loading the dark field image tag group data.")
+		}
+		
+		number TotalExposures = DFImages.TagGroupCountTags() + (DFImages.TagGroupCountTags() * 2 * shadowMode);
+		
 		Result("\n------------- Starting Dark Field Imaging Process ---------------\n");
-		result("\n" + tracker + " exposures to take, taking " + (DFExposure * tracker / 60) + " minutes.");
+		result("\n" + TotalExposures + " exposures to take, taking " + (DFExposure * TotalExposures / 60) + " minutes.");
 		
 		if (!ContinueCancelDialog( "Insert the Objective Aperture and center it. Switch to Imaging Mode and check the Brightfield image before continuing." )){
 			throw("Aborted by User. No data changed.")
