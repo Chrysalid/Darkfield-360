@@ -1,0 +1,79 @@
+Taggroup TAGS = NewTagGroup();
+TagGroup EmptyTags = NewTagGroup();
+
+TagGroup SubTags = NewTagList();
+subTags.TagGroupInsertTagAsNumber(0, 2);
+subTags.TagGroupInsertTagAsNumber(1, 3);
+
+TAGS.TagGroupSetTagAsTagGroup("SubTags", SubTags)
+TAGS.TagGroupSetTagAsTagGroup("EmptyTagGroup", EmptyTags)
+
+TAGS.TagGroupOpenBrowserWindow( 0 );
+
+number exist = TAGS.TagGroupDoesTagExist("EmptyTagGroup")
+
+result("\nResult: " + exist);
+
+// ---------------------------------------
+// The above reports the tag exists
+
+Taggroup TAGS = NewTagGroup();
+TagGroup EmptyTags = NewTagGroup();
+
+TagGroup SubTags = NewTagList();
+subTags.TagGroupInsertTagAsNumber(0, 2);
+subTags.TagGroupInsertTagAsNumber(1, 3);
+
+TAGS.TagGroupSetTagAsTagGroup("SubTags", SubTags)
+TAGS.TagGroupSetTagAsTagGroup("EmptyTagGroup", EmptyTags)
+
+TAGS.TagGroupOpenBrowserWindow( 0 );
+
+number exist = EmptyTags.TagGroupIsValid()
+
+result("\nResult: " + exist);
+// -----------------------------------------
+// Above reports EmptyTags as a valid tag group
+
+Taggroup TAGS = NewTagGroup();
+TagGroup EmptyTags = NewTagGroup();
+
+TagGroup SubTags = NewTagList();
+subTags.TagGroupInsertTagAsNumber(0, 2);
+subTags.TagGroupInsertTagAsNumber(1, 3);
+
+TAGS.TagGroupSetTagAsTagGroup("SubTags", SubTags)
+TAGS.TagGroupSetTagAsTagGroup("EmptyTagGroup", EmptyTags)
+
+TAGS.TagGroupOpenBrowserWindow( 0 );
+
+TagGroup LoadedTags;
+TAGS.TagGroupGetTagAsTagGroup("EmptyTagGroup", LoadedTags)
+
+number exist = LoadedTags.TagGroupIsValid()
+
+result("\nResult: " + exist);
+//--------------------------------------------
+// Above shows that loading an empty Tag group creates a valid taggroup
+
+
+Taggroup TAGS = NewTagGroup();
+TagGroup EmptyTags = NewTagGroup();
+
+TagGroup SubTags = NewTagList();
+subTags.TagGroupInsertTagAsNumber(0, 2);
+subTags.TagGroupInsertTagAsNumber(1, 3);
+
+TAGS.TagGroupSetTagAsTagGroup("SubTags", SubTags)
+TAGS.TagGroupSetTagAsTagGroup("EmptyTagGroup", EmptyTags)
+
+TAGS.TagGroupOpenBrowserWindow( 0 );
+
+TagGroup LoadedTags;
+TAGS.TagGroupGetTagAsTagGroup("ERROR", LoadedTags)
+
+number exist = LoadedTags.TagGroupIsValid()
+
+result("\nResult: " + exist);
+//--------------------------------------------
+// Loading a non-existant tag group creates a tag group that is Invalid
