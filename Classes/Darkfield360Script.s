@@ -5824,7 +5824,67 @@ class CreateDF360DialogClass : uiframe
 	//****************************************************
 	// IMAGING PROCESSES
 	//****************************************************
-	 
+	 /*	Function to calculate tilt values used to shadow a spot	
+			Returns a tag group with the information formatted for storage in Spot/Image groups in imageSets.
+	*/
+	
+	TagGroup calculateShadowTilt (object self, number xTiltStart, number yTiltStart, number shadowDistanceNM, string higherOrLower)
+	{
+		if(debugMode==true){result("\nFinding Shadowing Coordinates.");}
+		if(higherOrLower != "Higher" && higherOrLower != "Lower"){
+			throw("higherOrLower set incorrectly as " + higherOrLower);
+		}
+		
+		number xTiltCenter = dataObject.getCentreXTilt();
+		number yTiltCenter = dataObject.getCentreYTilt();
+
+		// First of all we get some values for the base coordinates.
+		number xTiltRelativeStart, yTiltRelativeStart; // tilt values relative to centre tilt
+		xTiltRelativeStart = xTiltStart - xTiltCenter;
+		yTiltRelativeStart = yTiltStart - yTiltCenter;
+		//void void tiltToPixel(object self, number xTilt, number yTilt, number &xPixelShift, number &yPixelShift, number isViewWindow, number binningMultiplier)
+		number xPixelShiftStart, yPixelShiftStart
+		dataObject.tiltToPixel(xTiltRelativeStart, yTiltRelativeStart, xPixelShiftStart, yPixelShiftStart, 0, 1);
+		// NMDistance is the D-spacing of the spot in units of 1/NM
+		number NMDistanceStart = distance(yPixelShiftStart, xPixelShiftStart) * dataObject.getRefScale();
+		number shadowMultiplier = shadowDistanceNM / NMDistanceStart;
+		number DSpacingAng = convertInverseNMToAngstrom(NMDistanceStart); // for tag writing later
+		if(shadowMultiplier.isNaN()){ // checks to see if the shadow multiplier is a real number
+			throw("Shadow Multiplier is not a number");
+		}		
+		// Need centre -> Tilt, not just tilt value.
+		number direction = (higherOrLower == "Higher") ? 1 : -1 ;
+		number shadowXshift = xTiltRelativeStart * shadowMultiplier * direction;
+		number shadowYshift = yTiltRelativeStart * shadowMultiplier * direction;
+		if(debugMode==true){result("\n\tShadowXShift (tilt) = " + shadowXshift);}
+		if(debugMode==true){result("\n\tShadowYShift (tilt) = " + shadowYshift);}
+		
+		number xTilt = xTiltStart + shadowXshift;
+		number yTilt = yTiltStart + shadowYshift;
+		
+		if(debugMode==1){result("\n\tBeam tilt caclulated for 1st shadow point.");}
+		// Store new beam tilt.
+		number xTiltRelative = xTilt - xTiltCenter;
+		number yTiltRelative = yTilt - yTiltCenter;
+		
+		number shadowValue = (higherOrLower == "Higher") ? 2 : 3 ;
+		
+		number xPixelShift, yPixelShift
+		dataObject.tiltToPixel(xTiltRelative, yTiltRelative, xPixelShift, yPixelShift, 0, 1);
+		
+		TagGroup shadowData = imageSetTools.createNewImageForImageSet();
+		shadowData.TagGroupSetTagAsNumber("XTiltRelative", xTiltRelative);
+		shadowData.TagGroupSetTagAsNumber("YTiltRelative", yTiltRelative);
+		shadowData.TagGroupSetTagAsNumber("XTiltValue", xTilt);
+		shadowData.TagGroupSetTagAsNumber("YTiltValue", yTilt);
+		shadowData.TagGroupSetTagAsNumber("ShadowDistance", shadowDistanceNM);
+		shadowData.TagGroupSetTagAsNumber("ShadowValue", shadowValue);
+		shadowData.TagGroupSetTagAsNumber("DSpacingAng", DSpacingAng);
+		shadowData.TagGroupSetTagAsNumber("XShift", xPixelShift);
+		shadowData.TagGroupSetTagAsNumber("YShift", yPixelShift);
+		return shadowData;
+	}
+	
 	/* Function to store tilt values and record the spot for later recall in the current Image Set
 		xTilt, yTilt = the tilt coordinates (not relative values) of the intended spot.
 		shadowDistance = distance from the central point (in 1/nm) to perform shadowing. 0 = no shadowing.
@@ -5878,72 +5938,21 @@ class CreateDF360DialogClass : uiframe
 		if(shadowDistance!=0)
 		{
 			if(debugMode==true){result("\nFinding Shadowing Coordinates.");}
-			//void tiltToPixel(dataObject, number xTilt, number yTilt, number &xPixelShift, number &yPixelShift, number isViewWindow)
-			dataObject.tiltToPixel(xTiltRelative, yTiltRelative, xPixelShift, yPixelShift, 0, 1);
-			if(debugMode==true){result("\n\tTilt -> Pixel Shift = (" + xTiltRelative + ", " + yTiltRelative\
-					+ ") -> (" + xPixelShift + ", " + yPixelShift + ")px");}
-			// NMDistance is the D-spacing of the spot in units of 1/NM
-			NMDistance = distance(yPixelShift, xPixelShift) * dataObject.getRefScale();
-			number shadowMultiplier = shadowDistance / NMDistance;
-			if(shadowMultiplier.isNaN()){ // checks to see if the shadow multiplier is a real number
-				throw("Shadow Distance is not a number");
-			}
-			if(debugMode==true){result("\n\tNMDistance = " + NMDistance);}
-			if(debugMode==true){result("\n\tShadowMultiplier = " + shadowMultiplier);}
 			
-			// Need centre -> Tilt, not just tilt value.
-			number shadowXshift = xTiltRelative * shadowMultiplier;
-			number shadowYshift = yTiltRelative * shadowMultiplier;
-			if(debugMode==true){result("\n\tShadowXShift (tilt) = " + shadowXshift);}
-			if(debugMode==true){result("\n\tShadowYShift (tilt) = " + shadowYshift);}
-			
-			xTilt = xTilt + shadowXshift;
-			yTilt = yTilt + shadowYshift;
-			
-			if(debugMode==1){result("\n\tBeam tilt caclulated for 1st shadow point.");}
-			// Store new beam tilt.
-			xTiltRelative = xTilt - xTiltCenter;
-			yTiltRelative = yTilt - yTiltCenter;
-			
-			TagGroup image2Data = imageSetTools.createNewImageForImageSet();
+			TagGroup image2Data = self.calculateShadowTilt (xTilt, yTilt, shadowDistance, "Higher")
 			tracker = tracker + 1
 			image2Data.TagGroupSetTagAsString("ImageType", "DP");
 			image2Data.TagGroupSetTagAsNumber("ExposureTime", DPExposure);
-			image2Data.TagGroupSetTagAsNumber("XTiltRelative", xTiltRelative);
-			image2Data.TagGroupSetTagAsNumber("YTiltRelative", yTiltRelative);
-			image2Data.TagGroupSetTagAsNumber("XTiltValue", xTilt);
-			image2Data.TagGroupSetTagAsNumber("YTiltValue", yTilt);
-			image2Data.TagGroupSetTagAsNumber("ShadowDistance", shadowDistance);
-			image2Data.TagGroupSetTagAsNumber("ShadowValue", 2);
-			image2Data.TagGroupSetTagAsNumber("DSpacingAng", DSpacingAng);
-			image2Data.TagGroupSetTagAsNumber("XShift", xPixelShift);
-			image2Data.TagGroupSetTagAsNumber("YShift", yPixelShift);
 			imageSetTools.addImageDataToCurrentSpot(image2Data, "Higher");
 						
 			// Second shadowing point
-		
-			xTilt = xTilt - (2 * shadowXshift);
-			yTilt = yTilt - (2 * shadowYshift);
 			
-			xTiltRelative = xTilt - xTiltCenter;
-			yTiltRelative = yTilt - yTiltCenter;
-			if(debugMode==1){result("\n\tBeam tilt calculated for 2nd shadow point.");}
-			
-			TagGroup image3Data = imageSetTools.createNewImageForImageSet();
-			tracker = tracker + 1;
+			TagGroup image3Data = self.calculateShadowTilt (xTilt, yTilt, shadowDistance, "Lower")
+			tracker = tracker + 1
 			image3Data.TagGroupSetTagAsString("ImageType", "DP");
-			image3Data.TagGroupSetTagAsNumber("ExposureTime", CameraControlObject.getDPExposure());
-			image3Data.TagGroupSetTagAsNumber("XTiltRelative", xTiltRelative);
-			image3Data.TagGroupSetTagAsNumber("YTiltRelative", yTiltRelative);
-			image3Data.TagGroupSetTagAsNumber("XTiltValue", xTilt);
-			image3Data.TagGroupSetTagAsNumber("YTiltValue", yTilt);
-			image3Data.TagGroupSetTagAsNumber("ShadowDistance", shadowDistance);
-			image3Data.TagGroupSetTagAsNumber("ShadowValue", 3);
-			image3Data.TagGroupSetTagAsNumber("DSpacingAng", DSpacingAng);
-			image3Data.TagGroupSetTagAsNumber("XShift", xPixelShift);
-			image3Data.TagGroupSetTagAsNumber("YShift", yPixelShift);
+			image3Data.TagGroupSetTagAsNumber("ExposureTime", DPExposure);
 			imageSetTools.addImageDataToCurrentSpot(image3Data, "Lower");
-
+			
 			// All shadow coordinates are now stored
 		}
 		dataObject.setTracker(tracker);
