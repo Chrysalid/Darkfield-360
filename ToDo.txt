@@ -23,7 +23,7 @@ Bugs
 ---------
 ImageProcessing processDarkFieldImages() uses camera size, not image sizes.
 StartDPStoring / calibration does not update any current image sets yet
-
+ImageSets not changed after initial creation.
 
 Desired Features
 ----------------
