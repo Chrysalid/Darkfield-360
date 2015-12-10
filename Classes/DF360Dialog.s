@@ -908,8 +908,8 @@ class CreateDF360DialogClass : uiframe
 		dataObject.tiltToPixel(xTiltRelativeStart, yTiltRelativeStart, xPixelShiftStart, yPixelShiftStart, 0, 1);
 		// NMDistance is the D-spacing of the spot in units of 1/NM
 		number NMDistanceStart = distance(yPixelShiftStart, xPixelShiftStart) * dataObject.getRefScale();
-		number shadowMultiplier = shadowDistanceNM / NMDistance;
-		number DSpacingAng = convertInverseNMToAngstrom(NMDistance); // for tag writing later
+		number shadowMultiplier = shadowDistanceNM / NMDistanceStart;
+		number DSpacingAng = convertInverseNMToAngstrom(NMDistanceStart); // for tag writing later
 		if(shadowMultiplier.isNaN()){ // checks to see if the shadow multiplier is a real number
 			throw("Shadow Multiplier is not a number");
 		}		
