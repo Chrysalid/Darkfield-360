@@ -23,7 +23,8 @@ Bugs
 ---------
 ImageProcessing processDarkFieldImages() uses camera size, not image sizes.
 StartDPStoring / calibration does not update any current image sets yet
-ImageSets not changed after initial creation.
+RingMode not saving a central BF image or central DP in the 0 position on the list.
+
 
 Desired Features
 ----------------

@@ -20,13 +20,19 @@ class ImageConfiguration : uiframe
 	TagGroup LocalImageSet; 
 	
 	void takeImageConfiguration(object self, tagGroup settingsGroup){ // updates the returnedSettings object
+		if(debugMode == true){
+			result("\n Image Configuration from a child object has been handed to the parent object. Stored in returnedSettings");
+		}
 		returnedSettings = settingsGroup;
 	}
 	
 	// Uses the LocalImageSet with the Image Tool function addImageSet().
 	// The Image Tool function decides what to do with the data, so it does not matter to the Image Config function what Tag group is sent forwards.
 	void addImageSetToImageList(object self){
-		GetScriptObjectFromID(ImageSetToolsID).addImageSet(LocalImageSet);
+		if(debugMode == true){
+			result("\n The stored imageConfig settings will now be used to update/create an ImageSet");
+		}
+		GetScriptObjectFromID(ImageSetToolsID).addImageSet(returnedSettings);
 	}
 	
 	// Tells the dialog what Toolkit it belongs to and which dataObject to use.
@@ -371,8 +377,11 @@ class ImageConfiguration : uiframe
 		childDialog.generateDialog(); // Make the dialog for this copy
 		if(debugMode==1){result("\nShowing child dialog");}
 		number useValues = childDialog.showImageSettingsDialog();	// Display the child with Pose() system
+		if(useValues == true){
+		
+		}
 		childDialog = NULL; // NULL the childDialog so it will always go out of scope.
-		return useValues; // Note, the image set will be stored in LocalImageSet. It will either be an updated one, a new one or maybe nothing.
+		return useValues; // Note, the image set from the childdialog will be stored in returnedSettings. It will either be an updated one, a new one or maybe nothing.
 	}
 
 	// The constructor

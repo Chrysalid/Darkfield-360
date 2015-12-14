@@ -362,13 +362,13 @@ class CreateDF360DialogClass : uiframe
 		if(debugMode){result("\nCapturing View Window...");}
 		if(CameraControlObject.storeCameraDetails() == 0){  // Stores camera width, height and binning multiplier.
 			result("\nError finding camera information.");
-			exit(0);		
+			throw("Error finding Camera Information");
 		}
 		
 		image viewImage;
 		if(!returnViewImage(debugMode, viewImage)){
 			result("\nNo View Image detected when capturing Live View Window.");
-			exit(0);
+			return;
 		}
 		self.drawReticle(viewImage, 1);
 		if(debugMode==1){result("\n\tReticle added to View window.");}
@@ -1409,6 +1409,10 @@ class CreateDF360DialogClass : uiframe
 			result("\n\tImage Set does not have the RingDSpacing tag. This is an error.");
 			Throw("Image Set Error: No RingDSpacing flag.");
 		}
+		if(RingDSpacing <= 0){
+			result("\n\tImage Set RingDSpacing tag is < 0");
+			Throw("Image Set Error: RingDSpacing is " + RingDSpacing);
+		}
 		// Integrated Image Checks
 		number IntegratedImage, NumberOfIntegrations, AutoSaveNonInt, AutoDisplayNonInt
 		if(targetImageSet.TagGroupGetTagAsNumber("IntegratedImage", IntegratedImage) == 0){
@@ -1418,6 +1422,10 @@ class CreateDF360DialogClass : uiframe
 		if(targetImageSet.TagGroupGetTagAsNumber("NumberOfIntegrations", NumberOfIntegrations) == 0){
 			result("\n\tImage Set does not have the NumberOfIntegrations tag. This is an error.");
 			Throw("Image Set Error: No NumberOfIntegrations flag.");
+		}
+		if(NumberOfIntegrations <= 0){
+			result("\n\tNumberOfIntegrations is <= 0.");
+			throw("Image Set Error: Number of Integrations per image is too small");
 		}
 		if(targetImageSet.TagGroupGetTagAsNumber("AutoSaveNonInt", AutoSaveNonInt) == 0){
 			result("\n\tImage Set does not have the AutoSaveNonInt tag. This is an error.");
@@ -1468,6 +1476,8 @@ class CreateDF360DialogClass : uiframe
 			if(debugMode==true){
 				result("\n\tAlpha for tiltVectorX: " + alpha );
 				result("\n\ttan (alpha): " + tan(alpha) );
+				result("\n\tRingRadius (1/NM): " + radiusNM );
+				result("\n\tRingRadius (px): " + radiusPX );
 				result("\n\ttiltVectorX = " + tiltVectorX);
 			}
 			number averageTiltVector = tiltVectorX; // Would use an average of X and Y vectors, but geometry is broken. Just using X.
@@ -1490,18 +1500,7 @@ class CreateDF360DialogClass : uiframe
 				
 				number xTiltRelative, yTiltRelative; // tilt values relative to centre tilt
 				xTiltRelative = tiltX - beamCentreX
-				yTiltRelative = tiltY - beamCentreY;
-				
-				/* debug code to check maths in detail
-				if(debugMode==true){result("\n\ti: " + i);}
-				if(debugMode==true){result("\n\tAngleToMove: " + angleToMove);}
-				if(debugMode==true){result("\n\tsin(angle): " + sin(angleToMove));}
-				if(debugMode==true){result("\n\tcos(angle): " + cos(angleToMove));}
-				if(debugMode==true){result("\n\tAdditional TiltX: " + (averageTiltVector * sin(angleToMove)));}
-				if(debugMode==true){result("\n\tAdditional TiltY: " + (averageTiltVector * sin(angleToMove)));}
-				if(debugMode==true){result("\n\t---------");}
-				*/
-				
+				yTiltRelative = tiltY - beamCentreY;				
 				
 				self.storeTiltCoord (tiltX, tiltY, shadowDistanceNM);
 				
@@ -1983,6 +1982,13 @@ class CreateDF360DialogClass : uiframe
 					fileName = "Sum_Of_Integrated_Images_Lower"
 					filePath = PathConcatenate(fileDirectory, fileName);
 					SaveAsGatan( lowerSumImage, filePath );
+				}
+			}
+			if(displayImages == true){
+				showImage(middleSumImage);
+				if(shadowMode == true){
+					showImage(higherSumImage);
+					showImage(lowerSumImage);
 				}
 			}
 		}

@@ -194,11 +194,11 @@ class ImageSetTools
 		if (self.getImageSetID(imageSet, imageSetID) == 1) { // get the new imageset ID
 			if(debugMode == true){result("\n\tgetImageSetID() succeded: " + imageSetID);}
 			if( self.getImageSetByID(imageSetID, ExistingImageSet) == 1 ){
-				if(debugMode == true){result("\n\tLoading Existing Image Set...");}
-				// if image set exists all ready, it must be the current imageset, so that does not require changing.
-				ExistingImageSet = NULL; // over-writing the old image set with the new one.
-				ExistingImageSet = imageSet;
-				if(debugMode == true){result("\nImage Set configuration updated");}
+				if(debugMode == true){result("\n\tLoaded Existing Image Set...");}
+				ExistingImageSet.TagGroupReplaceTagsWithCopy(imageSet); // over-writing the old image set with the new one.
+				//ImageSet.TagGroupOpenBrowserWindow(0); // for debugging.
+				//ExistingImageSet.TagGroupOpenBrowserWindow(0); // for debugging.
+				if(debugMode == true){result(" Image Set configuration updated");}
 			} else {
 				// image set does not exist all ready...
 				if(debugMode == true){result("\nAdding an image set to the imageSet store.");}

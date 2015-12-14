@@ -2683,11 +2683,11 @@ class ImageSetTools
 		if (self.getImageSetID(imageSet, imageSetID) == 1) { // get the new imageset ID
 			if(debugMode == true){result("\n\tgetImageSetID() succeded: " + imageSetID);}
 			if( self.getImageSetByID(imageSetID, ExistingImageSet) == 1 ){
-				if(debugMode == true){result("\n\tLoading Existing Image Set...");}
-				// if image set exists all ready, it must be the current imageset, so that does not require changing.
-				ExistingImageSet = NULL; // over-writing the old image set with the new one.
-				ExistingImageSet = imageSet;
-				if(debugMode == true){result("\nImage Set configuration updated");}
+				if(debugMode == true){result("\n\tLoaded Existing Image Set...");}
+				ExistingImageSet.TagGroupReplaceTagsWithCopy(imageSet); // over-writing the old image set with the new one.
+				//ImageSet.TagGroupOpenBrowserWindow(0); // for debugging.
+				//ExistingImageSet.TagGroupOpenBrowserWindow(0); // for debugging.
+				if(debugMode == true){result(" Image Set configuration updated");}
 			} else {
 				// image set does not exist all ready...
 				if(debugMode == true){result("\nAdding an image set to the imageSet store.");}
@@ -3730,13 +3730,19 @@ class ImageConfiguration : uiframe
 	TagGroup LocalImageSet; 
 	
 	void takeImageConfiguration(object self, tagGroup settingsGroup){ // updates the returnedSettings object
+		if(debugMode == true){
+			result("\n Image Configuration from a child object has been handed to the parent object. Stored in returnedSettings");
+		}
 		returnedSettings = settingsGroup;
 	}
 	
 	// Uses the LocalImageSet with the Image Tool function addImageSet().
 	// The Image Tool function decides what to do with the data, so it does not matter to the Image Config function what Tag group is sent forwards.
 	void addImageSetToImageList(object self){
-		GetScriptObjectFromID(ImageSetToolsID).addImageSet(LocalImageSet);
+		if(debugMode == true){
+			result("\n The stored imageConfig settings will now be used to update/create an ImageSet");
+		}
+		GetScriptObjectFromID(ImageSetToolsID).addImageSet(returnedSettings);
 	}
 	
 	// Tells the dialog what Toolkit it belongs to and which dataObject to use.
@@ -4081,8 +4087,11 @@ class ImageConfiguration : uiframe
 		childDialog.generateDialog(); // Make the dialog for this copy
 		if(debugMode==1){result("\nShowing child dialog");}
 		number useValues = childDialog.showImageSettingsDialog();	// Display the child with Pose() system
+		if(useValues == true){
+		
+		}
 		childDialog = NULL; // NULL the childDialog so it will always go out of scope.
-		return useValues; // Note, the image set will be stored in LocalImageSet. It will either be an updated one, a new one or maybe nothing.
+		return useValues; // Note, the image set from the childdialog will be stored in returnedSettings. It will either be an updated one, a new one or maybe nothing.
 	}
 
 	// The constructor
@@ -5301,13 +5310,13 @@ class CreateDF360DialogClass : uiframe
 		if(debugMode){result("\nCapturing View Window...");}
 		if(CameraControlObject.storeCameraDetails() == 0){  // Stores camera width, height and binning multiplier.
 			result("\nError finding camera information.");
-			exit(0);		
+			throw("Error finding Camera Information");
 		}
 		
 		image viewImage;
 		if(!returnViewImage(debugMode, viewImage)){
 			result("\nNo View Image detected when capturing Live View Window.");
-			exit(0);
+			return;
 		}
 		self.drawReticle(viewImage, 1);
 		if(debugMode==1){result("\n\tReticle added to View window.");}
@@ -6348,6 +6357,10 @@ class CreateDF360DialogClass : uiframe
 			result("\n\tImage Set does not have the RingDSpacing tag. This is an error.");
 			Throw("Image Set Error: No RingDSpacing flag.");
 		}
+		if(RingDSpacing <= 0){
+			result("\n\tImage Set RingDSpacing tag is < 0");
+			Throw("Image Set Error: RingDSpacing is " + RingDSpacing);
+		}
 		// Integrated Image Checks
 		number IntegratedImage, NumberOfIntegrations, AutoSaveNonInt, AutoDisplayNonInt
 		if(targetImageSet.TagGroupGetTagAsNumber("IntegratedImage", IntegratedImage) == 0){
@@ -6407,6 +6420,8 @@ class CreateDF360DialogClass : uiframe
 			if(debugMode==true){
 				result("\n\tAlpha for tiltVectorX: " + alpha );
 				result("\n\ttan (alpha): " + tan(alpha) );
+				result("\n\tRingRadius (1/NM): " + radiusNM );
+				result("\n\tRingRadius (px): " + radiusPX );
 				result("\n\ttiltVectorX = " + tiltVectorX);
 			}
 			number averageTiltVector = tiltVectorX; // Would use an average of X and Y vectors, but geometry is broken. Just using X.
@@ -6429,18 +6444,7 @@ class CreateDF360DialogClass : uiframe
 				
 				number xTiltRelative, yTiltRelative; // tilt values relative to centre tilt
 				xTiltRelative = tiltX - beamCentreX
-				yTiltRelative = tiltY - beamCentreY;
-				
-				/* debug code to check maths in detail
-				if(debugMode==true){result("\n\ti: " + i);}
-				if(debugMode==true){result("\n\tAngleToMove: " + angleToMove);}
-				if(debugMode==true){result("\n\tsin(angle): " + sin(angleToMove));}
-				if(debugMode==true){result("\n\tcos(angle): " + cos(angleToMove));}
-				if(debugMode==true){result("\n\tAdditional TiltX: " + (averageTiltVector * sin(angleToMove)));}
-				if(debugMode==true){result("\n\tAdditional TiltY: " + (averageTiltVector * sin(angleToMove)));}
-				if(debugMode==true){result("\n\t---------");}
-				*/
-				
+				yTiltRelative = tiltY - beamCentreY;				
 				
 				self.storeTiltCoord (tiltX, tiltY, shadowDistanceNM);
 				
@@ -6922,6 +6926,13 @@ class CreateDF360DialogClass : uiframe
 					fileName = "Sum_Of_Integrated_Images_Lower"
 					filePath = PathConcatenate(fileDirectory, fileName);
 					SaveAsGatan( lowerSumImage, filePath );
+				}
+			}
+			if(displayImages == true){
+				showImage(middleSumImage);
+				if(shadowMode == true){
+					showImage(higherSumImage);
+					showImage(lowerSumImage);
 				}
 			}
 		}
