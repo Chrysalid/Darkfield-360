@@ -6878,11 +6878,20 @@ class CreateDF360DialogClass : uiframe
 			if(debugMode==true){result("\n\t Integrating images for spot " + im);}
 			// If in Integrated image mode add it to the current integration image and display any completed integrated images.
 			if(integration==true){
+				if(debugMode==true){result("\n\t\t Middle ");}
 				middleIntegratedImage = middleIntegratedImage + MiddleDFImage;
-				higherIntegratedImage = higherIntegratedImage + HigherDFImage;
-				lowerIntegratedImage = lowerIntegratedImage + LowerDFImage;
-				result("\nIntegrating Exposures for spot " + im +" of " + TotalSpots);
+				if(debugMode==true){result(" integrated.");}
+				if(shadowMode == true){
+					if(debugMode==true){result("\n\t\t Higher ");}
+					higherIntegratedImage = higherIntegratedImage + HigherDFImage;
+					if(debugMode==true){result(" integrated.");}
+					if(debugMode==true){result("\n\t\t Lower ");}
+					lowerIntegratedImage = lowerIntegratedImage + LowerDFImage;
+					if(debugMode==true){result(" integrated.");}
+				}
+				
 				if(remainder(im, NumberOfIntegrations) == 0){ // save this integrated image and start a new one.
+					if(debugMode==true){result("\nNumberOfIntegrations reached.");}
 					middleSumImage = middleSumImage + middleIntegratedImage;
 					middleIntegratedImage.ImageSetName( "Integrated Image " + im + " Middle" );
 					if(displayImages == true){
