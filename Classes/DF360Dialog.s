@@ -230,6 +230,14 @@ class CreateDF360DialogClass : uiframe
 		fileName = fileName + shadowName;
 		
 		string filePath = PathConcatenate(imageSetDir, fileName);
+		
+		if(DoesFileExist(filePath + ".dm4") || DoesFileExist(filePath + ".dm3")){
+			result("\n" + filePath + " already exists. File name changed to ");
+			fileName = fileName + "_2";
+			filePath = PathConcatenate(imageSetDir, fileName);
+			result(filePath);
+		}		
+		
 		SaveAsGatan(theImage, filePath);
 		
 		if(DoesFileExist(filePath + ".dm4") || DoesFileExist(filePath + ".dm3")){
@@ -1097,6 +1105,21 @@ class CreateDF360DialogClass : uiframe
 		number DSpacingAng
 		string ImageSetID;
 		imageSet.TagGroupGetTagAsString("ImageSetID", ImageSetID);
+		// retrive calibration values
+		number xTiltx, xTilty, yTiltx, yTilty;
+		imageSet.TagGroupGetTagAsNumber("TiltCalibration:xTiltx", xTiltx);
+		imageSet.TagGroupGetTagAsNumber("TiltCalibration:xTilty", xTilty);
+		imageSet.TagGroupGetTagAsNumber("TiltCalibration:yTiltx", yTiltx);
+		imageSet.TagGroupGetTagAsNumber("TiltCalibration:yTilty", yTilty);
+		
+		// retrieve other settings.
+		number RingMode, IntegratedImage, NumberOfIntegrations, DegreeStep
+		imageSet.TagGroupGetTagAsNumber("RingMode", RingMode);
+		imageSet.TagGroupGetTagAsNumber("IntegratedImage", IntegratedImage);
+		imageSet.TagGroupGetTagAsNumber("NumberOfIntegrations", NumberOfIntegrations);
+		imageSet.TagGroupGetTagAsNumber("DegreeStep", DegreeStep);
+		
+		// reteive settings specific to this image, not the image set.
 		DFImageTags.TagGroupGetTagAsNumber("ShadowValue", shadowValue);
 		DFImageTags.TagGroupGetTagAsNumber("shadowDistance", shadowDistance);
 		DFImageTags.TagGroupGetTagAsNumber("DSpacingAng", DSpacingAng);
@@ -1104,8 +1127,11 @@ class CreateDF360DialogClass : uiframe
 		// Create Image Tags...
 		TagGroup ImageTags = ImageSetTools.createNewImageForImageSet();
 		// ImageTags.TagGroupSetTagAsNumber("ImageID"); // Unique imageID number
-		ImageTags.TagGroupSetTagAsString("ImageSetID", ImageSetID);
 		ImageTags.TagGroupSetTagAsString("ImageType", "DF");
+		ImageTags.TagGroupSetTagAsString("ImageSetID", ImageSetID);
+		ImageTags.TagGroupSetTagAsNumber("ImageSpotNumber", spotID);
+		ImageTags.TagGroupSetTagAsString("ImageMode", opticsMode);
+		ImageTags.TagGroupSetTagAsString("CameraLength", dataObject.getCameraLength());
 		ImageTags.TagGroupSetTagAsNumber("ExposureTime", Exposure);
 		ImageTags.TagGroupSetTagAsNumber("XTiltRelative", relativeXTilt);
 		ImageTags.TagGroupSetTagAsNumber("YTiltRelative", relativeYTilt);		
@@ -1114,7 +1140,16 @@ class CreateDF360DialogClass : uiframe
 		ImageTags.TagGroupSetTagAsNumber("ShadowValue", shadowValue);
 		ImageTags.TagGroupSetTagAsNumber("ShadowDistance", shadowDistance);
 		ImageTags.TagGroupSetTagAsNumber("DSpacingAng", DSpacingAng);
-
+		ImageTags.TagGroupSetTagAsNumber("TiltCalibration:xTiltx", xTiltx);
+		ImageTags.TagGroupSetTagAsNumber("TiltCalibration:xTilty", xTilty);
+		ImageTags.TagGroupSetTagAsNumber("TiltCalibration:yTiltx", yTiltx);
+		ImageTags.TagGroupSetTagAsNumber("TiltCalibration:yTilty", yTilty);
+		ImageTags.TagGroupSetTagAsNumber("RingMode", RingMode);
+		ImageTags.TagGroupSetTagAsNumber("IntegratedImage", IntegratedImage);
+		ImageTags.TagGroupSetTagAsNumber("NumberOfIntegrations", NumberOfIntegrations);
+		ImageTags.TagGroupSetTagAsNumber("DegreeStep", DegreeStep);
+		
+		
 		if(debugMode==true){result("\n\t attaching Darkfield360 tags to image's persistent tags");}
 		// attach these tags to the image's Persistent Tag group
 		TagGroup persistentTG = DFImage.ImageGetTagGroup();
@@ -1303,6 +1338,7 @@ class CreateDF360DialogClass : uiframe
 		// ImageTags.TagGroupSetTagAsNumber("ImageID"); // Unique imageID number
 		ImageTags.TagGroupSetTagAsString("ImageSetID", ImageSetID);
 		ImageTags.TagGroupSetTagAsString("ImageType", "BF");
+		ImageTags.TagGroupSetTagAsNumber("ImageSpotNumber", 0);
 		ImageTags.TagGroupSetTagAsNumber("ExposureTime", Exposure);
 		ImageTags.TagGroupSetTagAsNumber("XTiltRelative", relativeXTilt);
 		ImageTags.TagGroupSetTagAsNumber("YTiltRelative", relativeYTilt);		
@@ -1409,7 +1445,7 @@ class CreateDF360DialogClass : uiframe
 			result("\n\tImage Set does not have the RingDSpacing tag. This is an error.");
 			Throw("Image Set Error: No RingDSpacing flag.");
 		}
-		if(RingDSpacing <= 0){
+		if(RingMode == true && RingDSpacing <= 0){
 			result("\n\tImage Set RingDSpacing tag is < 0");
 			Throw("Image Set Error: RingDSpacing is " + RingDSpacing);
 		}
@@ -1423,7 +1459,7 @@ class CreateDF360DialogClass : uiframe
 			result("\n\tImage Set does not have the NumberOfIntegrations tag. This is an error.");
 			Throw("Image Set Error: No NumberOfIntegrations flag.");
 		}
-		if(NumberOfIntegrations <= 0){
+		if(IntegratedImage == true && NumberOfIntegrations <= 0){
 			result("\n\tNumberOfIntegrations is <= 0.");
 			throw("Image Set Error: Number of Integrations per image is too small");
 		}
@@ -1450,7 +1486,7 @@ class CreateDF360DialogClass : uiframe
 			number beamCentreY = dataObject.getCentreYTilt();
 			number RefScale = dataObject.getRefScale();
 			
-			// Ask the user how many DPs will be taken when the image set is finalized (not how many darkfield images will be tkaen)
+			// Ask the user how many DPs will be taken when the image set is finalized (not how many darkfield images will be taken)
 			number NumberOfPoints;
 			if (getnumber( "How many diffraction patterns should be recorded?", 16, NumberOfPoints) == false ){
 				throw("Cancelled by User");
@@ -1536,49 +1572,46 @@ class CreateDF360DialogClass : uiframe
 		number i;
 		for(i=0; i < NumberOfSpots; i++){
 			if(debugMode==true){result("\n\t Recording spot " + i + " (Middle)...");}
-			TagGroup newDFImageData
+			TagGroup newDFImageData;
 			image DPImage := self.takeDPImage( targetImageSet, i, "Middle", newDFImageData)
 			if(debugMode==true){result("\n\t Exposure done.");}
 			image DPImageLower, DPImageHigher;
 			TagGroup NewSpotSet, NewMiddleDF, higherImageData, NewHigherDF, lowerImageData, NewLowerDF;
-			// Update the DF Images group, unless ringMode is active.
-			if(RingMode == false){
-				if(debugMode==true){result("\n\t Creating Spot in ImageSet:Images ...");}
-				NewSpotSet = ImageSetTools.addImageToCurrentImageSet(); // creates a new set of 'spots' in the imageset:Images indexed taggroup
-				if(debugMode==true){result(" done.");}
-				
-				if(debugMode==true){result("\n\t Creating image settings for ImageSet:Images[spot index]:Middle ...");}
-				NewMiddleDF = ImageSetTools.createNewImageForImageSet(newDFImageData); // Uses loaded version of createNewImageForImageSet function to fill in a lot of the values before hand.
-				NewMiddleDF.TagGroupSetTagAsString("ImageType", "DF");
-				NewMiddleDF.TagGroupSetTagAsNumber("ExposureTime", CameraControlObject.getDFExposure());
-				if(debugMode==true){result(" done.");}
-				
-				if(debugMode==true){result("\n\t Adding image settings to ImageSet:Images[spot index]:Middle ...");}
-				// add the tag group to the new 'image' spot set
-				NewSpotSet.TagGroupSetTagAsTagGroup("Middle", NewMiddleDF);
-				if(debugMode==true){result(" done.");}
-			}
+
+			// Update the DF Images group. Note that in RingMode all but one (i == 0) of these values will be erased later.
+			if(debugMode==true){result("\n\t Creating Image Group in ImageSet:Images ...");}
+			NewSpotSet = ImageSetTools.addImageToCurrentImageSet(); // creates a new set of 'spots' in the imageset:Images indexed taggroup
+			if(debugMode==true){result(" done.");}
+			
+			if(debugMode==true){result("\n\t Creating image settings for ImageSet:Images[spot index]:Middle ...");}
+			NewMiddleDF = ImageSetTools.createNewImageForImageSet(newDFImageData); // Uses loaded version of createNewImageForImageSet function to fill in a lot of the values.
+			string imgtype = (i == 0) ? "BF" : "DF"
+			NewMiddleDF.TagGroupSetTagAsString("ImageType", imgtype);
+			number exptype = (i == 0) ? CameraControlObject.getBFExposure() : CameraControlObject.getDFExposure();
+			NewMiddleDF.TagGroupSetTagAsNumber("ExposureTime", CameraControlObject.getDFExposure());
+			if(debugMode==true){result(" done.");}
+			
+			if(debugMode==true){result("\n\t Adding image settings to ImageSet:Images[spot index]:Middle ...");}
+			// add the tag group to the new 'image' spot set
+			NewSpotSet.TagGroupSetTagAsTagGroup("Middle", NewMiddleDF);
+			if(debugMode==true){result(" done.");}
 			
 			if(ShadowMode == true && (i > 0)){
 				if(debugMode==true){result("\n\t Shadowing spot " + i + " (Higher)...");}
 				DPImageHigher := self.takeDPImage( targetImageSet, i, "Higher", higherImageData);
-				if(RingMode == false){
-					NewHigherDF = ImageSetTools.createNewImageForImageSet(higherImageData);
-					NewHigherDF.TagGroupSetTagAsString("ImageType", "DF");
-					NewHigherDF.TagGroupSetTagAsNumber("ExposureTime", CameraControlObject.getDFExposure());
-					// add the tag group to the new 'image' spot set
-					NewSpotSet.TagGroupSetTagAsTagGroup("Higher", NewHigherDF);
-				}
+				NewHigherDF = ImageSetTools.createNewImageForImageSet(higherImageData);
+				NewHigherDF.TagGroupSetTagAsString("ImageType", "DF");
+				NewHigherDF.TagGroupSetTagAsNumber("ExposureTime", CameraControlObject.getDFExposure());
+				// add the tag group to the new 'image' spot set
+				NewSpotSet.TagGroupSetTagAsTagGroup("Higher", NewHigherDF);
 				
 				if(debugMode==true){result("\n\t Shadowing spot " + i + " (Lower)...");}
 				DPImageLower := self.takeDPImage( targetImageSet, i, "Lower", lowerImageData);
-				if(RingMode == false){
-					NewLowerDF = ImageSetTools.createNewImageForImageSet(lowerImageData);
-					NewLowerDF.TagGroupSetTagAsString("ImageType", "DF");
-					NewLowerDF.TagGroupSetTagAsNumber("ExposureTime", CameraControlObject.getDFExposure());
-					// add the tag group to the new 'image' spot set
-					NewSpotSet.TagGroupSetTagAsTagGroup("Lower", NewLowerDF);
-				}
+				NewLowerDF = ImageSetTools.createNewImageForImageSet(lowerImageData);
+				NewLowerDF.TagGroupSetTagAsString("ImageType", "DF");
+				NewLowerDF.TagGroupSetTagAsNumber("ExposureTime", CameraControlObject.getDFExposure());
+				// add the tag group to the new 'image' spot set
+				NewSpotSet.TagGroupSetTagAsTagGroup("Lower", NewLowerDF);
 			}
 			
 			if(debugMode==true){result("\n\t Images taken.");}
@@ -1601,21 +1634,21 @@ class CreateDF360DialogClass : uiframe
 			}
 			
 		} // End of loop
-		// If the RingMode is being used then we must generate the actual set of DF coordinates
-		 // NumberOfRingPoints variable is the number of points.
+		
+		// If the RingMode is being used then we must generate the full set of DF coordinates
+		// NumberOfRingPoints variable is the number of points.
 		 
 		// Generate Ring Mode Coordinates
 		if(RingMode == true){
-			// Delete the DF image tag group created by DP imaging previously.
+			// Delete the DF image tag group created by DP imaging previously, except for the first one which is the BF image.
 			TagGroup DFToDelete;
 			targetImageSet.TagGroupGetTagAsTagGroup("Images", DFToDelete);
-			if(debugMode==true){result("\n\tDeleting " + DFToDelete.TagGroupCountTags() + " existing DF image groups");}
-			while (DFToDelete.TagGroupCountTags() > 0){
-				DFToDelete.TagGroupDeleteTagWithIndex(0);
+			if(debugMode==true){result("\n\tDeleting " + DFToDelete.TagGroupCountTags() + " existing DF image groups except for index 0");}
+			while (DFToDelete.TagGroupCountTags() > 1){
+				DFToDelete.TagGroupDeleteTagWithIndex(1);
 				if(debugMode==true){result("\n\t\tTag removed.");}
 			}
 			if(debugMode==true){result("\n\tDeleted existing DF image groups.");}
-			
 			if(debugMode==true){result("\n\tStarting to create Ring coordinates for DF Imaging.");}
 			number DPExposure = CameraControlObject.getDPExposure();
 			number DFExposure = CameraControlObject.getDFExposure();
@@ -1679,16 +1712,20 @@ class CreateDF360DialogClass : uiframe
 				
 				MiddleCoordinates.TagGroupSetTagAsString("ImageType", "DF");
 				MiddleCoordinates.TagGroupSetTagAsNumber("ExposureTime", DFExposure);
+				// Add the spot number to this data as well.
+				MiddleCoordinates.TagGroupSetTagAsNumber("ImageSpotNumber", i+1); // +1 because 0 is the central BF and all ready there.
 				
 				ImageSetTools.addImageDataToCurrentImageSet(MiddleCoordinates, "Middle"); // add the image data to the Images list
 				
 				if(ShadowMode == true){
 					HigherCoordinates.TagGroupSetTagAsString("ImageType", "DF");
 					HigherCoordinates.TagGroupSetTagAsNumber("ExposureTime", DFExposure);
+					HigherCoordinates.TagGroupSetTagAsNumber("ImageSpotNumber", i+1);
 					ImageSetTools.addImageDataToCurrentImageSet(HigherCoordinates, "Higher"); // add the image data to the Images list
 					
 					LowerCoordinates.TagGroupSetTagAsString("ImageType", "DF");
 					LowerCoordinates.TagGroupSetTagAsNumber("ExposureTime", DFExposure);
+					LowerCoordinates.TagGroupSetTagAsNumber("ImageSpotNumber", i+1);
 					ImageSetTools.addImageDataToCurrentImageSet(LowerCoordinates, "Lower"); // add the image data to the Images list
 				}				
 				
@@ -1701,7 +1738,7 @@ class CreateDF360DialogClass : uiframe
 			result("\nTilt coordinates have been generated for RingMode DF imaging");
 		}
 		
-		if(debugMode==true){result("\n\t All spots imaged. Setting DPsTaken flag. to 1");}
+		if(debugMode==true){result("\n\t All Diffraction Patterns imaged. Setting DPsTaken flag to 1");}
 		// update the image set to show that DP were taken.
 		targetImageSet.TagGroupSetTagAsNumber("DPsTaken", 1);
 	}
@@ -1855,7 +1892,7 @@ class CreateDF360DialogClass : uiframe
 				LowerDFImage := self.takeDFImage (ImageSet, im, "Lower", LowerImageTags);
 			}
 			
-			if(debugMode==true){result("\n\t Saving images for spot " + im);}
+			if(debugMode==true){result("\n\t Saving images for image group " + im);}
 			if(saveImages == true){
 				if((integration == 0) || (saveNonIntegrated == 1)){ // Saves each image. Integrations must be done seperately.
 					self.saveImageInImageSet(MiddleDFImage);
@@ -2544,11 +2581,24 @@ class CreateDF360DialogClass : uiframe
 		if( useValues == 1){
 			if(debugMode==true){result("\nUser made or changed an image set. Updating imageset list.");}
 			ImageConfigDialog.addImageSetToImageList();
-			return;
 		} else {
 			if(debugMode==true){result("\nUser cancelled image set creation/edit. No changes made.");}
 			return;
 		}
+		
+		// Create the information for the image of the centre of the diffraction pattern. This will be used to make the central DP image later.
+		TagGroup CentralImage = imageSetTools.createNewImageForImageSet();
+		CentralImage.TagGroupSetTagAsString("ImageType", "DP");
+		CentralImage.TagGroupSetTagAsNumber("ExposureTime", CameraControlObject.getDPExposure());
+		CentralImage.TagGroupSetTagAsNumber("XTiltRelative", 0);
+		CentralImage.TagGroupSetTagAsNumber("YTiltRelative", 0);
+		CentralImage.TagGroupSetTagAsNumber("XTiltValue", dataObject.getCentreXTilt());
+		CentralImage.TagGroupSetTagAsNumber("YTiltValue", dataObject.getCentreYTilt());
+		CentralImage.TagGroupSetTagAsNumber("ShadowValue", 0);
+		CentralImage.TagGroupSetTagAsNumber("DSpacingAng", 0);
+		imageSetTools.addSpotToCurrentImageSet();
+		imageSetTools.addImageDataToCurrentSpot(CentralImage, "Middle");
+		
 	}
 	
 	
@@ -2658,20 +2708,6 @@ class CreateDF360DialogClass : uiframe
 			result("\n\tImage Set shadowing distance is set to 0, but the shadow mode option is On.");
 			Throw("Shadow distance not set");
 		}
-		
-		// Create the information for the image of the centre of the diffraction pattern. This will be used to make the central BF image later.
-		TagGroup CentralImage = imageSetTools.createNewImageForImageSet();
-		CentralImage.TagGroupSetTagAsString("ImageType", "DP");
-		CentralImage.TagGroupSetTagAsNumber("ExposureTime", CameraControlObject.getDPExposure());
-		CentralImage.TagGroupSetTagAsNumber("XTiltRelative", 0);
-		CentralImage.TagGroupSetTagAsNumber("YTiltRelative", 0);
-		CentralImage.TagGroupSetTagAsNumber("XTiltValue", dataObject.getCentreXTilt());
-		CentralImage.TagGroupSetTagAsNumber("YTiltValue", dataObject.getCentreYTilt());
-		CentralImage.TagGroupSetTagAsNumber("ShadowValue", 0);
-		CentralImage.TagGroupSetTagAsNumber("DSpacingAng", 0);
-		
-		imageSetTools.addSpotToCurrentImageSet();
-		imageSetTools.addImageDataToCurrentSpot(CentralImage, "Middle");
 		
 		if(debugMode==true){result("\nCreating ROI List...");}
 		if(debugMode==true){result("\n\tROIs present: " + totalROI);}
