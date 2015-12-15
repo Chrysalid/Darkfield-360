@@ -2,13 +2,12 @@ Required Features
 -----------------
 Update image gathering functions to update imageSet values and image tags
 Update darkFieldImage to use ImageSet values for things.
+	Integrated and ring mode images.
 Update loadRingPoints to use image sets properly
 Update imageRingDP to write persistant image tags and use TakeDPImage function.
-Update DarkFieldImageButtonPress to work with image sets at all.
 
 Make saveImageInImageSet() record the SaveAsFile tag and Filename string in the imageSet.
 Make a function to produce persistent Image tags for integrated images
-
 
 Tag group save methods
 	- Save image information for processing
@@ -18,12 +17,13 @@ Put image acquisition in its own thread that can be stopped.
 
 Make 'reticle' component objects identifiable so that cleaning the reticle from an image does not affect other components.
 	~CreateDF360DialogClass also has this problem.
-Update moveToCurrentROI to something more useful.
+Update moveToCurrentROI to something more useful and bind to a key
 
 Bugs
 ---------
 ImageProcessing processDarkFieldImages() uses camera size, not image sizes.
 StartDPStoring / calibration does not update any current image sets yet
+RingMode not saving a central BF image or central DP in the 0 position on the list.
 
 
 Desired Features
@@ -36,6 +36,7 @@ Cycle through saved tilt settings
 
 Save the central DP and highlight + label the target coordinates in an image set.
 
+'Get' the marker ring's d-spacing with a button on the new image config dialog.
 
 Currently
 ----------
