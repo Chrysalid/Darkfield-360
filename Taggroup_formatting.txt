@@ -24,7 +24,13 @@ Darkfield360
 			xTiltx: 1000
 			xTilty: 0
 			yTiltx: 0
-			yTilty: 1000					
+			yTilty: 1000
+	ImagingModes
+			SAMAG
+			...
+	DiffractionModes
+			DIFFRACTION
+			...
 
 ImageSetsTools
 ----------------

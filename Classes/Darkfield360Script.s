@@ -1511,6 +1511,8 @@ class MyDataObject
 	TagGroup DiffractionScale;
 	TagGroup tiltVectorCalibrations;
 	TagGroup imageSets;
+	TagGroup ImagingModes;
+	TagGroup DiffractionModes;
 	string currentImageSet; // the imageSetID of the imageSet being created at the moment. Do not save this.
 	number shadowDistanceNM;
 	TagGroup DFList;
@@ -2147,6 +2149,7 @@ class MyDataObject
 
 	/* Function to load data from a Darkfield360 tag group (usually from persistent memory) into the dataObject */
 	number loadPersistent(object self, TagGroup persistentTG){
+		number TagRef;
 		result("\nLoading saved program settings...");
 		string tagPath = "Darkfield360";
 		if(TagGroupIsValid(persistentTG) != 1){
@@ -2184,6 +2187,36 @@ class MyDataObject
 		if(ImageSetsDoesExist==1){
 			TagGroupGetTagAsTagGroup(persistentTG, tagPath, imageSets);
 			result("\n\tLoaded Image Sets");
+		}
+		
+		// Imaging modes
+		tagPath = "ImagingModes";
+		number ImagingModesDoesExist = TagGroupDoesTagExist(persistentTG, tagPath);
+		if(ImageSetsDoesExist==1){
+			TagGroupGetTagAsTagGroup(persistentTG, tagPath, ImagingModes);
+			result("\n\tLoaded Imaging Mode list");
+		} else {
+			ImagingModes = NewTagList();
+			TagRef = ImagingModes.TagGroupCreateNewTagAtEnd();
+			ImagingModes.TagGroupSetIndexedTagAsString(TagRef, "SAMAG");
+			TagRef = ImagingModes.TagGroupCreateNewTagAtEnd();
+			ImagingModes.TagGroupSetIndexedTagAsString(TagRef, "IMAGING");
+			TagRef = ImagingModes.TagGroupCreateNewTagAtEnd();
+			ImagingModes.TagGroupSetIndexedTagAsString(TagRef, "MAG1");
+			TagRef = ImagingModes.TagGroupCreateNewTagAtEnd();
+			ImagingModes.TagGroupSetIndexedTagAsString(TagRef, "MAG2");
+		}
+		
+		// Diffraction modes
+		tagPath = "DiffractionModes";
+		number DiffractionModesDoesExist = TagGroupDoesTagExist(persistentTG, tagPath);
+		if(ImageSetsDoesExist==1){
+			TagGroupGetTagAsTagGroup(persistentTG, tagPath, DiffractionModes);
+			result("\n\tLoaded Diffraction Mode list");
+		} else {
+			DiffractionModes = NewTagList();
+			TagRef = DiffractionModes.TagGroupCreateNewTagAtEnd();
+			DiffractionModes.TagGroupSetIndexedTagAsString(TagRef, "DIFFRACTION");
 		}
 		
 		//TagGroupOpenBrowserWindow(cameraLengths, 0);
@@ -2270,184 +2303,244 @@ class MyDataObject
 		persistentTG.TagGroupCreateNewLabeledTag("ImageSets");
 		persistentTG.TagGroupSetTagAsTagGroup("ImageSets", NewTagGroup());
 		
+		number TagRef;
+		TagGroup defaultImagingModes = NewTagList();
+		TagRef = defaultImagingModes.TagGroupCreateNewTagAtEnd();
+		defaultImagingModes.TagGroupSetIndexedTagAsString(TagRef, "SAMAG");
+		TagRef = defaultImagingModes.TagGroupCreateNewTagAtEnd();
+		defaultImagingModes.TagGroupSetIndexedTagAsString(TagRef, "IMAGING");
+		TagRef = defaultImagingModes.TagGroupCreateNewTagAtEnd();
+		defaultImagingModes.TagGroupSetIndexedTagAsString(TagRef, "MAG1");
+		TagRef = defaultImagingModes.TagGroupCreateNewTagAtEnd();
+		defaultImagingModes.TagGroupSetIndexedTagAsString(TagRef, "MAG2");
+		persistentTG.TagGroupCreateNewLabeledTag("ImagingModes");
+		persistentTG.TagGroupSetTagAsTagGroup("ImagingModes", defaultImagingModes);
+		
+		TagGroup defaultDiffractionModes = NewTagList();
+		TagRef = defaultDiffractionModes.TagGroupCreateNewTagAtEnd();
+		defaultDiffractionModes.TagGroupSetIndexedTagAsString(TagRef, "DIFFRACTION");
+		persistentTG.TagGroupCreateNewLabeledTag("DiffractionModes");
+		persistentTG.TagGroupSetTagAsTagGroup("DiffractionModes", defaultDiffractionModes);
+		
 		return persistentTG;
 	}
 	
-	/* Function to generate a tag group using dataObject and persistent storage, and using the other to fill any gaps.
-		Set the dataDominant input to 1 to take the dataobject values first
-		Set the dataDominant input to 0 to take the persistent memory values first
-		
-		Would prefer function to combine all non-conflicting tags in groups, but too advanced for the time being.
+	/* Function to generate a Darkfield360 option tag group using dataObject and persistent storage, and using the other (and the default tags) to fill any gaps.
+		Set the dataDominant input to 1 to take the dataobject values first, then fill in gaps with the existing peristent tags.
+		Set the dataDominant input to 0 to take the persistent memory values first, then fill in the gaps with the dataObject values.
+		If neither values can be found then take the default entry from the default persistent list.
 	*/
 	TagGroup createPersistent(object self, number dataDominant){
-		if(debugMode==1){result("\nGenerating a persistent tag group...");}
-		TagGroup persistentTG = NewTagGroup();
-		persistentTG.TagGroupCreateNewLabeledTag("Toolkit Version");
-		persistentTG.TagGroupSetTagAsNumber("Toolkit Version", versionNumber);
+		if(debugMode==1){result("\nGenerating a persistent tag group");}
+		TagGroup persistentTG = self.createDefaultPersistent();
 		
 		// Check if the tag groups exist inside dataObject
 		number CameraLengthsDoesExist = TagGroupIsValid(cameralengths);
 		number scaleDoesExist = TagGroupIsValid(DiffractionScale);
 		number tiltDoesExist = TagGroupIsValid(tiltVectorCalibrations);
 		number imageSetsDoesExist = TagGroupIsValid(imageSets);
+		number imagingModesDoesExist = TagGroupIsValid(ImagingModes);
+		number diffractionModesDoesExist = TagGroupIsValid(DiffractionModes);
 
+		if(debugMode==1)
+		{
+			result("\nLoading Data Object tags:")
+			result("\n\t CameraLengthsDoesExist: " + CameraLengthsDoesExist);
+			result("\n\t DiffractionScaleDoesExist: " + scaleDoesExist);
+			result("\n\t TiltCalibrationDoesExist: " + tiltDoesExist);
+			result("\n\t ImageSetsDoesExist: " + imageSetsDoesExist);
+			result("\n\t ImagingModesDoesExist: " + imagingModesDoesExist);
+			result("\n\t DiffractionModesDoesExist: " + diffractionModesDoesExist);
+			result("\nLoading Complete.");
+		}
+		
+		// Check if there are DF360 persistant options saved on the computer at all.
 		number persistentExists = self.checkPersistent();
 		
-		persistentTG.TagGroupCreateNewLabeledTag("CameraLengths");
-		persistentTG.TagGroupCreateNewLabeledTag("DiffractionScale");
-		persistentTG.TagGroupCreateNewLabeledTag("TiltCalibration");
-		persistentTG.TagGroupCreateNewLabeledTag("ImageSets");
-		
-		if(persistentExists == 0){ // only dataObject values might be present.
-			if(debugMode==1){result("\nusing only dataObjects or making blank...");}
-			if(CameraLengthsDoesExist){ // if data object has it...
-				persistentTG.TagGroupSetTagAsTagGroup("CameraLengths", cameraLengths);
-			} else { //if data object does not have it, make a new blank one.
-				TagGroup CLValues = NewTagList();
-				CLValues.TagGroupInsertTagAsString(infinity(), "None");
-				persistentTG.TagGroupSetTagAsTagGroup("CameraLengths", CLValues);
-			}
-			
-			if(scaleDoesExist){ // if data object has it...
-				persistentTG.TagGroupSetTagAsTagGroup("DiffractionScale", diffractionScale);
-			} else { //if data object does not have it, make a new blank one.
-				TagGroup DiffScale = NewTagGroup()
-				DiffScale.TagGroupCreateNewLabeledTag("None");
-				DiffScale.TagGroupSetTagAsNumber("None", 1);
-				persistentTG.TagGroupSetTagAsTagGroup("DiffractionScale", DiffScale);
-			}
-			
-			if(tiltDoesExist){ // if data object has it...
-				persistentTG.TagGroupSetTagAsTagGroup("TiltCalibration", tiltVectorCalibrations);
-			} else { //if data object does not have it, make a new blank one.
-				TagGroup vectors = NewTagGroup();
-				vectors.TagGroupCreateNewLabeledTag("xTiltx");
-				vectors.TagGroupSetTagAsNumber("xTiltx", 1);
-				vectors.TagGroupCreateNewLabeledTag("xTilty");
-				vectors.TagGroupSetTagAsNumber("xTilty", 1);
-				vectors.TagGroupCreateNewLabeledTag("yTiltx");
-				vectors.TagGroupSetTagAsNumber("yTiltx", 1);
-				vectors.TagGroupCreateNewLabeledTag("yTilty");
-				vectors.TagGroupSetTagAsNumber("yTilty", 1);
-				
-				TagGroup tiltVectors = NewTagGroup();
-				tiltVectors.TagGroupCreateNewLabeledTag("None");
-				tiltVectors.TagGroupSetTagAsTagGroup("None", vectors);
-				
-				persistentTG.TagGroupSetTagAsTagGroup("TiltCalibration", tiltVectors);
-			}
-			
-			if(imageSetsDoesExist){ // if data object has it...
-				persistentTG.TagGroupSetTagAsTagGroup("ImageSets", imageSets);
-			} else { //if data object does not have it, make a new blank one.
-				TagGroup BlankImageSets = NewTagGroup();
-				persistentTG.TagGroupSetTagAsTagGroup("ImageSets", BlankImageSets);
-			}
-			if(debugMode==1){result(" Done.");}
-			return persistentTG;
-		}
-		
-		// Persistent memory contains a Darkfield360 tag group, but we do not know what is inside it.
 		TagGroup darkfield360
-		TagGroupGetTagAsTagGroup(GetPersistentTagGroup(), "Darkfield360", darkfield360);
-		if(debugMode==1){result("\nLooking in permanent memory");}
-		
 		string tagPath;
-		TagGroup loadedCameraLengths, loadedDiffractionScale, loadedTiltCalibration, loadedImageSets;
-
-		tagPath = "Darkfield360:CameraLengths";
-		if(TagGroupGetTagAsTagGroup(GetPersistentTagGroup(), tagPath, loadedCameraLengths)){
-			if(debugMode==1){result("\n\tFound CL List");}
-			// If the tag path exists then we can decide which data to use.
-			if(CameraLengthsDoesExist == 1 && dataDominant == 1){
-				if(debugMode==1){result("\n\tUsing DataObject CL List");}
-				persistentTG.TagGroupSetTagAsTagGroup("CameraLengths", cameraLengths); // use dataObject
-			} else {
-				if(debugMode==1){result("\n\tUsing CL List from memory");}
-				persistentTG.TagGroupSetTagAsTagGroup("CameraLengths", loadedCameraLengths); // use persistent memory
-			}
-		} else { // camera lengths data not in persistent memory
-			if(CameraLengthsDoesExist){ // if data object has it...
-				if(debugMode==1){result("\n\tUsing CL List from memory");}
-				persistentTG.TagGroupSetTagAsTagGroup("CameraLengths", cameraLengths);
-			} else { //if data object does not have it, make a new blank one.
-				if(debugMode==1){result("\n\tMaking Blank CL List");}
-				TagGroup CLValues = NewTagList();
-				CLValues.TagGroupInsertTagAsString(infinity(), "None");
-				persistentTG.TagGroupSetTagAsTagGroup("CameraLengths", CLValues);
+		TagGroup loadedCameraLengths;
+		number loadedCameraLengthsDoesExist;
+		TagGroup loadedDiffractionScale;
+		number loadedDiffractionScaleDoesExist;
+		TagGroup loadedTiltCalibration;
+		number loadedTiltCalibrationDoesExist;
+		TagGroup loadedImageSets;
+		number loadedImageSetsDoesExist;
+		TagGroup loadedImagingModes;
+		number loadedImagingModesDoesExist;
+		TagGroup loadedDiffractionModes;
+		number loadedDiffractionModesDoesExist;
+		
+		if(persistentExists == true)
+		{
+			// Check to see if the relevent tags are found and load them.
+			if(debugMode==1){result("\nLoading persistent tags:");}
+			TagGroupGetTagAsTagGroup(GetPersistentTagGroup(), "Darkfield360", darkfield360);
+			
+			tagPath = "CameraLengths";
+			loadedCameraLengthsDoesExist = TagGroupGetTagAsTagGroup(darkfield360, tagPath, loadedCameraLengths);
+			
+			tagPath = "DiffractionScale";
+			loadedDiffractionScaleDoesExist = TagGroupGetTagAsTagGroup(darkfield360, tagPath, loadedDiffractionScale);
+			
+			tagPath = "TiltCalibration";
+			loadedTiltCalibrationDoesExist = TagGroupGetTagAsTagGroup(darkfield360, tagPath, loadedTiltCalibration);
+			
+			tagPath = "ImageSets";
+			loadedImageSetsDoesExist = TagGroupGetTagAsTagGroup(darkfield360, tagPath, loadedImageSets);
+			
+			tagPath = "ImagingModes";
+			loadedImagingModesDoesExist = TagGroupGetTagAsTagGroup(darkfield360, tagPath, loadedImagingModes);
+			
+			tagPath = "DiffractionModes";
+			loadedDiffractionModesDoesExist = TagGroupGetTagAsTagGroup(darkfield360, tagPath, loadedDiffractionModes);
+			
+			if(debugMode==1)
+			{
+				result("\n\t loadedCameraLengthsDoesExist: " + loadedCameraLengthsDoesExist);
+				result("\n\t loadedDiffractionScaleDoesExist: " + loadedDiffractionScaleDoesExist);
+				result("\n\t loadedTiltCalibrationDoesExist: " + loadedTiltCalibrationDoesExist);
+				result("\n\t loadedImageSetsDoesExist: " + loadedImageSetsDoesExist);
+				result("\n\t loadedImagingModesDoesExist: " + loadedImagingModesDoesExist);
+				result("\n\t loadedDiffractionModesDoesExist: " + loadedDiffractionModesDoesExist);
+				result("\nLoading Complete.");
 			}
 		}
 		
-		tagPath = "Darkfield360:DiffractionScale";
-		if(TagGroupGetTagAsTagGroup(GetPersistentTagGroup(), tagPath, loadedDiffractionScale)){
-			// If the tag path exists then we can decide which data to use.
-			if(scaleDoesExist == 1 && dataDominant == 1){
+		if(CameraLengthsDoesExist == true && loadedCameraLengthsDoesExist == true) // This means that there is a choice of two values
+		{
+			if(dataDominant == true) { // the dataObject will be chosen.
+				if(debugMode==1){result("\n\t Saving CameraLengths from DataObject");}
+				persistentTG.TagGroupSetTagAsTagGroup("CameraLengths", cameraLengths);
+				if(debugMode==1){result(". Done.");}
+			} else { // The persisten memory value will be chosen
+				if(debugMode==1){result("\n\t Saving CameraLengths from Persistent Memory");}
+				persistentTG.TagGroupSetTagAsTagGroup("CameraLengths", loadedCameraLengths);
+				if(debugMode==1){result(". Done.");}
+			}
+		} else if(CameraLengthsDoesExist == true) {
+			if(debugMode==1){result("\n\t Saving CameraLengths from DataObject");}
+			persistentTG.TagGroupSetTagAsTagGroup("CameraLengths", cameraLengths);
+			if(debugMode==1){result(". Done.");}
+		} else if(loadedCameraLengthsDoesExist == true)	{
+			if(debugMode==1){result("\n\t Saving CameraLengths from Persistent Memory");}
+			persistentTG.TagGroupSetTagAsTagGroup("CameraLengths", loadedCameraLengths);
+			if(debugMode==1){result(". Done.");}
+		} else {
+			// neither exist, so do nothing to keep default values.
+		}
+		
+		if(ScaleDoesExist == true && loadedDiffractionScaleDoesExist == true) // This means that there is a choice of two values
+		{
+			if(dataDominant == true) { // the dataObject will be chosen.
+				if(debugMode==1){result("\n\t Saving DiffractionScale from DataObject");}
 				persistentTG.TagGroupSetTagAsTagGroup("DiffractionScale", diffractionScale); // use dataObject
-			} else {
+				if(debugMode==1){result(". Done.");}
+			} else { // The persisten memory value will be chosen
 				persistentTG.TagGroupSetTagAsTagGroup("DiffractionScale", loadedDiffractionScale); // use persistent memory
 			}
-		} else { // data not in persistent memory
-			if(scaleDoesExist){ // if data object has it...
-				persistentTG.TagGroupSetTagAsTagGroup("DiffractionScale", diffractionScale);
-			} else { //if data object does not have it, make a new blank one.
-				TagGroup DiffScale = NewTagGroup()
-				DiffScale.TagGroupCreateNewLabeledTag("None");
-				DiffScale.TagGroupSetTagAsNumber("None", 1);
-				persistentTG.TagGroupSetTagAsTagGroup("DiffractionScale", DiffScale);
-			}
+		} else if(ScaleDoesExist == true) {
+			if(debugMode==1){result("\n\t Saving DiffractionScale from DataObject");}
+			persistentTG.TagGroupSetTagAsTagGroup("DiffractionScale", diffractionScale); // use dataObject
+			if(debugMode==1){result(". Done.");}
+		} else if(loadedDiffractionScaleDoesExist == true)	{
+			persistentTG.TagGroupSetTagAsTagGroup("DiffractionScale", loadedDiffractionScale); // use persistent memory
+		} else {
+			if(debugMode==1){result("\n\t Using DiffractionScale from Default");}
+			// neither exist, so do nothing to keep default values.
 		}
 		
-		tagPath = "Darkfield360:TiltCalibration";
-		if(TagGroupGetTagAsTagGroup(GetPersistentTagGroup(), tagPath, loadedTiltCalibration)){
-			// If the tag path exists then we can decide which data to use.
-			if(tiltDoesExist == 1 && dataDominant == 1){
+		if(tiltDoesExist == true && loadedTiltCalibrationDoesExist == true) // This means that there is a choice of two values
+		{
+			if(dataDominant == true) { // the dataObject will be chosen.
+				if(debugMode==1){result("\n\t Saving TiltCalibration from DataObject");}
 				persistentTG.TagGroupSetTagAsTagGroup("TiltCalibration", tiltVectorCalibrations); // use dataObject
-			} else {
+				if(debugMode==1){result(". Done.");}
+			} else { // The persisten memory value will be chosen
 				persistentTG.TagGroupSetTagAsTagGroup("TiltCalibration", loadedTiltCalibration); // use persistent memory
 			}
-		} else { // data not in persistent memory
-			if(tiltDoesExist){ // if data object has it...
-				persistentTG.TagGroupSetTagAsTagGroup("TiltCalibration", tiltVectorCalibrations);
-			} else { //if data object does not have it, make a new blank one.
-				TagGroup vectors = NewTagGroup();
-				vectors.TagGroupCreateNewLabeledTag("xTiltx");
-				vectors.TagGroupSetTagAsNumber("xTiltx", 1);
-				vectors.TagGroupCreateNewLabeledTag("xTilty");
-				vectors.TagGroupSetTagAsNumber("xTilty", 1);
-				vectors.TagGroupCreateNewLabeledTag("yTiltx");
-				vectors.TagGroupSetTagAsNumber("yTiltx", 1);
-				vectors.TagGroupCreateNewLabeledTag("yTilty");
-				vectors.TagGroupSetTagAsNumber("yTilty", 1);
-				
-				TagGroup tiltVectors = NewTagGroup();
-				tiltVectors.TagGroupCreateNewLabeledTag("None");
-				tiltVectors.TagGroupSetTagAsTagGroup("None", vectors);
-				
-				persistentTG.TagGroupSetTagAsTagGroup("TiltCalibration", tiltVectors);
-			}
+		} else if(tiltDoesExist == true) {
+			if(debugMode==1){result("\n\t Saving TiltCalibration from DataObject");}
+			persistentTG.TagGroupSetTagAsTagGroup("TiltCalibration", tiltVectorCalibrations); // use dataObject
+			if(debugMode==1){result(". Done.");}
+		} else if(loadedTiltCalibrationDoesExist == true)	{
+			persistentTG.TagGroupSetTagAsTagGroup("TiltCalibration", loadedTiltCalibration); // use persistent memory
+		} else {
+			// neither exist, so do nothing to keep default values.
 		}
 		
-		tagPath = "Darkfield360:ImageSets";
-		if(TagGroupGetTagAsTagGroup(GetPersistentTagGroup(), tagPath, loadedImageSets)){
-			// If the tag path exists then we can decide which data to use.
-			if(imageSetsDoesExist == 1 && dataDominant == 1){
+		if(imageSetsDoesExist == true && loadedImageSetsDoesExist == true) // This means that there is a choice of two values
+		{
+			if(dataDominant == true) { // the dataObject will be chosen.
+				if(debugMode==1){result("\n\t Saving ImageSets from DataObject");}
 				persistentTG.TagGroupSetTagAsTagGroup("ImageSets", imageSets); // use dataObject
-			} else {
+				if(debugMode==1){result(". Done.");}
+			} else { // The persisten memory value will be chosen
 				persistentTG.TagGroupSetTagAsTagGroup("ImageSets", loadedImageSets); // use persistent memory
 			}
-		} else { // data not in persistent memory
-			if(imageSetsDoesExist){ // if data object has it...
-				persistentTG.TagGroupSetTagAsTagGroup("ImageSets", imageSets);
-			} else { //if data object does not have it, make a new blank one.
-				TagGroup BlankImageSets = NewTagGroup();
-				persistentTG.TagGroupSetTagAsTagGroup("ImageSets", BlankImageSets);
-			}
+		} else if(imageSetsDoesExist == true) {
+			if(debugMode==1){result("\n\t Saving ImageSets from DataObject");}
+			persistentTG.TagGroupSetTagAsTagGroup("ImageSets", imageSets); // use dataObject
+			if(debugMode==1){result(". Done.");}
+		} else if(loadedImageSetsDoesExist == true)	{
+			persistentTG.TagGroupSetTagAsTagGroup("ImageSets", loadedImageSets); // use persistent memory
+		} else {
+			if(debugMode==1){result("\n\t Using ImageSets from Default");}
+			// neither exist, so do nothing to keep default values.
 		}
+		
+		if(imagingModesDoesExist == true && loadedImagingModesDoesExist == true) // This means that there is a choice of two values
+		{
+			if(dataDominant == true) { // the dataObject will be chosen.
+				if(debugMode==1){result("\n\t Saving ImagingModes from DataObject");}
+				persistentTG.TagGroupSetTagAsTagGroup("ImagingModes", ImagingModes); // use dataObject
+				if(debugMode==1){result(". Done.");}
+			} else { // The persisten memory value will be chosen
+				if(debugMode==1){result("\n\t Saving ImagingModes from Persistent Memory");}
+				persistentTG.TagGroupSetTagAsTagGroup("ImagingModes", loadedImagingModes); // use persistent memory
+				if(debugMode==1){result(". Done.");}
+			}
+		} else if(imagingModesDoesExist == true) {
+			if(debugMode==1){result("\n\t Saving ImagingModes from DataObject");}
+			persistentTG.TagGroupSetTagAsTagGroup("ImagingModes", ImagingModes); // use dataObject
+			if(debugMode==1){result(". Done.");}
+		} else if(loadedImagingModesDoesExist == true)	{
+			if(debugMode==1){result("\n\t Saving ImagingModes from Persistent Memory");}
+			persistentTG.TagGroupSetTagAsTagGroup("ImagingModes", loadedImagingModes); // use persistent memory
+			if(debugMode==1){result(". Done.");}
+		} else {
+			if(debugMode==1){result("\n\t Using ImagingModes from Default");}
+			// neither exist, so do nothing to keep default values.
+		}
+		
+		if(diffractionModesDoesExist == true && loadedDiffractionModesDoesExist == true) // This means that there is a choice of two values
+		{
+			if(dataDominant == true) { // the dataObject will be chosen.
+				if(debugMode==1){result("\n\t Saving DiffractionModes from DataObject");}
+				persistentTG.TagGroupSetTagAsTagGroup("DiffractionModes", DiffractionModes); // use dataObject
+				if(debugMode==1){result(". Done.");}
+			} else { // The persisten memory value will be chosen
+				if(debugMode==1){result("\n\t Saving DiffractionModes from Persistent Memory");}
+				persistentTG.TagGroupSetTagAsTagGroup("DiffractionModes", loadedDiffractionModes); // use persistent memory
+				if(debugMode==1){result(". Done.");}
+			}
+		} else if(diffractionModesDoesExist == true) {
+			if(debugMode==1){result("\n\t Saving DiffractionModes from DataObject");}
+			persistentTG.TagGroupSetTagAsTagGroup("DiffractionModes", DiffractionModes); // use dataObject
+			if(debugMode==1){result(". Done.");}
+		} else if(loadedDiffractionModesDoesExist == true)	{
+			if(debugMode==1){result("\n\t Saving DiffractionModes from Persistent Memory");}
+			persistentTG.TagGroupSetTagAsTagGroup("DiffractionModes", loadedDiffractionModes); // use persistent memory
+			if(debugMode==1){result(". Done.");}
+		} else {
+			if(debugMode==1){result("\n\t Using DiffractionModes from Default");}
+			// neither exist, so do nothing to keep default values.
+		}
+		
 		if(debugMode==1){result("\nReturning TagGroup");}
 		return persistentTG;		
 	}
-	
-
 	
 	// Constructor
 	MyDataObject(object self)
@@ -3546,6 +3639,8 @@ class CameraControl
 	number DPExposure; // # of seconds to expose the camera for taking Diffraction Pattern images.
 	number BFExposure; // # of seconds to expose the camera for taking BrightField images.
 	
+	TagGroup ImagingModes; // Taglist of the names used for imaging modes
+	TagGroup DiffractionModes;// Taglist of names used for diffraction modes
 
 	// Check if the microscope is online and if there is a Live View Image
 	void updateEMstatus(object self)
@@ -3568,26 +3663,32 @@ class CameraControl
 	number isImagingMode(object self)
 	{
 		string opticsMode = EMGetImagingOpticsMode();
-		// Known imaging mode values: "SAMAG", "IMAGING", "MAG1", "MAG2"
-		// will make this configurable later
-		if( opticsMode == "SAMAG" || opticsMode == "IMAGING" || opticsMode == "MAG1" || opticsMode == "MAG2" ){
-			return 1;
-		} else {
-			return 0;
+		number totalModes = ImagingModes.TagGroupCountTags();
+		number i;
+		for(i=0; i < totalModes; i++){
+			string possibleMode;
+			ImagingModes.TagGroupGetIndexedTagAsString(i, possibleMode);
+			if( opticsMode == possibleMode ){
+				return 1;
+			}
 		}
+		return 0;
 	}
 	
 	// Returns 1 if the microscope is in diffraction mode. 0 could mean anything.
 	number isDiffractionMode(object self)
 	{
 		string opticsMode = EMGetImagingOpticsMode();
-		// Known diffracton mode values: "DIFFRACTION"
-		// will make this configurable later
-		if( opticsMode == "DIFFRACTION" ){
-			return 1;
-		} else {
-			return 0;
+		number totalModes = DiffractionModes.TagGroupCountTags();
+		number i;
+		for(i=0; i < totalModes; i++){
+			string possibleMode;
+			DiffractionModes.TagGroupGetIndexedTagAsString(i, possibleMode);
+			if( opticsMode == possibleMode ){
+				return 1;
+			}
 		}
+		return 0;
 	}
 	
 	
@@ -3601,6 +3702,25 @@ class CameraControl
 		DFExposure = 30; // # of seconds to expose the camera for taking DarkField images.
 		DPExposure = 1; // # of seconds to expose the camera for taking Diffraction Pattern images.
 		BFExposure = 0.5; // # of seconds to expose the camera for taking BrightField images.
+
+		// Default starting values for the different imaging modes. A way to edit these can be added later.
+		DiffractionModes = newTaglist();
+		ImagingModes = newTaglist();
+		
+		number TagRef = DiffractionModes.TagGroupCreateNewTagAtEnd();
+		DiffractionModes.TagGroupSetIndexedTagAsString(TagRef, "DIFFRACTION");
+		
+		TagRef = ImagingModes.TagGroupCreateNewTagAtEnd();
+		ImagingModes.TagGroupSetIndexedTagAsString(TagRef, "SAMAG");
+		TagRef = ImagingModes.TagGroupCreateNewTagAtEnd();
+		ImagingModes.TagGroupSetIndexedTagAsString(TagRef, "IMAGING");
+		TagRef = ImagingModes.TagGroupCreateNewTagAtEnd();
+		ImagingModes.TagGroupSetIndexedTagAsString(TagRef, "MAG1");
+		TagRef = ImagingModes.TagGroupCreateNewTagAtEnd();
+		ImagingModes.TagGroupSetIndexedTagAsString(TagRef, "MAG2");
+		
+		//DiffractionModes.TagGroupOpenBrowserWindow(0);
+		//ImagingModes.TagGroupOpenBrowserWindow(0);
 	}
 
 	void setDebugMode(object self, number input)

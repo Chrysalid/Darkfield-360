@@ -23,6 +23,8 @@ class CameraControl
 	number DPExposure; // # of seconds to expose the camera for taking Diffraction Pattern images.
 	number BFExposure; // # of seconds to expose the camera for taking BrightField images.
 	
+	TagGroup ImagingModes; // Taglist of the names used for imaging modes
+	TagGroup DiffractionModes;// Taglist of names used for diffraction modes
 
 	// Check if the microscope is online and if there is a Live View Image
 	void updateEMstatus(object self)
@@ -45,26 +47,32 @@ class CameraControl
 	number isImagingMode(object self)
 	{
 		string opticsMode = EMGetImagingOpticsMode();
-		// Known imaging mode values: "SAMAG", "IMAGING", "MAG1", "MAG2"
-		// will make this configurable later
-		if( opticsMode == "SAMAG" || opticsMode == "IMAGING" || opticsMode == "MAG1" || opticsMode == "MAG2" ){
-			return 1;
-		} else {
-			return 0;
+		number totalModes = ImagingModes.TagGroupCountTags();
+		number i;
+		for(i=0; i < totalModes; i++){
+			string possibleMode;
+			ImagingModes.TagGroupGetIndexedTagAsString(i, possibleMode);
+			if( opticsMode == possibleMode ){
+				return 1;
+			}
 		}
+		return 0;
 	}
 	
 	// Returns 1 if the microscope is in diffraction mode. 0 could mean anything.
 	number isDiffractionMode(object self)
 	{
 		string opticsMode = EMGetImagingOpticsMode();
-		// Known diffracton mode values: "DIFFRACTION"
-		// will make this configurable later
-		if( opticsMode == "DIFFRACTION" ){
-			return 1;
-		} else {
-			return 0;
+		number totalModes = DiffractionModes.TagGroupCountTags();
+		number i;
+		for(i=0; i < totalModes; i++){
+			string possibleMode;
+			DiffractionModes.TagGroupGetIndexedTagAsString(i, possibleMode);
+			if( opticsMode == possibleMode ){
+				return 1;
+			}
 		}
+		return 0;
 	}
 	
 	
@@ -78,6 +86,25 @@ class CameraControl
 		DFExposure = 30; // # of seconds to expose the camera for taking DarkField images.
 		DPExposure = 1; // # of seconds to expose the camera for taking Diffraction Pattern images.
 		BFExposure = 0.5; // # of seconds to expose the camera for taking BrightField images.
+
+		// Default starting values for the different imaging modes. A way to edit these can be added later.
+		DiffractionModes = newTaglist();
+		ImagingModes = newTaglist();
+		
+		number TagRef = DiffractionModes.TagGroupCreateNewTagAtEnd();
+		DiffractionModes.TagGroupSetIndexedTagAsString(TagRef, "DIFFRACTION");
+		
+		TagRef = ImagingModes.TagGroupCreateNewTagAtEnd();
+		ImagingModes.TagGroupSetIndexedTagAsString(TagRef, "SAMAG");
+		TagRef = ImagingModes.TagGroupCreateNewTagAtEnd();
+		ImagingModes.TagGroupSetIndexedTagAsString(TagRef, "IMAGING");
+		TagRef = ImagingModes.TagGroupCreateNewTagAtEnd();
+		ImagingModes.TagGroupSetIndexedTagAsString(TagRef, "MAG1");
+		TagRef = ImagingModes.TagGroupCreateNewTagAtEnd();
+		ImagingModes.TagGroupSetIndexedTagAsString(TagRef, "MAG2");
+		
+		//DiffractionModes.TagGroupOpenBrowserWindow(0);
+		//ImagingModes.TagGroupOpenBrowserWindow(0);
 	}
 
 	void setDebugMode(object self, number input)
