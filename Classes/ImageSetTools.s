@@ -515,6 +515,40 @@ class ImageSetTools
 		return 1;
 	}
 	
+	/* Save the taggroup as a .s or .txt file so it can be read more easily by a human.
+		No text import function as yet.
+	*/
+	number exportImageSetAsTXT(object self, TagGroup ImageSet){
+		String path;
+		string defaultName, imageSetID;
+		ImageSet.TagGroupGetTagAsString("SetName", defaultName);
+		ImageSet.TagGroupGetTagAsString("ImageSetID", imageSetID);
+		number SavePathSelected = SaveAsDialog( "Save Image Set to...", imageSetID, path );
+		if(SavePathSelected == 0){
+			return 0;
+		}
+		// Create a text editor window into which to save the values.
+
+		string title="Image Set " + imageSetID;
+		number top=100, left=100, bottom=400, right=600;
+		documentwindow textwin = NewScriptWindow( title, top, left, bottom, right );
+		
+		// Write text with: textwin.EditorWindowAddText( "Indicated Magnification : "+tagvalue+"\n" )
+		string textPart1 = defaultName + "\n" +\
+			"Image Set ID:" + ImageSetID + "\n" +\
+			"Put Data Here";
+		
+		textwin.EditorWindowAddText( textPart1 );
+		editorwindowsavetofile(textwin,path);
+		if(debugMode==true){
+			result("\nImageSet saved to " + path);
+		}
+		// This closes the text file without any prompts. If you want the option to keep the file open
+		// change the (0) to (1)
+		textwin.windowclose(1)
+		return 1;
+	}
+	
 	/* Import an imageset file. Will ask for file, pass the taggroup and return 0/1 for fail/pass. */
 	number importImageSet(object self, TagGroup &LoadedImageSet){
 		String path;
