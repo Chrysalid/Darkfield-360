@@ -26,6 +26,29 @@ class CameraControl
 	TagGroup ImagingModes; // Taglist of the names used for imaging modes
 	TagGroup DiffractionModes;// Taglist of names used for diffraction modes
 
+	// Function to print out the various saved variables for debugging
+	void printAllValues(object self)
+	{
+		result("\n\nCamera Control Debug Values")
+		result("\n------------------------")
+		string textstring;
+		textstring = "\n\tObjectID: " + CameraControlID +\
+			"\n DebugMode: " + debugMode +\
+			"\n EMonline: " + EMOnline +\
+			"\n AllowControl: " + AllowControl +\
+			"\n dataObjectID: " + dataObjectID +\
+			"\n imageSetToolsID: " + imageSetToolsID +\
+			"\n cameraWidth: " + cameraWidth +\
+			"\n cameraHeight: " + cameraHeight +\
+			"\n binningMultiplier: " + binningMultiplier +\
+			"\n DFExposure: " + DFExposure +\
+			"\n DPExposure: " + DPExposure +\
+			"\n BFExposure: " + BFExposure +\
+			"\n Imaging Modes saved: " + ImagingModes.TagGroupCountTags() +\
+			"\n Diffraction Modes saved: " + DiffractionModes.TagGroupCountTags();
+		result(textstring);
+		result("\n-------End----------------");
+	}
 	// Check if the microscope is online and if there is a Live View Image
 	void updateEMstatus(object self)
 	{
@@ -83,28 +106,13 @@ class CameraControl
 		
 		self.updateEMstatus(); // set the AllowControl variable asap.
 		
-		DFExposure = 30; // # of seconds to expose the camera for taking DarkField images.
-		DPExposure = 1; // # of seconds to expose the camera for taking Diffraction Pattern images.
-		BFExposure = 0.5; // # of seconds to expose the camera for taking BrightField images.
+		DFExposure = GetScriptObjectFromID(dataObjectID).getDFExposure(); // # of seconds to expose the camera for taking DarkField images.
+		DPExposure = GetScriptObjectFromID(dataObjectID).getDPExposure(); // # of seconds to expose the camera for taking Diffraction Pattern images.
+		BFExposure = GetScriptObjectFromID(dataObjectID).getBFExposure(); // # of seconds to expose the camera for taking BrightField images.
 
 		// Default starting values for the different imaging modes. A way to edit these can be added later.
-		DiffractionModes = newTaglist();
-		ImagingModes = newTaglist();
-		
-		number TagRef = DiffractionModes.TagGroupCreateNewTagAtEnd();
-		DiffractionModes.TagGroupSetIndexedTagAsString(TagRef, "DIFFRACTION");
-		
-		TagRef = ImagingModes.TagGroupCreateNewTagAtEnd();
-		ImagingModes.TagGroupSetIndexedTagAsString(TagRef, "SAMAG");
-		TagRef = ImagingModes.TagGroupCreateNewTagAtEnd();
-		ImagingModes.TagGroupSetIndexedTagAsString(TagRef, "IMAGING");
-		TagRef = ImagingModes.TagGroupCreateNewTagAtEnd();
-		ImagingModes.TagGroupSetIndexedTagAsString(TagRef, "MAG1");
-		TagRef = ImagingModes.TagGroupCreateNewTagAtEnd();
-		ImagingModes.TagGroupSetIndexedTagAsString(TagRef, "MAG2");
-		
-		//DiffractionModes.TagGroupOpenBrowserWindow(0);
-		//ImagingModes.TagGroupOpenBrowserWindow(0);
+		DiffractionModes = GetScriptObjectFromID(dataObjectID).getDiffractionModes();
+		ImagingModes = GetScriptObjectFromID(dataObjectID).getImagingModes();		
 	}
 
 	void setDebugMode(object self, number input)
@@ -173,6 +181,7 @@ class CameraControl
 	}
 	void setDFExposure(object self, number newValue) {
 		DFExposure = newValue;
+		GetScriptObjectFromID(dataObjectID).setDFExposure(newValue);
 	}
 
 	number getBFExposure(object self) {
@@ -180,6 +189,7 @@ class CameraControl
 	}
 	void setBFExposure(object self, number newValue) {
 		BFExposure = newValue;
+		GetScriptObjectFromID(dataObjectID).setBFExposure(newValue);
 	}
 
 	number getDPExposure(object self) {
@@ -187,6 +197,7 @@ class CameraControl
 	}
 	void setDPExposure(object self, number newValue) {
 		DPExposure = newValue;
+		GetScriptObjectFromID(dataObjectID).setDPExposure(newValue);
 	}
 
 	number getBinningMultiplier(object self){

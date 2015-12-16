@@ -23,7 +23,9 @@ Bugs
 ---------
 ImageProcessing processDarkFieldImages() uses camera size, not image sizes.
 StartDPStoring / calibration does not update any current image sets yet
-RingMode not saving a central BF image or central DP in the 0 position on the list.
+
+Update print command
+DisableModeWarnings implementation
 
 
 Desired Features
@@ -40,7 +42,3 @@ Save the central DP and highlight + label the target coordinates in an image set
 
 Currently
 ----------
-Making Finalize Images function work with
-	Ring mode
-	Integrated images
-	

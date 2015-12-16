@@ -42,14 +42,21 @@ class CreateDF360DialogClass : uiframe
 		result("\n------------------------")
 		string textstring;
 		textstring = "\n\tObjectID: " + ToolkitID +\
-			"\nDebugMode: " + debugMode +\
-			"\nEMonline: " + EMOnline +\
-			"\nAllowControl: " + AllowControl +\
-			"\nDataObjectID: " + DataObjectID + " and " + (dataObject.ScriptObjectIsValid() ? "is" : "is not") +" valid" +\
-			"\nKeyListenerID: " + KeyListenerID + " and " + (KeyListener.ScriptObjectIsValid() ? "is" : "is not") +" valid" +\
-			"\nimageAlignmentDialogID: " + imageAlignmentDialogID + " and " + (imageAlignmentDialog.ScriptObjectIsValid() ? "is" : "is not") + " valid";
+			"\n DebugMode: " + debugMode +\
+			"\n EMonline: " + EMOnline +\
+			"\n AllowControl: " + AllowControl +\
+			"\n DataObjectID: " + DataObjectID + " and " + (dataObject.ScriptObjectIsValid() ? "is" : "is not") +" valid" +\
+			"\n KeyListenerID: " + KeyListenerID + " and " + (KeyListener.ScriptObjectIsValid() ? "is" : "is not") +" valid" +\
+			"\n imageAlignmentDialogID: " + imageAlignmentDialogID + " and " + (imageAlignmentDialog.ScriptObjectIsValid() ? "is" : "is not") + " valid"+\
+			"\n imageSetToolsID: " + imageSetToolsID + " and " + (imageSetTools.ScriptObjectIsValid() ? "is" : "is not") + " valid"+\
+			"\n scaleCalibrationDialogID: " + scaleCalibrationDialogID + " and " + (scaleCalibrationDialog.ScriptObjectIsValid() ? "is" : "is not") + " valid"+\
+			"\n tiltCalibrationDialogID: " + tiltCalibrationDialogID + " and " + (tiltCalibrationDialog.ScriptObjectIsValid() ? "is" : "is not") + " valid"+\
+			"\n CameraControlObjectID: " + CameraControlObjectID + " and " + (CameraControlObject.ScriptObjectIsValid() ? "is" : "is not") + " valid"+\
+			"\n ImageProcessingObjectID: " + ImageProcessingObjectID + " and " + (ImageProcessingObject.ScriptObjectIsValid() ? "is" : "is not") + " valid"+\
+			"\n ImageConfigDialogID: " + ImageConfigDialogID + " and " + (ImageConfigDialog.ScriptObjectIsValid() ? "is" : "is not") + " valid";
 		result(textstring);
 		result("\n-------End----------------")
+		CameraControlObject.printAllValues();
 	}
 	
 	/* Stores the dataObject */
@@ -560,13 +567,16 @@ class CreateDF360DialogClass : uiframe
 		TagGroup tiltCalibrationAutoButton = DLGCreatePushButton("CALIBRATE TILT", "startCalibrationButtonPress")
 		panel1.dlgaddelement(tiltCalibrationAutoButton)
 		panel1.dlgaddelement(dlgcreatelabel("Darkfield Exposure:"))
-		TagGroup DarkfieldImagingExposure = DLGCreateRealField( 30, 10, 3, "onDFChange").dlgidentifier("DarkfieldExposureFieldInput")
+		number initialDFExposure = CameraControlObject.getDFExposure();
+		TagGroup DarkfieldImagingExposure = DLGCreateRealField( initialDFExposure, 10, 3, "onDFChange").dlgidentifier("DarkfieldExposureFieldInput")
 		panel1.dlgaddelement(DarkfieldImagingExposure)
 		panel1.dlgaddelement(dlgcreatelabel("Brightfield Exposure:")) // Label
-		TagGroup BrightfieldImagingExposure = DLGCreateRealField( 0.5, 10, 3, "onBFChange").dlgidentifier("BrightfieldExposureFieldInput")
+		number initialBFExposure = CameraControlObject.getBFExposure();
+		TagGroup BrightfieldImagingExposure = DLGCreateRealField( initialBFExposure, 10, 3, "onBFChange").dlgidentifier("BrightfieldExposureFieldInput")
 		panel1.dlgaddelement(BrightfieldImagingExposure)
 		panel1.dlgaddelement(dlgcreatelabel("Diffraction Pattern Exposure:")) // Label
-		TagGroup DiffractionImagingExposure = DLGCreateRealField( 1, 10, 3, "onDPChange").dlgidentifier("DiffractionExposureFieldInput")
+		number initialDPExposure = CameraControlObject.getDPExposure();
+		TagGroup DiffractionImagingExposure = DLGCreateRealField( initialDPExposure, 10, 3, "onDPChange").dlgidentifier("DiffractionExposureFieldInput")
 		panel1.dlgaddelement(DiffractionImagingExposure)
 		
 			// Arrange the buttons and things

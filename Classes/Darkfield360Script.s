@@ -1517,6 +1517,9 @@ class MyDataObject
 	number shadowDistanceNM;
 	TagGroup DFList;
 	number digitalMicrographVersion; //1 or 2. 2 is newer and uses different close dialog codes.
+	number DFExposure;
+	number BFExposure;
+	number DPExposure;
 
 	number getDigitalMicrographVersion(object self){
 		return digitalMicrographVersion;
@@ -1702,6 +1705,27 @@ class MyDataObject
 		cameraLength = newValue;
 	}
 	
+	number getDFExposure(object self) {
+		return DFExposure;
+	}
+	void setDFExposure(object self, number newValue) {
+		DFExposure = newValue;
+	}
+
+	number getBFExposure(object self) {
+		return BFExposure;
+	}
+	void setBFExposure(object self, number newValue) {
+		BFExposure = newValue;
+	}
+
+	number getDPExposure(object self) {
+		return DPExposure;
+	}
+	void setDPExposure(object self, number newValue) {
+		DPExposure = newValue;
+	}
+	
 	TagGroup getDFList(object self){
 		return DFList		
 	}
@@ -1718,6 +1742,9 @@ class MyDataObject
 	number getDataObjectID(object self){
 		return dataObjectID;
 	}
+	
+	
+	
 	
 	// Function to return a text string with all the stored values.
 	string printAllValues(object self){
@@ -2104,6 +2131,23 @@ class MyDataObject
 		currentImageSet = input;
 	}
 	
+	TagGroup getImagingModes(object self){
+		return ImagingModes;
+	}
+	
+	void setImagingModes(object self, TagGroup input){
+		ImagingModes = input;
+	}
+	
+	TagGroup getDiffractionModes(object self){
+		return DiffractionModes;
+	}
+	
+	void setDiffractionModes(object self, TagGroup input){
+		DiffractionModes = input;
+	}
+	
+	
 	/* Function to check if persistent tags are present */
 	number checkPersistent(object self){
 		TagGroup persistentTG = GetPersistentTagGroup();
@@ -2121,22 +2165,6 @@ class MyDataObject
 		return 1;
 	}
 	
-	/* Function to load the persistent tags into the dataObject by deleting the existing dataObject stuff */
-	void overWriteDataObject(object self){
-	
-		string tagPath = "Darkfield360:CameraLengths";
-		TagGroupGetTagAsTagGroup(GetPersistentTagGroup(), tagPath, cameraLengths);
-
-		tagPath = "Darkfield360:DiffractionScale";
-		TagGroupGetTagAsTagGroup(GetPersistentTagGroup(), tagPath, diffractionScale);
-		
-		tagPath = "Darkfield360:TiltCalibration";
-		TagGroupGetTagAsTagGroup(GetPersistentTagGroup(), tagPath, tiltVectorCalibrations);
-		
-		tagPath = "Darkfield360:ImageSets";
-		TagGroupGetTagAsTagGroup(GetPersistentTagGroup(), tagPath, imageSets);		
-	}
-	
 	/* Function to save the persistent tag group in memory. Input is the entire Darkfield360 tag group to be saved. */
 	number updatePersistent(object self, TagGroup updatedTagGroup){
 		string tagPath = "Darkfield360";
@@ -2147,7 +2175,9 @@ class MyDataObject
 		taggroupaddlabeledtaggroup(GetPersistentTagGroup(), tagPath, updatedTagGroup);	
 	}
 
-	/* Function to load data from a Darkfield360 tag group (usually from persistent memory) into the dataObject */
+	/* Function to load data from a Darkfield360 tag group (usually from persistent memory) into the dataObject
+		used in the loadToolkitVariablesFromFilePress() function
+	*/
 	number loadPersistent(object self, TagGroup persistentTG){
 		number TagRef;
 		result("\nLoading saved program settings...");
@@ -2195,16 +2225,6 @@ class MyDataObject
 		if(ImageSetsDoesExist==1){
 			TagGroupGetTagAsTagGroup(persistentTG, tagPath, ImagingModes);
 			result("\n\tLoaded Imaging Mode list");
-		} else {
-			ImagingModes = NewTagList();
-			TagRef = ImagingModes.TagGroupCreateNewTagAtEnd();
-			ImagingModes.TagGroupSetIndexedTagAsString(TagRef, "SAMAG");
-			TagRef = ImagingModes.TagGroupCreateNewTagAtEnd();
-			ImagingModes.TagGroupSetIndexedTagAsString(TagRef, "IMAGING");
-			TagRef = ImagingModes.TagGroupCreateNewTagAtEnd();
-			ImagingModes.TagGroupSetIndexedTagAsString(TagRef, "MAG1");
-			TagRef = ImagingModes.TagGroupCreateNewTagAtEnd();
-			ImagingModes.TagGroupSetIndexedTagAsString(TagRef, "MAG2");
 		}
 		
 		// Diffraction modes
@@ -2213,34 +2233,29 @@ class MyDataObject
 		if(ImageSetsDoesExist==1){
 			TagGroupGetTagAsTagGroup(persistentTG, tagPath, DiffractionModes);
 			result("\n\tLoaded Diffraction Mode list");
-		} else {
-			DiffractionModes = NewTagList();
-			TagRef = DiffractionModes.TagGroupCreateNewTagAtEnd();
-			DiffractionModes.TagGroupSetIndexedTagAsString(TagRef, "DIFFRACTION");
+		}
+		
+		tagPath = "DFExposure";
+		number DFExposureDoesExist = TagGroupDoesTagExist(persistentTG, tagPath);
+		if(DFExposureDoesExist==1){
+			TagGroupGetTagAsNumber(persistentTG, tagPath, DFExposure);
+			result("\n\tLoaded DF Exposure");
+		}
+		tagPath = "DPExposure";
+		number DPExposureDoesExist = TagGroupDoesTagExist(persistentTG, tagPath);
+		if(DPExposureDoesExist==1){
+			TagGroupGetTagAsNumber(persistentTG, tagPath, DPExposure);
+			result("\n\tLoaded DP Exposure");
+		}
+		tagPath = "BFExposure";
+		number BFExposureDoesExist = TagGroupDoesTagExist(persistentTG, tagPath);
+		if(BFExposureDoesExist==1){
+			TagGroupGetTagAsNumber(persistentTG, tagPath, BFExposure);
+			result("\n\tLoaded BF Exposure");
 		}
 		
 		//TagGroupOpenBrowserWindow(cameraLengths, 0);
 		return 1;
-	}
-	
-	/* Function to create a tag group from ONLY the dataObject values.
-		Not used yet?
-	*/
-	TagGroup createDataFromDataObject(object self){
-		TagGroup dataSet = newTagGroup();
-		dataSet.TagGroupCreateNewLabeledTag("CameraLengths");
-		dataSet.TagGroupSetTagAsTagGroup("CameraLengths", self.getAvailableCameraLengths());
-		
-		dataSet.TagGroupCreateNewLabeledTag("DiffractionScale");
-		dataSet.TagGroupSetTagAsTagGroup("DiffractionScale", self.getScaleCalibrationTable());
-		
-		dataSet.TagGroupCreateNewLabeledTag("TiltCalibration");
-		dataSet.TagGroupSetTagAsTagGroup("TiltCalibration", self.getTiltVectorCalibrations());
-		
-		dataSet.TagGroupCreateNewLabeledTag("ImageSets");
-		dataSet.TagGroupSetTagAsTagGroup("ImageSets", self.getImageSets());
-	
-		return dataSet;
 	}
 	
 	/* Function to create a 'default' tag group for storage
@@ -2250,6 +2265,10 @@ class MyDataObject
 		TagGroup persistentTG = NewTagGroup();
 		persistentTG.TagGroupCreateNewLabeledTag("Toolkit Version");
 		persistentTG.TagGroupSetTagAsNumber("Toolkit Version", versionNumber);
+		
+		persistentTG.TagGroupSetTagAsNumber("DFExposure", 30);
+		persistentTG.TagGroupSetTagAsNumber("BFExposure", 1);
+		persistentTG.TagGroupSetTagAsNumber("DPExposure", 0.5);
 		
 		TagGroup CLValues = NewTagList();
 		CLValues.TagGroupInsertTagAsString(infinity(), "20cm");
@@ -2371,12 +2390,17 @@ class MyDataObject
 		number loadedImagingModesDoesExist;
 		TagGroup loadedDiffractionModes;
 		number loadedDiffractionModesDoesExist;
+		number loadedBFExposure, loadedDFExposure, loadedDPExposure; // These will be 0 if a failed load anyway.
 		
 		if(persistentExists == true)
 		{
 			// Check to see if the relevent tags are found and load them.
 			if(debugMode==1){result("\nLoading persistent tags:");}
 			TagGroupGetTagAsTagGroup(GetPersistentTagGroup(), "Darkfield360", darkfield360);
+			
+			TagGroupGetTagAsNumber(darkfield360, "DFExposure", loadedDFExposure);
+			TagGroupGetTagAsNumber(darkfield360, "BFExposure", loadedBFExposure);
+			TagGroupGetTagAsNumber(darkfield360, "DPExposure", loadedDPExposure);
 			
 			tagPath = "CameraLengths";
 			loadedCameraLengthsDoesExist = TagGroupGetTagAsTagGroup(darkfield360, tagPath, loadedCameraLengths);
@@ -2406,6 +2430,75 @@ class MyDataObject
 				result("\n\t loadedDiffractionModesDoesExist: " + loadedDiffractionModesDoesExist);
 				result("\nLoading Complete.");
 			}
+		}
+		
+		if(DPExposure != 0 && loadedDPExposure != 0) // This means that there is a choice of two values
+		{
+			if(dataDominant == true) { // the dataObject will be chosen.
+				if(debugMode==1){result("\n\t Saving DPExposure from DataObject");}
+				persistentTG.TagGroupSetTagAsNumber("DPExposure", DPExposure);
+				if(debugMode==1){result(". Done.");}
+			} else { // The persisten memory value will be chosen
+				if(debugMode==1){result("\n\t Saving DPExposure from Persistent Memory");}
+				persistentTG.TagGroupSetTagAsNumber("DPExposure", loadedDPExposure);
+				if(debugMode==1){result(". Done.");}
+			}
+		} else if(DPExposure != 0) {
+			if(debugMode==1){result("\n\t Saving DPExposure from DataObject");}
+			persistentTG.TagGroupSetTagAsNumber("DPExposure", DPExposure);
+			if(debugMode==1){result(". Done.");}
+		} else if(loadedDPExposure != 0) {
+			if(debugMode==1){result("\n\t Saving DPExposure from Persistent Memory");}
+			persistentTG.TagGroupSetTagAsNumber("DPExposure", loadedDPExposure);
+			if(debugMode==1){result(". Done.");}
+		} else {
+			// neither exist, so do nothing to keep default values.
+		}
+		
+		if(DFExposure != 0 && loadedDFExposure != 0) // This means that there is a choice of two values
+		{
+			if(dataDominant == true) { // the dataObject will be chosen.
+				if(debugMode==1){result("\n\t Saving DFExposure from DataObject");}
+				persistentTG.TagGroupSetTagAsNumber("DFExposure", DFExposure);
+				if(debugMode==1){result(". Done.");}
+			} else { // The persisten memory value will be chosen
+				if(debugMode==1){result("\n\t Saving DFExposure from Persistent Memory");}
+				persistentTG.TagGroupSetTagAsNumber("DFExposure", loadedDFExposure);
+				if(debugMode==1){result(". Done.");}
+			}
+		} else if(DFExposure != 0) {
+			if(debugMode==1){result("\n\t Saving DFExposure from DataObject");}
+			persistentTG.TagGroupSetTagAsNumber("DFExposure", DFExposure);
+			if(debugMode==1){result(". Done.");}
+		} else if(loadedDFExposure != 0) {
+			if(debugMode==1){result("\n\t Saving DFExposure from Persistent Memory");}
+			persistentTG.TagGroupSetTagAsNumber("DFExposure", loadedDFExposure);
+			if(debugMode==1){result(". Done.");}
+		} else {
+			// neither exist, so do nothing to keep default values.
+		}
+		
+		if(BFExposure != 0 && loadedBFExposure != 0) // This means that there is a choice of two values
+		{
+			if(dataDominant == true) { // the dataObject will be chosen.
+				if(debugMode==1){result("\n\t Saving BFExposure from DataObject");}
+				persistentTG.TagGroupSetTagAsNumber("BFExposure", BFExposure);
+				if(debugMode==1){result(". Done.");}
+			} else { // The persisten memory value will be chosen
+				if(debugMode==1){result("\n\t Saving BFExposure from Persistent Memory");}
+				persistentTG.TagGroupSetTagAsNumber("BFExposure", loadedBFExposure);
+				if(debugMode==1){result(". Done.");}
+			}
+		} else if(BFExposure != 0) {
+			if(debugMode==1){result("\n\t Saving BFExposure from DataObject");}
+			persistentTG.TagGroupSetTagAsNumber("BFExposure", BFExposure);
+			if(debugMode==1){result(". Done.");}
+		} else if(loadedBFExposure != 0) {
+			if(debugMode==1){result("\n\t Saving BFExposure from Persistent Memory");}
+			persistentTG.TagGroupSetTagAsNumber("BFExposure", loadedBFExposure);
+			if(debugMode==1){result(". Done.");}
+		} else {
+			// neither exist, so do nothing to keep default values.
 		}
 		
 		if(CameraLengthsDoesExist == true && loadedCameraLengthsDoesExist == true) // This means that there is a choice of two values
@@ -3642,6 +3735,29 @@ class CameraControl
 	TagGroup ImagingModes; // Taglist of the names used for imaging modes
 	TagGroup DiffractionModes;// Taglist of names used for diffraction modes
 
+	// Function to print out the various saved variables for debugging
+	void printAllValues(object self)
+	{
+		result("\n\nCamera Control Debug Values")
+		result("\n------------------------")
+		string textstring;
+		textstring = "\n\tObjectID: " + CameraControlID +\
+			"\n DebugMode: " + debugMode +\
+			"\n EMonline: " + EMOnline +\
+			"\n AllowControl: " + AllowControl +\
+			"\n dataObjectID: " + dataObjectID +\
+			"\n imageSetToolsID: " + imageSetToolsID +\
+			"\n cameraWidth: " + cameraWidth +\
+			"\n cameraHeight: " + cameraHeight +\
+			"\n binningMultiplier: " + binningMultiplier +\
+			"\n DFExposure: " + DFExposure +\
+			"\n DPExposure: " + DPExposure +\
+			"\n BFExposure: " + BFExposure +\
+			"\n Imaging Modes saved: " + ImagingModes.TagGroupCountTags() +\
+			"\n Diffraction Modes saved: " + DiffractionModes.TagGroupCountTags();
+		result(textstring);
+		result("\n-------End----------------");
+	}
 	// Check if the microscope is online and if there is a Live View Image
 	void updateEMstatus(object self)
 	{
@@ -3699,28 +3815,13 @@ class CameraControl
 		
 		self.updateEMstatus(); // set the AllowControl variable asap.
 		
-		DFExposure = 30; // # of seconds to expose the camera for taking DarkField images.
-		DPExposure = 1; // # of seconds to expose the camera for taking Diffraction Pattern images.
-		BFExposure = 0.5; // # of seconds to expose the camera for taking BrightField images.
+		DFExposure = GetScriptObjectFromID(dataObjectID).getDFExposure(); // # of seconds to expose the camera for taking DarkField images.
+		DPExposure = GetScriptObjectFromID(dataObjectID).getDPExposure(); // # of seconds to expose the camera for taking Diffraction Pattern images.
+		BFExposure = GetScriptObjectFromID(dataObjectID).getBFExposure(); // # of seconds to expose the camera for taking BrightField images.
 
 		// Default starting values for the different imaging modes. A way to edit these can be added later.
-		DiffractionModes = newTaglist();
-		ImagingModes = newTaglist();
-		
-		number TagRef = DiffractionModes.TagGroupCreateNewTagAtEnd();
-		DiffractionModes.TagGroupSetIndexedTagAsString(TagRef, "DIFFRACTION");
-		
-		TagRef = ImagingModes.TagGroupCreateNewTagAtEnd();
-		ImagingModes.TagGroupSetIndexedTagAsString(TagRef, "SAMAG");
-		TagRef = ImagingModes.TagGroupCreateNewTagAtEnd();
-		ImagingModes.TagGroupSetIndexedTagAsString(TagRef, "IMAGING");
-		TagRef = ImagingModes.TagGroupCreateNewTagAtEnd();
-		ImagingModes.TagGroupSetIndexedTagAsString(TagRef, "MAG1");
-		TagRef = ImagingModes.TagGroupCreateNewTagAtEnd();
-		ImagingModes.TagGroupSetIndexedTagAsString(TagRef, "MAG2");
-		
-		//DiffractionModes.TagGroupOpenBrowserWindow(0);
-		//ImagingModes.TagGroupOpenBrowserWindow(0);
+		DiffractionModes = GetScriptObjectFromID(dataObjectID).getDiffractionModes();
+		ImagingModes = GetScriptObjectFromID(dataObjectID).getImagingModes();		
 	}
 
 	void setDebugMode(object self, number input)
@@ -3789,6 +3890,7 @@ class CameraControl
 	}
 	void setDFExposure(object self, number newValue) {
 		DFExposure = newValue;
+		GetScriptObjectFromID(dataObjectID).setDFExposure(newValue);
 	}
 
 	number getBFExposure(object self) {
@@ -3796,6 +3898,7 @@ class CameraControl
 	}
 	void setBFExposure(object self, number newValue) {
 		BFExposure = newValue;
+		GetScriptObjectFromID(dataObjectID).setBFExposure(newValue);
 	}
 
 	number getDPExposure(object self) {
@@ -3803,6 +3906,7 @@ class CameraControl
 	}
 	void setDPExposure(object self, number newValue) {
 		DPExposure = newValue;
+		GetScriptObjectFromID(dataObjectID).setDPExposure(newValue);
 	}
 
 	number getBinningMultiplier(object self){
@@ -5110,14 +5214,21 @@ class CreateDF360DialogClass : uiframe
 		result("\n------------------------")
 		string textstring;
 		textstring = "\n\tObjectID: " + ToolkitID +\
-			"\nDebugMode: " + debugMode +\
-			"\nEMonline: " + EMOnline +\
-			"\nAllowControl: " + AllowControl +\
-			"\nDataObjectID: " + DataObjectID + " and " + (dataObject.ScriptObjectIsValid() ? "is" : "is not") +" valid" +\
-			"\nKeyListenerID: " + KeyListenerID + " and " + (KeyListener.ScriptObjectIsValid() ? "is" : "is not") +" valid" +\
-			"\nimageAlignmentDialogID: " + imageAlignmentDialogID + " and " + (imageAlignmentDialog.ScriptObjectIsValid() ? "is" : "is not") + " valid";
+			"\n DebugMode: " + debugMode +\
+			"\n EMonline: " + EMOnline +\
+			"\n AllowControl: " + AllowControl +\
+			"\n DataObjectID: " + DataObjectID + " and " + (dataObject.ScriptObjectIsValid() ? "is" : "is not") +" valid" +\
+			"\n KeyListenerID: " + KeyListenerID + " and " + (KeyListener.ScriptObjectIsValid() ? "is" : "is not") +" valid" +\
+			"\n imageAlignmentDialogID: " + imageAlignmentDialogID + " and " + (imageAlignmentDialog.ScriptObjectIsValid() ? "is" : "is not") + " valid"+\
+			"\n imageSetToolsID: " + imageSetToolsID + " and " + (imageSetTools.ScriptObjectIsValid() ? "is" : "is not") + " valid"+\
+			"\n scaleCalibrationDialogID: " + scaleCalibrationDialogID + " and " + (scaleCalibrationDialog.ScriptObjectIsValid() ? "is" : "is not") + " valid"+\
+			"\n tiltCalibrationDialogID: " + tiltCalibrationDialogID + " and " + (tiltCalibrationDialog.ScriptObjectIsValid() ? "is" : "is not") + " valid"+\
+			"\n CameraControlObjectID: " + CameraControlObjectID + " and " + (CameraControlObject.ScriptObjectIsValid() ? "is" : "is not") + " valid"+\
+			"\n ImageProcessingObjectID: " + ImageProcessingObjectID + " and " + (ImageProcessingObject.ScriptObjectIsValid() ? "is" : "is not") + " valid"+\
+			"\n ImageConfigDialogID: " + ImageConfigDialogID + " and " + (ImageConfigDialog.ScriptObjectIsValid() ? "is" : "is not") + " valid";
 		result(textstring);
 		result("\n-------End----------------")
+		CameraControlObject.printAllValues();
 	}
 	
 	/* Stores the dataObject */
@@ -5628,13 +5739,16 @@ class CreateDF360DialogClass : uiframe
 		TagGroup tiltCalibrationAutoButton = DLGCreatePushButton("CALIBRATE TILT", "startCalibrationButtonPress")
 		panel1.dlgaddelement(tiltCalibrationAutoButton)
 		panel1.dlgaddelement(dlgcreatelabel("Darkfield Exposure:"))
-		TagGroup DarkfieldImagingExposure = DLGCreateRealField( 30, 10, 3, "onDFChange").dlgidentifier("DarkfieldExposureFieldInput")
+		number initialDFExposure = CameraControlObject.getDFExposure();
+		TagGroup DarkfieldImagingExposure = DLGCreateRealField( initialDFExposure, 10, 3, "onDFChange").dlgidentifier("DarkfieldExposureFieldInput")
 		panel1.dlgaddelement(DarkfieldImagingExposure)
 		panel1.dlgaddelement(dlgcreatelabel("Brightfield Exposure:")) // Label
-		TagGroup BrightfieldImagingExposure = DLGCreateRealField( 0.5, 10, 3, "onBFChange").dlgidentifier("BrightfieldExposureFieldInput")
+		number initialBFExposure = CameraControlObject.getBFExposure();
+		TagGroup BrightfieldImagingExposure = DLGCreateRealField( initialBFExposure, 10, 3, "onBFChange").dlgidentifier("BrightfieldExposureFieldInput")
 		panel1.dlgaddelement(BrightfieldImagingExposure)
 		panel1.dlgaddelement(dlgcreatelabel("Diffraction Pattern Exposure:")) // Label
-		TagGroup DiffractionImagingExposure = DLGCreateRealField( 1, 10, 3, "onDPChange").dlgidentifier("DiffractionExposureFieldInput")
+		number initialDPExposure = CameraControlObject.getDPExposure();
+		TagGroup DiffractionImagingExposure = DLGCreateRealField( initialDPExposure, 10, 3, "onDPChange").dlgidentifier("DiffractionExposureFieldInput")
 		panel1.dlgaddelement(DiffractionImagingExposure)
 		
 			// Arrange the buttons and things
@@ -8163,7 +8277,18 @@ object startToolkit () {
 	result("\nSetting Variables.")
 	// Set Variables
 	dataObject.setMaxDeviation(0.2); // difference (in 1/nm) allowed during pattern matching operations
-	//image dataArray; // Array of values that are stored for future reference.
+	result("\nLoading Persistent Memory Settings.")
+	TagGroup persistentSave
+	if(dataObject.checkPersistent()==false){
+		result("\n\t No Persistent Memory found. Using default settings.")
+		persistentSave = dataObject.createPersistent(1); // make a default set of data
+		dataObject.updatePersistent(persistentSave); // save it to persistent memory
+		dataObject.loadPersistent(persistentSave); // Load it into data object
+	} else { // load variables from permanent memory into the dataObject.
+		result("\n\t Persistent Memory found. Loading settings.")
+		persistentSave = dataObject.createPersistent(0); // create set of data from memory and dataObject
+		dataObject.loadPersistent(persistentSave); // Load it into data object
+	}
 	
 	result("\nLoading Image Set Tools...")
 	object theImageSetTools = alloc(ImageSetTools);
@@ -8190,12 +8315,6 @@ object startToolkit () {
 	result("\nLoading Image Set Configuration Dialog...")
 	object ImageConfigDialog = alloc(ImageConfiguration);
 	
-	if(dataObject.checkPersistent()==false){
-		TagGroup persistentSave = dataObject.createDefaultPersistent(); // make a blank set of data
-		dataObject.updatePersistent(persistentSave); // save it to memory
-	}
-	dataObject.overWriteDataObject(); // load variables from permanent memory into the dataObject.
-
 	// Construct the Toolkit. This automatically creates the toolkit dialog.
 	object Toolkit = alloc(CreateDF360DialogClass);
 	// Toolkit.ToggleDebugMode() // comment out to deactivate debugMode on startup. Can be toggled on toolkit manually

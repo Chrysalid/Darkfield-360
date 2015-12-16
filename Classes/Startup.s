@@ -13,7 +13,18 @@ object startToolkit () {
 	result("\nSetting Variables.")
 	// Set Variables
 	dataObject.setMaxDeviation(0.2); // difference (in 1/nm) allowed during pattern matching operations
-	//image dataArray; // Array of values that are stored for future reference.
+	result("\nLoading Persistent Memory Settings.")
+	TagGroup persistentSave
+	if(dataObject.checkPersistent()==false){
+		result("\n\t No Persistent Memory found. Using default settings.")
+		persistentSave = dataObject.createPersistent(1); // make a default set of data
+		dataObject.updatePersistent(persistentSave); // save it to persistent memory
+		dataObject.loadPersistent(persistentSave); // Load it into data object
+	} else { // load variables from permanent memory into the dataObject.
+		result("\n\t Persistent Memory found. Loading settings.")
+		persistentSave = dataObject.createPersistent(0); // create set of data from memory and dataObject
+		dataObject.loadPersistent(persistentSave); // Load it into data object
+	}
 	
 	result("\nLoading Image Set Tools...")
 	object theImageSetTools = alloc(ImageSetTools);
@@ -40,12 +51,6 @@ object startToolkit () {
 	result("\nLoading Image Set Configuration Dialog...")
 	object ImageConfigDialog = alloc(ImageConfiguration);
 	
-	if(dataObject.checkPersistent()==false){
-		TagGroup persistentSave = dataObject.createDefaultPersistent(); // make a blank set of data
-		dataObject.updatePersistent(persistentSave); // save it to memory
-	}
-	dataObject.overWriteDataObject(); // load variables from permanent memory into the dataObject.
-
 	// Construct the Toolkit. This automatically creates the toolkit dialog.
 	object Toolkit = alloc(CreateDF360DialogClass);
 	// Toolkit.ToggleDebugMode() // comment out to deactivate debugMode on startup. Can be toggled on toolkit manually

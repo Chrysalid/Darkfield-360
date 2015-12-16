@@ -4,6 +4,10 @@ These tags are saved within the Gatan Digital Micrograph software for future use
 They can be seen in the Global Tags group and accessed with GetPersistentTagGroup();
 
 Darkfield360
+	DisableModeWarnings: 0/1 // Turns off the warnings during imaging to check that the microscope is in the correct mode.
+	DFExposure;
+	BFExposure;
+	DPExposure;
 	CameraLengths // preset camera lengths that can be used
 		<indexedList>:<cameraLength>
 		20cm
