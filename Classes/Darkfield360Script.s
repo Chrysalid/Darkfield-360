@@ -2861,8 +2861,9 @@ class ImageSetTools
 	
 	/* Add an imageSet to the ImageSets list and select it as the current open imageSet
 		if the image set all ready exists then it will update the existing tag group rather than add a new one.
+		return 1 on success, 0 on fail.
 	*/
-	void addImageSet(object self, TagGroup imageSet){
+	number addImageSet(object self, TagGroup imageSet){
 		TagGroup ExistingImageSet
 		string imageSetID
 		if(debugMode == true){result("\nRunning addImageSet() function...");}
@@ -2874,16 +2875,18 @@ class ImageSetTools
 				//ImageSet.TagGroupOpenBrowserWindow(0); // for debugging.
 				//ExistingImageSet.TagGroupOpenBrowserWindow(0); // for debugging.
 				if(debugMode == true){result(" Image Set configuration updated");}
+				return 1;
 			} else {
 				// image set does not exist all ready...
 				if(debugMode == true){result("\nAdding an image set to the imageSet store.");}
 				imageSets.TagGroupAddTagGroupAtEnd(imageSet)
 				currentImageSetIndex = (imageSets.TagGroupCountTags() - 1); // Set this image set as the current image set.
 				if(debugMode == true){result("\ncurrentImageSetIndex is now " + currentImageSetIndex);}
+				return 1;
 			}
 		} else {
 			result("\nERROR: No image set ID found when adding the image set to list (or updating one).")
-			return;
+			return 0;
 		}
 		
 	}
@@ -3224,17 +3227,32 @@ class ImageSetTools
 		return 1;
 	}
 	
-	/* Import an imageset file. Will ask for file, pass the taggroup and return 0/1 for fail/pass. */
-	number importImageSet(object self, TagGroup &LoadedImageSet){
+	/* Import an imageset file. Will ask for file, import the taggroup, check for a valid imageSet
+		and then add the imageSet to the current list of image sets.
+		return 0/1 for fail/pass.
+	*/
+	number importImageSetFile(object self){
 		String path;
+		TagGroup LoadedImageSet = NewTagGroup();
 		number fileSelected =  OpenDialog( path );
 		
-		if(fileSelected == 0){
+		if(fileSelected == false){
 			return 0;
+		} else {
+			result("\n Image Set loading from " + path);
 		}
 		
 		number fileLoaded = TagGroupLoadFromFile( LoadedImageSet, path );
-		if(fileLoaded == 0){
+		if(fileLoaded == false){
+			result("\nThere was an error opening the file.");
+			return 0;
+		} else {
+			if(debugMode==true) {result("\n Image Set opened.");}
+		}
+		
+		number fileAdded = self.addImageSet( LoadedImageSet );
+		if(fileAdded == false){
+			result("\nThere was an error adding this Image Set to the current list of image sets.");
 			return 0;
 		}
 		return 1;
@@ -5859,7 +5877,10 @@ class CreateDF360DialogClass : uiframe
 		TagGroup DarkFieldStoredButton = DLGCreatePushButton("Start Imaging", "DarkFieldImageButtonPress")
 		panel7.dlgaddelement(DarkFieldStoredButton)
 		panel7.dlgaddelement(dlgcreatelabel("Image Processing")) // Label
-		panel7.dlgaddelement(dlgcreatelabel("")) // Blank		
+		panel7.dlgaddelement(dlgcreatelabel("")) // Blank
+		TagGroup LoadImageSetButton = DLGCreatePushButton("Load Image Set File", "LoadImageSetButtonPress")
+		panel7.dlgaddelement(LoadImageSetButton)
+		panel7.dlgaddelement(dlgcreatelabel("")) // Blank
 		TagGroup ProcessSingleFileButton = DLGCreatePushButton("Binary Image", "ProcessSingleFileButtonPress")
 		panel7.dlgaddelement(ProcessSingleFileButton)
 		TagGroup BinaryDirectoryButton = DLGCreatePushButton("Binary Directory", "ProcessDirectoryButtonPress")
@@ -7256,6 +7277,8 @@ class CreateDF360DialogClass : uiframe
 		}
 
 		positionDebugWindow(debugMode); //Return View Window to the front if it is not all ready
+		
+		ImageSetTools.exportImageSetAsGTG(ImageSet); // Save the image set tag group as its own file.
 		Result("\n------------- Ending Dark Field Imaging Process ---------------\n");
 	}
 
@@ -8082,6 +8105,11 @@ class CreateDF360DialogClass : uiframe
 			Throw("Image Set has not been finalised");
 		}
 		self.darkFieldImage (imageSet);
+	}
+	
+	void LoadImageSetButtonPress(object self)
+	{
+		ImageSetTools.importImageSetFile();
 	}
 	
 	void ProcessDirectoryButtonPress (object self) // Makes binaries for a collection of images.

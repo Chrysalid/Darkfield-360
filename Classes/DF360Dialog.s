@@ -653,7 +653,10 @@ class CreateDF360DialogClass : uiframe
 		TagGroup DarkFieldStoredButton = DLGCreatePushButton("Start Imaging", "DarkFieldImageButtonPress")
 		panel7.dlgaddelement(DarkFieldStoredButton)
 		panel7.dlgaddelement(dlgcreatelabel("Image Processing")) // Label
-		panel7.dlgaddelement(dlgcreatelabel("")) // Blank		
+		panel7.dlgaddelement(dlgcreatelabel("")) // Blank
+		TagGroup LoadImageSetButton = DLGCreatePushButton("Load Image Set File", "LoadImageSetButtonPress")
+		panel7.dlgaddelement(LoadImageSetButton)
+		panel7.dlgaddelement(dlgcreatelabel("")) // Blank
 		TagGroup ProcessSingleFileButton = DLGCreatePushButton("Binary Image", "ProcessSingleFileButtonPress")
 		panel7.dlgaddelement(ProcessSingleFileButton)
 		TagGroup BinaryDirectoryButton = DLGCreatePushButton("Binary Directory", "ProcessDirectoryButtonPress")
@@ -2050,6 +2053,8 @@ class CreateDF360DialogClass : uiframe
 		}
 
 		positionDebugWindow(debugMode); //Return View Window to the front if it is not all ready
+		
+		ImageSetTools.exportImageSetAsGTG(ImageSet); // Save the image set tag group as its own file.
 		Result("\n------------- Ending Dark Field Imaging Process ---------------\n");
 	}
 
@@ -2876,6 +2881,11 @@ class CreateDF360DialogClass : uiframe
 			Throw("Image Set has not been finalised");
 		}
 		self.darkFieldImage (imageSet);
+	}
+	
+	void LoadImageSetButtonPress(object self)
+	{
+		ImageSetTools.importImageSetFile();
 	}
 	
 	void ProcessDirectoryButtonPress (object self) // Makes binaries for a collection of images.
