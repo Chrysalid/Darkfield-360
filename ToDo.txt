@@ -41,6 +41,6 @@ Save the central DP and highlight + label the target coordinates in an image set
 
 Currently
 ----------
-Save imageSetData as file: Gatan format and Text format
-	Do this at end of an imaging run automatically.
-Load imageSet Data from files.
+Split up file name generation + move to imageSetTools
+Make saveImageInImageSet() record the SaveAsFile tag and Filename string in the imageSet.
+Make Auto-Save always on?

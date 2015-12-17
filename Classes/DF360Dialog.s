@@ -189,73 +189,6 @@ class CreateDF360DialogClass : uiframe
 		return imageConfigDialogID;
 	}
 	
-	/*
-	Function to save an image using image set data and to feed those values into the image tags and imageset tags
-		returns 0 on a failure/cancellation, 1 on success.
-		Will save all images for an image set in a subfolder with the imageset ID
-	*/
-	number saveImageInImageSet(object self, image &theImage){
-		if(debugmode==true){result("\nSaving Image " + theImage.ImageGetID());}
-		TagGroup PersistentTags = theImage.ImageGetTagGroup();
-		string imageSetID
-		PersistentTags.TagGroupGetTagAsString("Darkfield360:ImageSetID", imageSetID);
-		if(debugMode==true){result("\n\t ImageSetID: " + imageSetID);}
-		TagGroup ImageSet
-		number imageSetFound = ImageSetTools.getImageSetByID(ImageSetID, ImageSet);
-		if(imageSetFound == false){
-			result("\n\nImage Set with ID " + ImageSetID + " not found when saving an image!")
-			return 0;
-		}
-		string saveDir = GetApplicationDirectory( 1100, 1 );
-		// index 1100 = autosave
-		string imageSetDir = PathConcatenate(saveDir, ImageSetID);
-		number imageSetDirExists = DoesDirectoryExist( imageSetDir );
-		if(imageSetDirExists == false){
-			CreateDirectory( imageSetDir );
-			imageSetDirExists = DoesDirectoryExist( imageSetDir );
-			if(imageSetDirExists == false){
-				result("\n\nCould not find or create a save directory when saving an image!")
-				return 0;
-			}
-		}
-		number ImageSpotNumber, shadowValue;
-		string ImageType, fileName, shadowName;
-		PersistentTags.TagGroupGetTagAsString("Darkfield360:ImageType", ImageType);
-		PersistentTags.TagGroupGetTagAsNumber("Darkfield360:ImageSpotNumber", ImageSpotNumber);
-		PersistentTags.TagGroupGetTagAsNumber("Darkfield360:ShadowValue", shadowValue);
-		
-		fileName = (ImageType == "BF") ? ("Brightfield_" + constructTimeStamp()) : fileName;
-		fileName = (ImageType == "DF") ? ("Darkfield_" + constructTimeStamp() + "_spot_" + ImageSpotNumber) : fileName;
-		fileName = (ImageType == "DP") ? ("Diffraction_" + constructTimeStamp() + "_spot_" + ImageSpotNumber) : fileName;
-		fileName = (ImageType == "Bin") ? ("Binary_" + constructTimeStamp()) : fileName;
-		
-		shadowName = (shadowValue == 0) ? ("_middle") : shadowName;
-		shadowName = (shadowValue == 1) ? ("_middle") : shadowName;
-		shadowName = (shadowValue == 2) ? ("_higher") : shadowName;
-		shadowName = (shadowValue == 3) ? ("_lower") : shadowName;
-		
-		fileName = fileName + shadowName;
-		
-		string filePath = PathConcatenate(imageSetDir, fileName);
-		
-		if(DoesFileExist(filePath + ".dm4") || DoesFileExist(filePath + ".dm3")){
-			result("\n" + filePath + " already exists. File name changed to ");
-			fileName = fileName + "_2";
-			filePath = PathConcatenate(imageSetDir, fileName);
-			result(filePath);
-		}		
-		
-		SaveAsGatan(theImage, filePath);
-		
-		if(DoesFileExist(filePath + ".dm4") || DoesFileExist(filePath + ".dm3")){
-			result("\n" + filePath + " saved.")
-			return 1;
-		} else {
-			result("\n\nFinal save check indicates the file " + filePath + " did not save. You'd better check!")
-			return 0;
-		}
-	}
-	
 	
 	/* Function to draw the lines on the View Window used to centre the beam and pick spots.
 		If updateToolkit = 1, Adds the ring marker and stores it in the toolkit.
@@ -1034,6 +967,8 @@ class CreateDF360DialogClass : uiframe
 		TagGroup spot = ImageSetTools.addSpotToCurrentImageSet(); // The 1-3 images here will be placed inside the spot group
 		spotTracker = spotTracker + 1;
 		tracker = tracker + 1;
+		MiddleCoordinates.TagGroupSetTagAsString("ImageType", "DP");
+		MiddleCoordinates.TagGroupSetTagAsNumber("ExposureTime", DPExposure);
 		imageSetTools.addImageDataToCurrentSpot(MiddleCoordinates, "Middle"); // this is the middle image and is added to that tag in the spot taggroup
 
 		// For images with Shadowing activated...
@@ -1639,10 +1574,10 @@ class CreateDF360DialogClass : uiframe
 			
 			if(AutoSaveImages == true ){
 				if(debugMode==true){result("\n\t Saving images.");}
-				self.saveImageInImageSet(DPImage);
+				ImageSetTools.saveImageInImageSet(DPImage);
 				if(ShadowMode == true && (i > 0)){
-					self.saveImageInImageSet(DPImageHigher);
-					self.saveImageInImageSet(DPImageLower);
+					ImageSetTools.saveImageInImageSet(DPImageHigher);
+					ImageSetTools.saveImageInImageSet(DPImageLower);
 				}
 			}
 			
@@ -1856,7 +1791,7 @@ class CreateDF360DialogClass : uiframe
 		startBFImage := self.takeBFImage(ImageSet, BFImageTags);
 		
 		if(saveImages == 1){
-			self.saveImageInImageSet(startBFImage);
+			ImageSetTools.saveImageInImageSet(startBFImage);
 		}
 		
 		if(displayImages == true) // If displaying the image...
@@ -1908,12 +1843,12 @@ class CreateDF360DialogClass : uiframe
 			if(debugMode==true){result("\n\t Saving images for image group " + im);}
 			if(saveImages == true){
 				if((integration == 0) || (saveNonIntegrated == 1)){ // Saves each image. Integrations must be done seperately.
-					self.saveImageInImageSet(MiddleDFImage);
+					ImageSetTools.saveImageInImageSet(MiddleDFImage);
 					if(HigherImage.TagGroupIsValid() == true){
-						self.saveImageInImageSet(HigherDFImage);
+						ImageSetTools.saveImageInImageSet(HigherDFImage);
 					}
 					if(LowerImage.TagGroupIsValid() == true){
-						self.saveImageInImageSet(LowerDFImage);
+						ImageSetTools.saveImageInImageSet(LowerDFImage);
 					}
 				}
 			} else { // If not saving the image...
@@ -2009,7 +1944,7 @@ class CreateDF360DialogClass : uiframe
 		endBFImage := self.takeBFImage(ImageSet, EndBFImageTags);
 		
 		if(saveImages == 1){
-			self.saveImageInImageSet(endBFImage);
+			ImageSetTools.saveImageInImageSet(endBFImage);
 		} else { // If not saving the image...
 			EndBFImageTags.TagGroupSetTagAsNumber("SavedAsFile", 0);
 		}

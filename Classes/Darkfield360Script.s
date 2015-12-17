@@ -3177,6 +3177,98 @@ class ImageSetTools
 		return 1;
 	}
 	
+	/* Function to read the **image's persistent tags** and extract the information needed to find the image in an imageSet
+		returns 0/1 for fail/pass
+		Passes on values for ImageSetID, ImageType (BF/DF/DP), Spot number, ShadowValue (0/1/2/3)
+		Does not do ANYTHING with currently active image sets in memory.
+	*/
+	number identifyImageInImageSet(object self, image &theImage, string &ImageSetID, string &ImageType, number &SpotNumber, number &ShadowValue)
+	{
+		number DoImageTagsExist = self.doImageTagsExist(theImage);
+		if(DoImageTagsExist == false){
+			return 0;
+		}
+		
+		TagGroup ImageTags;
+		TagGroup persistentTG = theImage.ImageGetTagGroup();
+		persistentTG.TagGroupGetTagAsTagGroup("Darkfield360", ImageTags);
+		
+		if (self.getImageSetID(ImageTags, ImageSetID) == false) {
+			return 0;
+		}
+		if( ImageTags.TagGroupDoesTagExist("ImageType") == false ){
+			return 0;
+		}
+		if( ImageTags.TagGroupDoesTagExist("ImageSpotNumber") == false ){
+			return 0;
+		}
+		if( ImageTags.TagGroupDoesTagExist("ShadowValue") == false ){
+			return 0;
+		}
+		
+		ImageTags.TagGroupGetTagAsString("ImageType", ImageType);
+		ImageTags.TagGroupGetTagAsNumber("ImageSpotNumber", SpotNumber);
+		ImageTags.TagGroupGetTagAsNumber("ShadowValue", ShadowValue);		
+	
+		if(ImageType == ""){
+			return 0;
+		}
+
+		return 1;
+	}
+	
+	/* Function to load a specific image/spot data from an ImageSet.
+		Passes on the TagGroup of the image inside the ImageSet;
+		Returns 0/1 for fail/pass;
+	*/
+	number getImageDataFromImageSet (object self, TagGroup ImageSet, String ImageType, Number SpotNumber, Number ShadowValue, TagGroup &ImageData)
+	{
+		if(ImageType != "BF" && ImageType != "DF" && ImageType != "DP"){
+			result("\n Image data could not be retrieved: " + ImageType + " is not a valid Image Type (BF/DP/DF)");
+			return 0;
+		}
+		number loaded;
+		TagGroup Collection;
+		if(ImageType == "DP"){
+			loaded = ImageSet.TagGroupGetTagAsTagGroup("Spots", Collection);
+		} else {
+			loaded = ImageSet.TagGroupGetTagAsTagGroup("Images", Collection);
+		}
+		if(loaded == 0){
+			result("\n Image data could not be retrieved: No Image/Spot Collection found in this ImageSet.");
+			return 0;
+		}
+		
+		number TotalImageGroups = Collection.TagGroupCountTags();
+		if(SpotNumber >= TotalImageGroups){
+			result("\n Image data could not be retrieved: " + SpotNumber + " is out of range.");
+			return 0;
+		}
+		
+		TagGroup ImageGroup
+		loaded = Collection.TagGroupGetIndexedTagAsTagGroup(SpotNumber, ImageGroup);
+		if(loaded == 0){
+			result("\n Image data could not be retrieved: No Image Data found for this Spot Number");
+			return 0;
+		}
+		
+		if(ShadowValue == 0 || shadowValue == 1){
+			loaded = ImageGroup.TagGroupGetTagAsTagGroup("Middle", ImageData);
+		} else if (ShadowValue == 2){
+			loaded = ImageGroup.TagGroupGetTagAsTagGroup("Higher", ImageData);
+		} else if (ShadowValue == 3){
+			loaded = ImageGroup.TagGroupGetTagAsTagGroup("Lower", ImageData);
+		} else {
+			result("\n Image data could not be retrieved: " + ShadowValue + " is not valid (0/1/2/3).");
+			return 0;
+		}
+		if(loaded == 0){
+			result("\n Image data could not be retrieved: No Image Data found for this Shadow Value");
+			return 0;
+		}
+		return 1;	
+	}	
+	
 	/* Save the taggroup as a gtg file used natively by DM. Function will ask for file path etc. */
 	number exportImageSetAsGTG(object self, TagGroup ImageSet){
 		String path;
@@ -3193,7 +3285,7 @@ class ImageSetTools
 		return 1;
 	}
 	
-	/* Save the taggroup as a .s or .txt file so it can be read more easily by a human.
+	/*	Save the taggroup as a .s or .txt file so it can be read more easily by a human.
 		No text import function as yet.
 	*/
 	number exportImageSetAsTXT(object self, TagGroup ImageSet){
@@ -3247,7 +3339,7 @@ class ImageSetTools
 			result("\nThere was an error opening the file.");
 			return 0;
 		} else {
-			if(debugMode==true) {result("\n Image Set opened.");}
+			result("\n Image Set opened.");
 		}
 		
 		number fileAdded = self.addImageSet( LoadedImageSet );
@@ -3297,6 +3389,116 @@ class ImageSetTools
 		return persistentTG;
 	}
 
+	/*
+	Function to generate the filename for an image in an ImageSet and then check if it can be saved without over-writting an existing image.
+		Passes the filename to a variable.
+		Passes the full filepath to a variable.
+		Returns 1 if the file is safe to be saved, 0 if there is a problem.
+		Will add _2 to the filename if there is an existing file, but will only go to _2, since anymore than one duplicate means something has gone wrong.
+	*/
+
+	number generateFileNameForImageInImageSet(object self, TagGroup ImageTags, string &fileName, string &filePath)
+	{
+		if(debugmode==true){result("\nGenerating the Image Filename and Path.");}
+		string imageSetID
+		ImageTags.TagGroupGetTagAsString("Darkfield360:ImageSetID", imageSetID);
+
+		string saveDir = GetApplicationDirectory( 1100, 1 );
+		// index 1100 = autosave
+		string imageSetDir = PathConcatenate(saveDir, ImageSetID);
+		number imageSetDirExists = DoesDirectoryExist( imageSetDir );
+		if(imageSetDirExists == false){
+			CreateDirectory( imageSetDir );
+			imageSetDirExists = DoesDirectoryExist( imageSetDir );
+			if(imageSetDirExists == false){
+				result("\n\nCould not find or create a save directory when generating the folder for an image set!")
+				return 0;
+			}
+		}
+		number ImageSpotNumber, shadowValue;
+		string ImageType, shadowName;
+		ImageTags.TagGroupGetTagAsString("Darkfield360:ImageType", ImageType);
+		ImageTags.TagGroupGetTagAsNumber("Darkfield360:ImageSpotNumber", ImageSpotNumber);
+		ImageTags.TagGroupGetTagAsNumber("Darkfield360:ShadowValue", shadowValue);
+		
+		fileName = (ImageType == "BF") ? ("Brightfield_" + constructTimeStamp()) : fileName;
+		fileName = (ImageType == "DF") ? ("Darkfield_" + constructTimeStamp() + "_spot_" + ImageSpotNumber) : fileName;
+		fileName = (ImageType == "DP") ? ("Diffraction_" + constructTimeStamp() + "_spot_" + ImageSpotNumber) : fileName;
+		fileName = (ImageType == "Bin") ? ("Binary_" + constructTimeStamp()) : fileName;
+		
+		shadowName = (shadowValue == 0) ? ("_middle") : shadowName;
+		shadowName = (shadowValue == 1) ? ("_middle") : shadowName;
+		shadowName = (shadowValue == 2) ? ("_higher") : shadowName;
+		shadowName = (shadowValue == 3) ? ("_lower") : shadowName;
+		
+		fileName = fileName + shadowName;
+	
+		filePath = PathConcatenate(imageSetDir, fileName);
+		
+		if(DoesFileExist(filePath + ".dm4") || DoesFileExist(filePath + ".dm3")){
+			result("\n" + filePath + " already exists. File name changed to ");
+			fileName = fileName + "_2";
+			filePath = PathConcatenate(imageSetDir, fileName);
+			result(fileName);
+			if(DoesFileExist(filePath + ".dm4") || DoesFileExist(filePath + ".dm3")){
+				result("\n Multiple Versions of " + filename + " found.");
+				return 0;
+			}
+		}
+		return 1;
+	}
+	
+	/*	Function to save an image using image set data and to feed those values into the image tags and imageset tags
+		returns 0 on a failure/cancellation, 1 on success.
+		Will save all images for an image set in a subfolder with the imageset ID
+	*/
+	number saveImageInImageSet(object self, image &theImage)
+	{
+		if(debugmode==true){result("\nSaving Image " + theImage.ImageGetID());}
+		TagGroup PersistentTags = theImage.ImageGetTagGroup();
+		string imageSetID
+		PersistentTags.TagGroupGetTagAsString("Darkfield360:ImageSetID", imageSetID);
+		if(debugMode==true){result("\n\t ImageSetID: " + imageSetID);}
+		TagGroup ImageSet
+		number imageSetFound = self.getImageSetByID(ImageSetID, ImageSet);
+		if(imageSetFound == false){
+			result("\n\nImage Set with ID " + ImageSetID + " not found when saving an image!")
+			return 0;
+		}
+		
+		// Load identifying data for this image in its imageSet
+		//number identifyImageInImageSet(object self, image &theImage, string &ImageSetID, string &ImageType, number &SpotNumber, number &ShadowValue)
+		string ImageType;
+		number SpotNumber, ShadowValue;
+		self.identifyImageInImageSet(theImage, ImageSetID, ImageType, SpotNumber, ShadowValue);
+		
+		string fileName, filePath;
+		//number generateFileNameForImageInImageSet(object self, TagGroup ImageTags, string &filename, string &filePath)
+		number FileSaveAllowed = self.generateFileNameForImageInImageSet( PersistentTags, fileName, filePath);
+		if(FileSaveAllowed == false){
+			result("\n\n File was not saved.");
+			return 0;
+		}
+		
+		SaveAsGatan(theImage, filePath);
+		
+		if(DoesFileExist(filePath + ".dm4") || DoesFileExist(filePath + ".dm3")){
+			result("\n" + filePath + " saved.")
+			// Record the saved file name in the ImageSet for future recall.
+			//number getImageDataFromImageSet (object self, TagGroup ImageSet, String ImageType, Number SpotNumber, Number ShadowValue, TagGroup &ImageData)
+			TagGroup ImageData;
+			self.getImageDataFromImageSet(ImageSet, ImageType, SpotNumber, ShadowValue, ImageData);
+			
+			ImageData.TagGroupSetTagAsString("FileName", fileName);
+			ImageData.TagGroupSetTagAsNumber("SavedAsFile", 1);
+			result("\n ImageSet " + ImageSetID + " updated with file name " + fileName);
+			return 1;
+		} else {
+			result("\n\nFinal save check indicates the file " + filePath + " did not save. \nIt may still have saved, but you should check.")
+			return 0;
+		}
+	}
+	
 }
 
 // ********************************
@@ -5413,73 +5615,6 @@ class CreateDF360DialogClass : uiframe
 		return imageConfigDialogID;
 	}
 	
-	/*
-	Function to save an image using image set data and to feed those values into the image tags and imageset tags
-		returns 0 on a failure/cancellation, 1 on success.
-		Will save all images for an image set in a subfolder with the imageset ID
-	*/
-	number saveImageInImageSet(object self, image &theImage){
-		if(debugmode==true){result("\nSaving Image " + theImage.ImageGetID());}
-		TagGroup PersistentTags = theImage.ImageGetTagGroup();
-		string imageSetID
-		PersistentTags.TagGroupGetTagAsString("Darkfield360:ImageSetID", imageSetID);
-		if(debugMode==true){result("\n\t ImageSetID: " + imageSetID);}
-		TagGroup ImageSet
-		number imageSetFound = ImageSetTools.getImageSetByID(ImageSetID, ImageSet);
-		if(imageSetFound == false){
-			result("\n\nImage Set with ID " + ImageSetID + " not found when saving an image!")
-			return 0;
-		}
-		string saveDir = GetApplicationDirectory( 1100, 1 );
-		// index 1100 = autosave
-		string imageSetDir = PathConcatenate(saveDir, ImageSetID);
-		number imageSetDirExists = DoesDirectoryExist( imageSetDir );
-		if(imageSetDirExists == false){
-			CreateDirectory( imageSetDir );
-			imageSetDirExists = DoesDirectoryExist( imageSetDir );
-			if(imageSetDirExists == false){
-				result("\n\nCould not find or create a save directory when saving an image!")
-				return 0;
-			}
-		}
-		number ImageSpotNumber, shadowValue;
-		string ImageType, fileName, shadowName;
-		PersistentTags.TagGroupGetTagAsString("Darkfield360:ImageType", ImageType);
-		PersistentTags.TagGroupGetTagAsNumber("Darkfield360:ImageSpotNumber", ImageSpotNumber);
-		PersistentTags.TagGroupGetTagAsNumber("Darkfield360:ShadowValue", shadowValue);
-		
-		fileName = (ImageType == "BF") ? ("Brightfield_" + constructTimeStamp()) : fileName;
-		fileName = (ImageType == "DF") ? ("Darkfield_" + constructTimeStamp() + "_spot_" + ImageSpotNumber) : fileName;
-		fileName = (ImageType == "DP") ? ("Diffraction_" + constructTimeStamp() + "_spot_" + ImageSpotNumber) : fileName;
-		fileName = (ImageType == "Bin") ? ("Binary_" + constructTimeStamp()) : fileName;
-		
-		shadowName = (shadowValue == 0) ? ("_middle") : shadowName;
-		shadowName = (shadowValue == 1) ? ("_middle") : shadowName;
-		shadowName = (shadowValue == 2) ? ("_higher") : shadowName;
-		shadowName = (shadowValue == 3) ? ("_lower") : shadowName;
-		
-		fileName = fileName + shadowName;
-		
-		string filePath = PathConcatenate(imageSetDir, fileName);
-		
-		if(DoesFileExist(filePath + ".dm4") || DoesFileExist(filePath + ".dm3")){
-			result("\n" + filePath + " already exists. File name changed to ");
-			fileName = fileName + "_2";
-			filePath = PathConcatenate(imageSetDir, fileName);
-			result(filePath);
-		}		
-		
-		SaveAsGatan(theImage, filePath);
-		
-		if(DoesFileExist(filePath + ".dm4") || DoesFileExist(filePath + ".dm3")){
-			result("\n" + filePath + " saved.")
-			return 1;
-		} else {
-			result("\n\nFinal save check indicates the file " + filePath + " did not save. You'd better check!")
-			return 0;
-		}
-	}
-	
 	
 	/* Function to draw the lines on the View Window used to centre the beam and pick spots.
 		If updateToolkit = 1, Adds the ring marker and stores it in the toolkit.
@@ -6258,6 +6393,8 @@ class CreateDF360DialogClass : uiframe
 		TagGroup spot = ImageSetTools.addSpotToCurrentImageSet(); // The 1-3 images here will be placed inside the spot group
 		spotTracker = spotTracker + 1;
 		tracker = tracker + 1;
+		MiddleCoordinates.TagGroupSetTagAsString("ImageType", "DP");
+		MiddleCoordinates.TagGroupSetTagAsNumber("ExposureTime", DPExposure);
 		imageSetTools.addImageDataToCurrentSpot(MiddleCoordinates, "Middle"); // this is the middle image and is added to that tag in the spot taggroup
 
 		// For images with Shadowing activated...
@@ -6863,10 +7000,10 @@ class CreateDF360DialogClass : uiframe
 			
 			if(AutoSaveImages == true ){
 				if(debugMode==true){result("\n\t Saving images.");}
-				self.saveImageInImageSet(DPImage);
+				ImageSetTools.saveImageInImageSet(DPImage);
 				if(ShadowMode == true && (i > 0)){
-					self.saveImageInImageSet(DPImageHigher);
-					self.saveImageInImageSet(DPImageLower);
+					ImageSetTools.saveImageInImageSet(DPImageHigher);
+					ImageSetTools.saveImageInImageSet(DPImageLower);
 				}
 			}
 			
@@ -7080,7 +7217,7 @@ class CreateDF360DialogClass : uiframe
 		startBFImage := self.takeBFImage(ImageSet, BFImageTags);
 		
 		if(saveImages == 1){
-			self.saveImageInImageSet(startBFImage);
+			ImageSetTools.saveImageInImageSet(startBFImage);
 		}
 		
 		if(displayImages == true) // If displaying the image...
@@ -7132,12 +7269,12 @@ class CreateDF360DialogClass : uiframe
 			if(debugMode==true){result("\n\t Saving images for image group " + im);}
 			if(saveImages == true){
 				if((integration == 0) || (saveNonIntegrated == 1)){ // Saves each image. Integrations must be done seperately.
-					self.saveImageInImageSet(MiddleDFImage);
+					ImageSetTools.saveImageInImageSet(MiddleDFImage);
 					if(HigherImage.TagGroupIsValid() == true){
-						self.saveImageInImageSet(HigherDFImage);
+						ImageSetTools.saveImageInImageSet(HigherDFImage);
 					}
 					if(LowerImage.TagGroupIsValid() == true){
-						self.saveImageInImageSet(LowerDFImage);
+						ImageSetTools.saveImageInImageSet(LowerDFImage);
 					}
 				}
 			} else { // If not saving the image...
@@ -7233,7 +7370,7 @@ class CreateDF360DialogClass : uiframe
 		endBFImage := self.takeBFImage(ImageSet, EndBFImageTags);
 		
 		if(saveImages == 1){
-			self.saveImageInImageSet(endBFImage);
+			ImageSetTools.saveImageInImageSet(endBFImage);
 		} else { // If not saving the image...
 			EndBFImageTags.TagGroupSetTagAsNumber("SavedAsFile", 0);
 		}
