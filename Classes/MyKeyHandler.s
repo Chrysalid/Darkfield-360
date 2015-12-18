@@ -11,10 +11,10 @@ void printCommands(){
 	result("\n\nShortcut Keys Available:");
 	result("\n\t'h' to display these commands again.");
 	result("\n\t's' to store a diffraction spot's coordinates.");
-	result("\n\t'r' to erase the stored diffraction spot cordinates.");
-	result("\n\t'p' to print stored tilt data to this screen.");
+	result("\n\t'p' to view the stored image sets.");
+	result("\n\t'p' in debug mode to print out a detailed list of debugging information");
 	result("\n\t'1' to show the ring marker and measuring system.");
-	result("\n\t'2' to move the marker ring to a set D-Spacing.");
+	result("\n\t'2' to move the marker ring to a different D-Spacing.");
 	result("\n\t'3' to update the ring-mode radius display.");
 	result("\n\t'0' to return the beam to the centre of the screen.");
 }
@@ -27,6 +27,8 @@ class MyKeyHandler
 	number ImageSetToolsID; // ID of the imageset tools object
 	number debugMode
 
+	// Need undo command?
+	
 	// Function to print out the various saved variables for debugging
 	void printAllValues(object self)
 	{
@@ -89,27 +91,14 @@ class MyKeyHandler
 					Toolkit.beamCentre();
 					return 0;
 				}
-			if(keydescription.MatchesKeyDescriptor( "r" )) // RESET DATA
+			if(keydescription.MatchesKeyDescriptor( "p" )) // PRINT DATA
 				{	
-					if(debugMode==true){result("\nYou pressed r to reset the stored Tilt Values.");}
-					if(OkCancelDialog("Delete stored target coordinates?")){
-						// Centre beam.
-						Toolkit.beamCentre();
-						if(debugMode==1){result("\nBeam centered");}
-						dataObject.resetTiltStore();
-					}
-				}
-			if(keydescription.MatchesKeyDescriptor( "p" )) // PRINT SPOTID ARRAY
-				{	
-					if(debugMode==true){result("\nYou pressed p to print the stored Tilt Values.");}
+					if(debugMode==true){result("\nYou pressed p to examine stored Tilt Values.");}
 					if(debugMode!=true){
-						dataObject.printSpotIDArray();
-					} else {
-						dataObject.printSpotIDArray (100);
-						result(dataObject.printAllValues());
-						self.printAllValues();
-						dataObject.showDataTagGroup(3);
 						GetScriptObjectFromID(ImageSetToolsID).showImageSets();
+					} else {
+						self.printAllValues();
+						GetScriptObjectFromID(ToolkitID).printAllValues();
 					}
 					return 0;
 				}

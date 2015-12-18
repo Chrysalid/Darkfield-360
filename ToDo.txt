@@ -6,11 +6,9 @@ Update moveToCurrentROI to something more useful and bind to a key
 
 Update darkFieldImage to use ImageSet values for things ?
 
-Make saveImageInImageSet() record the SaveAsFile tag and Filename string in the imageSet.
 Make a function to produce persistent Image tags for integrated images
 
 Tag group save methods
-	- Save image information for processing
 	- See the Taggroup_formatting.txt file for information
 	
 Put image acquisition in its own thread that can be stopped.
@@ -33,14 +31,10 @@ Desired Features
 Allow colour selection in createMap()
 	- Make a generic colour selection dialog
 
-Cycle through saved tilt settings
-
 Save the central DP and highlight + label the target coordinates in an image set.
 
 'Get' the marker ring's d-spacing with a button on the new image config dialog.
 
 Currently
 ----------
-Split up file name generation + move to imageSetTools
-Make saveImageInImageSet() record the SaveAsFile tag and Filename string in the imageSet.
 Make Auto-Save always on?

@@ -14,9 +14,7 @@ class ImageProcessing
 	number dataObjectID;
 	number imageSetToolsID;
 	number imageAlignmentDialogID;
-
-	number debugMode;
-	
+	number debugMode;	
 
 	void initialise(object self, number theToolkitID, number theDataObjectID, number theImageSetToolsID, number theAlignmentDialogID){
 		ToolkitID = theToolkitID;
@@ -30,6 +28,24 @@ class ImageProcessing
 		debugMode = input;
 		if(debugMode == 1){result("\n\tDebug Mode Activated in Image Processing Object");}
 	}
+	
+		/* Prints out the stored variables in the object */
+	void printAll(object self)
+	{
+		result("\n\nImageProcessing Debug Values")
+		result("\n------------------------------")
+		string textstring;
+		textstring = "\n\tObjectID: " + ImageProcessingID +\
+			"\n DebugMode: " + debugMode +\
+			"\n ToolkitID: " + ToolkitID +\
+			"\n DataObjectID: " + DataObjectID +\
+			"\n ImageSetToolsID: " + ImageSetToolsID +\
+			"\n imageAlignmentDialogID: " + imageAlignmentDialogID;
+		result(textstring);
+		result("\n-------End----------------")
+	}
+	
+	
 	
 	/* Finds the level of brightness needed to filter out the less bright pixels
 		Values to customize in this function:

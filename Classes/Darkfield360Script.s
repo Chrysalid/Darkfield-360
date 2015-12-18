@@ -1743,14 +1743,11 @@ class MyDataObject
 		return dataObjectID;
 	}
 	
-	
-	
-	
-	// Function to return a text string with all the stored values.
-	string printAllValues(object self){
-		string textString
-		textString = "\nPreparing Dump of all Data Variables..." +\
-		"\ntoggle: " + toggle +\
+	// Function to print out the object's stored values.
+	void printAll(object self){
+		result("\n\nDataObject Debug Values");
+		result("\n------------------------------");
+		string textString = "\ntoggle: " + toggle +\
 		"\ntracker: " + tracker +\
 		"\nspotTracker: " + spotTracker +\
 		"\nROITracker: " + ROITracker +\
@@ -1769,18 +1766,8 @@ class MyDataObject
 		"\ncameraLength: " + cameraLength +\
 		"\nshadowDistanceNM: " + shadowDistanceNM;
 		
-		return textString
-	}
-
-	/* Function to print out all the values in the data image for debugging and backup */
-	void printSpotIDArray (object self){
-		result("\nprintSpotIDArray() called. Debug function requires updating.")
-	}
-	/* Function to print out all the values in the data image for debugging and backup.
-			This version ignores the tracker value in the dataObject and uses the one provided.
-	 */
-	void printSpotIDArray (object self, number forcedValue){
-		result("\nprintSpotIDArray() called. Debug function requires updating.");
+		result(textString);
+		result("\n-------End----------------");
 	}
 
 	 /* Displays a TagList saved inside the data Object. Used for debugging. */
@@ -1792,9 +1779,6 @@ class MyDataObject
 	void resetTiltStore (object self){
 		if(tracker==0){
 			throw("No Data to Delete");
-		}
-		if(debugMode==true){
-			self.printSpotIDArray(); // Data dump before it is destroyed.
 		}
 		// Boolean TwoButtonDialog( String prompt, String acceptLabel, String rejectLabel )
 		if(TwoButtonDialog( "Delete Calibration Data?", "Yes", "No")){
@@ -2690,7 +2674,9 @@ class ImageSetTools
 	TagGroup imageSets //tag list of image sets
 	number currentImageSetIndex // index number of the currently open image set
 	number currentSpotIndex; //index number of currently open spot number
+	
 	string currentImageTagName; // Middle, Lower or Higher, to show which image we are working on.
+	// Used in 1/2 functions. Phase this out.
 	
 	void initialise(object self, number theToolkitID, number theDataObjectID){
 		ToolkitID = theToolkitID;
@@ -2720,6 +2706,24 @@ class ImageSetTools
 	/* Opens the ImageSets tag list in a window in DM. Used for debugging. */
 	void showImageSets(object self){
 		TagGroupOpenBrowserWindow(imageSets, 0);
+	}
+	
+	/* Prints out the stored variables in the objct and shows the ImageSet Tag List */
+	void printAll(object self)
+	{
+		self.showImageSets();
+		result("\n\nImageSetTools Debug Values")
+		result("\n------------------------------")
+		string textstring;
+		textstring = "\n\tObjectID: " + ImageSetToolsID +\
+			"\n DebugMode: " + debugMode +\
+			"\n ToolkitID: " + ToolkitID +\
+			"\n DataObjectID: " + DataObjectID +\
+			"\n currentImageSetIndex: " + currentImageSetIndex +\
+			"\n currentSpotIndex: " + currentSpotIndex +\
+			"\n currentImageTagName: " + currentImageTagName;
+		result(textstring);
+		result("\n-------End----------------")
 	}
 	
 	/* Returns the image set id string for a given image set tag group. Used to simplify using image sets in external functions.*/
@@ -4589,6 +4593,21 @@ class ImageConfiguration : uiframe
 		debugMode = input;
 		if(debugMode == 1){result("\n\tDebug Mode Activated in Imageset configuration dialog.");}
 	}
+	
+	/* Prints out the stored variables in the object */
+	void printAll(object self)
+	{
+		result("\n\nImageConfiguration Debug Values")
+		result("\n------------------------------")
+		string textstring;
+		textstring = "\n\tObjectID: " + imageConfigurationID +\
+			"\n DebugMode: " + debugMode +\
+			"\n ToolkitID: " + ToolkitID +\
+			"\n DataObjectID: " + DataObjectID +\
+			"\n ImageSetToolsID: " + ImageSetToolsID;
+		result(textstring);
+		result("\n-------End----------------")
+	}
 }
 // ********************************************************************************
 //  Image Processing class.
@@ -4606,9 +4625,7 @@ class ImageProcessing
 	number dataObjectID;
 	number imageSetToolsID;
 	number imageAlignmentDialogID;
-
-	number debugMode;
-	
+	number debugMode;	
 
 	void initialise(object self, number theToolkitID, number theDataObjectID, number theImageSetToolsID, number theAlignmentDialogID){
 		ToolkitID = theToolkitID;
@@ -4622,6 +4639,24 @@ class ImageProcessing
 		debugMode = input;
 		if(debugMode == 1){result("\n\tDebug Mode Activated in Image Processing Object");}
 	}
+	
+		/* Prints out the stored variables in the object */
+	void printAll(object self)
+	{
+		result("\n\nImageProcessing Debug Values")
+		result("\n------------------------------")
+		string textstring;
+		textstring = "\n\tObjectID: " + ImageProcessingID +\
+			"\n DebugMode: " + debugMode +\
+			"\n ToolkitID: " + ToolkitID +\
+			"\n DataObjectID: " + DataObjectID +\
+			"\n ImageSetToolsID: " + ImageSetToolsID +\
+			"\n imageAlignmentDialogID: " + imageAlignmentDialogID;
+		result(textstring);
+		result("\n-------End----------------")
+	}
+	
+	
 	
 	/* Finds the level of brightness needed to filter out the less bright pixels
 		Values to customize in this function:
@@ -5280,10 +5315,10 @@ void printCommands(){
 	result("\n\nShortcut Keys Available:");
 	result("\n\t'h' to display these commands again.");
 	result("\n\t's' to store a diffraction spot's coordinates.");
-	result("\n\t'r' to erase the stored diffraction spot cordinates.");
-	result("\n\t'p' to print stored tilt data to this screen.");
+	result("\n\t'p' to view the stored image sets.");
+	result("\n\t'p' in debug mode to print out a detailed list of debugging information");
 	result("\n\t'1' to show the ring marker and measuring system.");
-	result("\n\t'2' to move the marker ring to a set D-Spacing.");
+	result("\n\t'2' to move the marker ring to a different D-Spacing.");
 	result("\n\t'3' to update the ring-mode radius display.");
 	result("\n\t'0' to return the beam to the centre of the screen.");
 }
@@ -5296,6 +5331,8 @@ class MyKeyHandler
 	number ImageSetToolsID; // ID of the imageset tools object
 	number debugMode
 
+	// Need undo command?
+	
 	// Function to print out the various saved variables for debugging
 	void printAllValues(object self)
 	{
@@ -5358,27 +5395,14 @@ class MyKeyHandler
 					Toolkit.beamCentre();
 					return 0;
 				}
-			if(keydescription.MatchesKeyDescriptor( "r" )) // RESET DATA
+			if(keydescription.MatchesKeyDescriptor( "p" )) // PRINT DATA
 				{	
-					if(debugMode==true){result("\nYou pressed r to reset the stored Tilt Values.");}
-					if(OkCancelDialog("Delete stored target coordinates?")){
-						// Centre beam.
-						Toolkit.beamCentre();
-						if(debugMode==1){result("\nBeam centered");}
-						dataObject.resetTiltStore();
-					}
-				}
-			if(keydescription.MatchesKeyDescriptor( "p" )) // PRINT SPOTID ARRAY
-				{	
-					if(debugMode==true){result("\nYou pressed p to print the stored Tilt Values.");}
+					if(debugMode==true){result("\nYou pressed p to examine stored Tilt Values.");}
 					if(debugMode!=true){
-						dataObject.printSpotIDArray();
-					} else {
-						dataObject.printSpotIDArray (100);
-						result(dataObject.printAllValues());
-						self.printAllValues();
-						dataObject.showDataTagGroup(3);
 						GetScriptObjectFromID(ImageSetToolsID).showImageSets();
+					} else {
+						self.printAllValues();
+						GetScriptObjectFromID(ToolkitID).printAllValues();
 					}
 					return 0;
 				}
@@ -5483,6 +5507,8 @@ class CreateDF360DialogClass : uiframe
 		result(textstring);
 		result("\n-------End----------------")
 		CameraControlObject.printAllValues();
+		ImageSetTools.printAll();
+		DataObject.printAll();
 	}
 	
 	/* Stores the dataObject */

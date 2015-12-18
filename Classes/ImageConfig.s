@@ -401,4 +401,19 @@ class ImageConfiguration : uiframe
 		debugMode = input;
 		if(debugMode == 1){result("\n\tDebug Mode Activated in Imageset configuration dialog.");}
 	}
+	
+	/* Prints out the stored variables in the object */
+	void printAll(object self)
+	{
+		result("\n\nImageConfiguration Debug Values")
+		result("\n------------------------------")
+		string textstring;
+		textstring = "\n\tObjectID: " + imageConfigurationID +\
+			"\n DebugMode: " + debugMode +\
+			"\n ToolkitID: " + ToolkitID +\
+			"\n DataObjectID: " + DataObjectID +\
+			"\n ImageSetToolsID: " + ImageSetToolsID;
+		result(textstring);
+		result("\n-------End----------------")
+	}
 }

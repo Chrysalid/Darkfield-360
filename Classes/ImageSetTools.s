@@ -15,7 +15,9 @@ class ImageSetTools
 	TagGroup imageSets //tag list of image sets
 	number currentImageSetIndex // index number of the currently open image set
 	number currentSpotIndex; //index number of currently open spot number
+	
 	string currentImageTagName; // Middle, Lower or Higher, to show which image we are working on.
+	// Used in 1/2 functions. Phase this out.
 	
 	void initialise(object self, number theToolkitID, number theDataObjectID){
 		ToolkitID = theToolkitID;
@@ -45,6 +47,24 @@ class ImageSetTools
 	/* Opens the ImageSets tag list in a window in DM. Used for debugging. */
 	void showImageSets(object self){
 		TagGroupOpenBrowserWindow(imageSets, 0);
+	}
+	
+	/* Prints out the stored variables in the objct and shows the ImageSet Tag List */
+	void printAll(object self)
+	{
+		self.showImageSets();
+		result("\n\nImageSetTools Debug Values")
+		result("\n------------------------------")
+		string textstring;
+		textstring = "\n\tObjectID: " + ImageSetToolsID +\
+			"\n DebugMode: " + debugMode +\
+			"\n ToolkitID: " + ToolkitID +\
+			"\n DataObjectID: " + DataObjectID +\
+			"\n currentImageSetIndex: " + currentImageSetIndex +\
+			"\n currentSpotIndex: " + currentSpotIndex +\
+			"\n currentImageTagName: " + currentImageTagName;
+		result(textstring);
+		result("\n-------End----------------")
 	}
 	
 	/* Returns the image set id string for a given image set tag group. Used to simplify using image sets in external functions.*/

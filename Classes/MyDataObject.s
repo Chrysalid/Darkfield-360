@@ -273,14 +273,11 @@ class MyDataObject
 		return dataObjectID;
 	}
 	
-	
-	
-	
-	// Function to return a text string with all the stored values.
-	string printAllValues(object self){
-		string textString
-		textString = "\nPreparing Dump of all Data Variables..." +\
-		"\ntoggle: " + toggle +\
+	// Function to print out the object's stored values.
+	void printAll(object self){
+		result("\n\nDataObject Debug Values");
+		result("\n------------------------------");
+		string textString = "\ntoggle: " + toggle +\
 		"\ntracker: " + tracker +\
 		"\nspotTracker: " + spotTracker +\
 		"\nROITracker: " + ROITracker +\
@@ -299,18 +296,8 @@ class MyDataObject
 		"\ncameraLength: " + cameraLength +\
 		"\nshadowDistanceNM: " + shadowDistanceNM;
 		
-		return textString
-	}
-
-	/* Function to print out all the values in the data image for debugging and backup */
-	void printSpotIDArray (object self){
-		result("\nprintSpotIDArray() called. Debug function requires updating.")
-	}
-	/* Function to print out all the values in the data image for debugging and backup.
-			This version ignores the tracker value in the dataObject and uses the one provided.
-	 */
-	void printSpotIDArray (object self, number forcedValue){
-		result("\nprintSpotIDArray() called. Debug function requires updating.");
+		result(textString);
+		result("\n-------End----------------");
 	}
 
 	 /* Displays a TagList saved inside the data Object. Used for debugging. */
@@ -322,9 +309,6 @@ class MyDataObject
 	void resetTiltStore (object self){
 		if(tracker==0){
 			throw("No Data to Delete");
-		}
-		if(debugMode==true){
-			self.printSpotIDArray(); // Data dump before it is destroyed.
 		}
 		// Boolean TwoButtonDialog( String prompt, String acceptLabel, String rejectLabel )
 		if(TwoButtonDialog( "Delete Calibration Data?", "Yes", "No")){

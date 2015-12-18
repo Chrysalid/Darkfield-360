@@ -57,6 +57,8 @@ class CreateDF360DialogClass : uiframe
 		result(textstring);
 		result("\n-------End----------------")
 		CameraControlObject.printAllValues();
+		ImageSetTools.printAll();
+		DataObject.printAll();
 	}
 	
 	/* Stores the dataObject */
