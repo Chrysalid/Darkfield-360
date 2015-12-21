@@ -1,6 +1,5 @@
 Required Features
 -----------------
-Update print command
 DisableModeWarnings implementation
 Update moveToCurrentROI to something more useful and bind to a key
 
@@ -21,7 +20,7 @@ Bugs
 ---------
 ImageProcessing processDarkFieldImages() uses camera size, not image sizes.
 StartDPStoring / calibration does not update any current image sets yet
-
+Either the StartingBFImage or FinalBFImage in DF imaging sequence does not have its filename saved because it always reads index 0.
 
 
 

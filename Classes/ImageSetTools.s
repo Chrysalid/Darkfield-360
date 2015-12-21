@@ -844,5 +844,185 @@ class ImageSetTools
 		}
 	}
 	
+	/* Make a tagList of the names of all image files inside an imageSet 
+		Return 0 on failure.
+	*/
+	Number listAllImageFilesInImageSet(object self, TagGroup ImageSet, TagGroup &ImageList){
+		TagGroup filesToSearchFor = NewTagList();
+		// Create a tagList of the the image filenames in the image set. Each one will be a single indexed entry with a labelled tag called Name inside it. Store the name without a directory, just like the file list tag group.
+		
+		
+		number DPsTaken; // If the diffraction patterns have been taken.
+		ImageSet.TagGroupGetTagAsNumber("DPsTaken", DPsTaken);
+		number ImagesTaken; // If the darkfield images have been taken.
+		ImageSet.TagGroupGetTagAsNumber("ImagesTaken", ImagesTaken);
+		
+		if(DPsTaken == false){
+			result("Diffraction Patterns have not been taken for this Image Set");
+			return 0;
+		}
+		
+		number ShadowMode;
+		ImageSet.TagGroupGetTagAsNumber("ShadowMode", ShadowMode);
+		
+		TagGroup images, spots;
+		ImageSet.TagGroupGetTagAsTagGroup("Spots", spots);
+		if(spots.TagGroupIsValid() == false){
+			result("Error loading spots list");
+			return 0;
+		}
+		
+		number numberOfSpots = spots.TagGroupCountTags();
+		number i;
+		for(i=0; i < numberOfSpots; i++){
+			// For each diffraction pattern (spot) that was taken, save its name into the filesToSearchFor taglist
+			TagGroup ImageData;
+			self.getImageDataFromImageSet (ImageSet, "DP", i, 1, ImageData);
+			string fileName;
+			ImageData.TagGroupGetTagAsString("FileName", fileName);
+			
+			TagGroup thisGroup;
+			thisGroup.TagGroupCreateNewLabeledTag("Name")
+			thisGroup.TagGroupSetTagAsString( "Name", fileName );
+			filesToSearchFor.TagGroupAddTagGroupAtEnd(thisGroup);
+			
+			if(ShadowMode == true){
+				TagGroup higherGroup, lowerGroup;
+				self.getImageDataFromImageSet (ImageSet, "DP", i, 2, ImageData);
+				ImageData.TagGroupGetTagAsString("FileName", fileName);
+				higherGroup.TagGroupCreateNewLabeledTag("Name")
+				higherGroup.TagGroupSetTagAsString( "Name", fileName );
+				filesToSearchFor.TagGroupAddTagGroupAtEnd(higherGroup);
+				
+				self.getImageDataFromImageSet (ImageSet, "DP", i, 3, ImageData);
+				ImageData.TagGroupGetTagAsString("FileName", fileName);
+				lowerGroup.TagGroupCreateNewLabeledTag("Name")
+				lowerGroup.TagGroupSetTagAsString("Name" , fileName );
+				filesToSearchFor.TagGroupAddTagGroupAtEnd(lowerGroup);
+			}
+		} // end of loop to record DP images (spots)
+		
+		// end here if DF images not taken.
+		if(ImagesTaken == false){
+			result("\n No Dark field images taken in Image Set.");
+			ImageList.TagGroupCopyTagsFrom(filesToSearchFor);
+			result("\n List of image set files complete");
+			return 1;
+		}
+		
+		// Record Darkfield/BF Images
+		ImageSet.TagGroupGetTagAsTagGroup("Images", images);
+		if(images.TagGroupIsValid() == false){
+			result("Error loading Images list. Diffraction Pattern list discarded.");
+			return 0;
+		}
+		
+		numberOfSpots = images.TagGroupCountTags();
+		for(i=0; i < numberOfSpots; i++){
+			// For each darkfield image (DF) that was taken, save its name into the filesToSearchFor taglist
+			TagGroup ImageData;
+			if(i == 0){ // first image is the Brightfield image, not a darkfield image.
+				self.getImageDataFromImageSet (ImageSet, "BF", i, 0, ImageData);
+			} else {
+				self.getImageDataFromImageSet (ImageSet, "DF", i, 1, ImageData);
+			}
+			string fileName;
+			ImageData.TagGroupGetTagAsString("FileName", fileName);
+			
+			TagGroup thisGroup;
+			thisGroup.TagGroupCreateNewLabeledTag("Name")
+			thisGroup.TagGroupSetTagAsString("Name" , fileName );
+			filesToSearchFor.TagGroupAddTagGroupAtEnd(thisGroup);
+			
+			if(ShadowMode == true){
+				self.getImageDataFromImageSet (ImageSet, "DF", i, 2, ImageData);
+				TagGroup higherGroup = NewTagGroup();
+				ImageData.TagGroupGetTagAsString("FileName", fileName);
+				higherGroup.TagGroupCreateNewLabeledTag("Name")
+				higherGroup.TagGroupSetTagAsString( "Name", fileName );
+				filesToSearchFor.TagGroupAddTagGroupAtEnd(higherGroup);
+				
+				self.getImageDataFromImageSet (ImageSet, "DF", i, 3, ImageData);
+				TagGroup lowerGroup = NewTagGroup();
+				ImageData.TagGroupGetTagAsString("FileName", fileName);
+				lowerGroup.TagGroupCreateNewLabeledTag("Name")
+				lowerGroup.TagGroupSetTagAsString("Name" , fileName );
+				filesToSearchFor.TagGroupAddTagGroupAtEnd(lowerGroup);
+			}
+		} // end of loop to record DF images (images)
+		
+		result("\n List of image set files complete");
+		ImageList.TagGroupCopyTagsFrom(filesToSearchFor);
+		return 1;
+	}
+	
+	
+	
+	/* Check to see if all the images in an imageSet are present in the imageset directory
+		passes on a list of found files, a list of missing files .
+		returns 1 if all files found, 0 if there are any missing files.
+	*/
+	number allFilesPresent(object self, TagGroup ImageSet, String ImageSetDir, TagGroup &missingFiles, TagGroup &foundFiles)
+	{
+		result("\nChecking to see if all files are in the image set directory.");
+		result("\n Loading file names from Directory");
+		TagGroup filesInImageSetDir = GetFilesInDirectory( ImageSetDir, 1 );
+		// Format of file list is an indexed TagList. Each file is an entry on the TagList.
+		// Each TagList entry has a labelled tag called Name, which contains the file name with extension but *not* the full directory path.
+
+		result("\n Loading file names from Image Set");
+		TagGroup filesInImageSet;
+		number ImageSetListCreated = self.listAllImageFilesInImageSet(ImageSet, filesInImageSet);
+		if(ImageSetListCreated == false){
+			result("\n Error loading file names from Image Set Data. Ending function");
+			return 0;
+		}
+		
+		number NumberOfFiles = filesInImageSetDir.taggroupcounttags();
+		number NumberOfFilesInImageSet = filesInImageSet.taggroupcounttags();
+		
+		// For each image in the ImageSet look for it in the imageSetDir list. If it is missing then add it to the missingFiles list.
+		number i, j;
+		string thisFileName, thatFileName;
+		missingFiles = NewTagList();
+		foundFiles = NewTagList();
+		
+		for(i=0; i < NumberOfFilesInImageSet; i++)
+		{
+			TagGroup thisImage;
+			filesInImageSet.TagGroupGetIndexedTagAsTagGroup(i, thisImage);
+			thisImage.TagGroupGetTagAsString("Name", thisFileName);
+			number fileFoundFlag = 0;
+			for(j = 0; j < NumberOfFiles; j++){
+				TagGroup thatImage;
+				filesInImageSetDir.TagGroupGetIndexedTagAsTagGroup(j, thatImage);
+				thatImage.TagGroupGetTagAsString("Name", thatFileName);
+				if(thisFileName == thatFileName){
+					fileFoundFlag = 1;
+					TagGroup temp = NewTagGroup();
+					temp.TagGroupCreateNewLabeledTag("Name")
+					temp.TagGroupSetTagAsString("Name" , thisFileName );
+					foundFiles.TagGroupAddTagGroupAtEnd(temp);
+					break;
+				}
+			} // end of matching filename loop
+			if (fileFoundFlag == false) {
+				// add file to missingFiles list
+				TagGroup temp = NewTagGroup();
+				temp.TagGroupCreateNewLabeledTag("Name")
+				temp.TagGroupSetTagAsString("Name" , thisFileName );
+				missingFiles.TagGroupAddTagGroupAtEnd(temp);
+			}
+		} // end loop going through files.
+		
+		if(missingFiles.TagGroupCountTags() == 0){
+			result("\n All files are accounted for.");
+			return 1;
+		} else {
+			result("\n There are " + missingFiles.TagGroupCountTags() + " files missing.");
+			return 0;
+		}
+	}
+	
 }
 
