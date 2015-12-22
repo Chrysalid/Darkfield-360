@@ -197,7 +197,7 @@ class CreateDF360DialogClass : uiframe
 	{
 		ProgressBarDialog = theProgressBarDialog;
 		ProgressBarDialogID = ProgressBarDialog.ScriptObjectGetID();
-		ProgressBarDialog.initialise(ToolkitID, dataObjectID); // Tell the object who it belongs to
+		ProgressBarDialog.initialise(ToolkitID, dataObjectID, imageSetToolsID); // Tell the object who it belongs to
 		ProgressBarDialog.setDebugMode(debugMode);
 	}
 	
@@ -2832,7 +2832,7 @@ class CreateDF360DialogClass : uiframe
 			Throw("Image Set has not been finalised");
 		}
 		self.darkFieldImage (imageSet);
-		//ProgressBarDialog.makeDialog(); command to start the progress bar dialog.
+		//ProgressBarDialog.makeDialog(); //command to start the progress bar dialog.
 	}
 	
 	void LoadImageSetButtonPress(object self)
