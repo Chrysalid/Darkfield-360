@@ -37,3 +37,4 @@ Save the central DP and highlight + label the target coordinates in an image set
 Currently
 ----------
 Make Auto-Save always on?
+Progress bar + Seperate thread for imaging.

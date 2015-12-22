@@ -51,6 +51,9 @@ object startToolkit () {
 	result("\nLoading Image Set Configuration Dialog...")
 	object ImageConfigDialog = alloc(ImageConfiguration);
 	
+	result("\nLoading Progress Bar Dialog...")
+	object ProgressBarDialog = alloc(ProgressDialog);
+	
 	// Construct the Toolkit. This automatically creates the toolkit dialog.
 	object Toolkit = alloc(CreateDF360DialogClass);
 	// Toolkit.ToggleDebugMode() // comment out to deactivate debugMode on startup. Can be toggled on toolkit manually
@@ -64,6 +67,7 @@ object startToolkit () {
 	Toolkit.storeCameraControlObject(theCameraControlObject);
 	Toolkit.storeImageProcessingObject(ImageProcessingObject);
 	Toolkit.storeImageConfigDialog(ImageConfigDialog);
+	Toolkit.storeProgressBarDialog(ProgressBarDialog);
 	Toolkit.updateDialog();
 	return Toolkit;
 }

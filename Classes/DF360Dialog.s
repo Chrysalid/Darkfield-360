@@ -32,6 +32,8 @@ class CreateDF360DialogClass : uiframe
 	number ImageProcessingObjectID;
 	object ImageConfigDialog;
 	number ImageConfigDialogID;
+	object ProgressBarDialog;
+	number ProgressBarDialogID;
 	component markerRing;
 	component ringRadiusText;
 	
@@ -186,11 +188,23 @@ class CreateDF360DialogClass : uiframe
 		imageConfigDialog.initialise(ToolkitID, dataObjectID, imageSetToolsID); // Tell the object who it belongs to
 		imageConfigDialog.setDebugMode(debugMode);
 	}
-	number getImageConfigDialog(object self)
+	number getImageConfigDialogID(object self)
 	{
 		return imageConfigDialogID;
 	}
 	
+	void storeProgressBarDialog(object self, object theProgressBarDialog)
+	{
+		ProgressBarDialog = theProgressBarDialog;
+		ProgressBarDialogID = ProgressBarDialog.ScriptObjectGetID();
+		ProgressBarDialog.initialise(ToolkitID, dataObjectID); // Tell the object who it belongs to
+		ProgressBarDialog.setDebugMode(debugMode);
+	}
+	
+	number getProgressBarDialogID(object self)
+	{
+		return ProgressBarDialogID;
+	}
 	
 	/* Function to draw the lines on the View Window used to centre the beam and pick spots.
 		If updateToolkit = 1, Adds the ring marker and stores it in the toolkit.
@@ -2818,6 +2832,7 @@ class CreateDF360DialogClass : uiframe
 			Throw("Image Set has not been finalised");
 		}
 		self.darkFieldImage (imageSet);
+		//ProgressBarDialog.makeDialog(); command to start the progress bar dialog.
 	}
 	
 	void LoadImageSetButtonPress(object self)
