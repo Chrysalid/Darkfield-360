@@ -54,8 +54,11 @@ object startToolkit () {
 	result("\nLoading Progress Bar Dialog...")
 	object ProgressBarDialog = alloc(ProgressDialog);
 	
-	// Construct the Toolkit. This automatically creates the toolkit dialog.
-	object Toolkit = alloc(CreateDF360DialogClass);
+	result("\nLoading Imaging Functions Object...")
+	object ImagingFunctionsObject = alloc(ImagingFunctions);
+	
+	// Construct the Toolkit.
+	object Toolkit = alloc(DF360Dialog);
 	// Toolkit.ToggleDebugMode() // comment out to deactivate debugMode on startup. Can be toggled on toolkit manually
 	result("\nAttaching data store to Toolkit...")
 	Toolkit.storeDataObject(dataObject);
@@ -68,6 +71,7 @@ object startToolkit () {
 	Toolkit.storeImageProcessingObject(ImageProcessingObject);
 	Toolkit.storeImageConfigDialog(ImageConfigDialog);
 	Toolkit.storeProgressBarDialog(ProgressBarDialog);
+	Toolkit.storeImagingFunctionsObject(ImagingFunctionsObject);
 	Toolkit.updateDialog();
 	return Toolkit;
 }
@@ -103,4 +107,4 @@ void main()
 	printCommands(); // Shortcut keys
 }
 
-main();
+main(); // Run the script.

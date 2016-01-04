@@ -211,6 +211,14 @@ class CameraControl
 		return xscale;
 	}
 	
+	/* Function to centre beam */
+	void beamCentre(object self){
+		if(self.getAllowControl() == true){
+			number centreXTilt = GetScriptObjectFromID(dataObjectID).getCentreXTilt();
+			number centreYTilt = GetScriptObjectFromID(dataObjectID).getCentreYTilt();
+			moveBeamTilt ( centreXTilt, centreYTilt );
+		}
+	}	
 	
 	// constructor
 	CameraControl(object self){

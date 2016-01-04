@@ -21,8 +21,8 @@ Bugs
 ImageProcessing processDarkFieldImages() uses camera size, not image sizes.
 StartDPStoring / calibration does not update any current image sets yet
 Either the StartingBFImage or FinalBFImage in DF imaging sequence does not have its filename saved because it always reads index 0.
-
-
+see what dataObject.tracker is used for, if anything.
+see what createDFList is used for, if anything
 
 Desired Features
 ----------------
