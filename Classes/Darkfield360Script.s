@@ -5504,19 +5504,38 @@ class ProgressDialog : uiframe
 	Number ToolkitID;
 	Number DialogID;
 	Number ImageSetToolsID;
+	Number ImageFunctionsObjectID;
 	number debugMode;
 	
 	// Control signals for the thread
-	Object StartSignal
-	Object StopSignal
-	number do_break
+	Object StartSignal;
+	Object StopSignal;
+	number do_break; // Note: Only the parent object do_break value is used.
 	
 	number startTick;
-	number processLength; // number of seconds the process should take.
 	number refreshProgressEvery; // number of seconds between updating the progress bar.
+	number currentProgress;
 	
 	object childDialog; // Store a clone of this dialog here. The clone is what the user will actually interact with so it can be safely closed without the object class going out of scope..
 
+	// Used to post variables into the results window for debugging.
+	void printAllValues(object self)
+	{
+		result("\n\nProgress Bar Dialog Debug Values")
+		result("\n--------------------------");
+		string textstring;
+		textstring = "\n\tObjectID: " + DialogID +\
+			"\n DebugMode: " + debugMode +\
+			"\n ToolkitID: " + ToolkitID +\
+			"\n dataObjectID: " + dataObjectID +\
+			"\n imageSetToolsID: " + imageSetToolsID +\
+			"\n ImageFunctionsObjectID: " + ImageFunctionsObjectID +\
+			"\n do_Break: " + do_Break +\
+			"\n currentProgress: " + currentProgress ;
+		result(textstring);
+		result("\n-------End----------------");
+	}
+	
 	// clears the child dialog from this object's memory.
 	void StopChildDialog(object self)
 	{
@@ -5547,60 +5566,88 @@ class ProgressDialog : uiframe
 		startTick = GetOSTickCount();
 	}
 	
+	void setDoBreak(object self, number theValue)
+	{
+		do_break = theValue;
+	}
+	
+	number getDoBreak(object self)
+	{
+		return do_break;
+	}
+	
 	// Tells the dialog what Toolkit it belongs to and which dataObject to use.
 	// Uses Weak Referencing so it can go out of scope once the Toolkit is destroyed.
-	void initialise(object self, number theToolkitID, number theDataObjectID, number theImageSetToolsID)
+	void initialise(object self, number theToolkitID, number theDataObjectID, number theImageSetToolsID, number theImageFunctionsObjectID)
 	{
 		dataObjectID = theDataObjectID; // The ID of the dataObject
 		ToolkitID = theToolkitID; // ID of the toolkit object this object will be kept inside of.
 		ImageSetToolsID = theImageSetToolsID;
-		processLength = 10;
-	}
-	
-	// Returns the Dialog ID to external functions.
-	number getDialogID(object self){
-		return DialogID;
+		ImageFunctionsObjectID = theImageFunctionsObjectID;
+		refreshProgressEvery = 0.5;
+		currentProgress = 0;
+		do_break = 0;
 	}
 	
 	void startLoop(object self){
-		result("\nAttempting to start imaging process");
+		if(debugMode == true){result("\nAttempting to start imaging process");}
 		startsignal=NewSignal(0);
 		stopsignal=NewSignal(0);
-		self.setStartingTick();
-		self.startthread("ImagingThread")
+		self.startthread("ProgressThread");
 	}
 
-	// Sets the progress bar to a given % completeness.
-	// % is 0 to 1.
-	void setProgressPercent(object self, number percentComplete)
-	{
-		self.dlgsetprogress("progbar", percentComplete);
+	// function to set the current progress variable for use by INTERNAL functions.
+	void setCurrentProgress(object self, Number percentComplete){
+		currentProgress = percentComplete;
 	}
 	
-	/* Function activated when pressing the cancel button. */
-	void cancelButtonPress(object self ){
-		result("\n Stopping imaging process");
-		do_break = 1;
+	// EXTERNAL - This instruction is to be sent to the parent object only.
+	// % is 0 to 1.
+	// Command is issued to the parent object. It will pass the information down to the Child Dialog without the external function needing its ID.
+	void setProgressPercent(object self, number percentComplete)
+	{
+		// Is parent object, so pass to child.
+		if(debugMode == true){
+			result("\n\t Progress bar dialog being set to " + (percentComplete * 100) + "%");
+		}
+		childDialog.setCurrentProgress(percentComplete);
+	}
+	
+	// Function to end the loop for use in INTERNAL processes.
+	void stopLoop(object self){
+		if(debugMode == true){result("\n Stopping progress bar process");}
+		GetScriptObjectFromID(DialogID).setDoBreak(1);
 		stopsignal.setsignal();
-		result("\n Closing dialog");
+	}
+	
+	/* Function activated when pressing the cancel button.
+		The dialog is not aware of the ImagingFunctionsObject's class methods, so it cannot stop the loop there.
+		However, the ImageFunctionsObject will check with the parent dialog at regular intervals to see if do_break == 1
+	*/
+	void cancelButtonPress(object self ){
+		self.stopLoop();
+		if(debugMode == true){result("\n Closing dialog");}
 		self.CloseSelf();
 	}
 	
-	// Runs the Darkfield Imaging process as a thread here. (Or it will eventually)
-	void ImagingThread (object self){
-		do_break = false;
-		number endingTick = startTick + ( processLength * GetOSTicksPerSecond() );
-		result("\n")
+	// EXTERNAL - This instruction is to be sent to the parent object only.
+	// This allows external objects to cancel/close the progress dialog without knowing the child ID.
+	void EndProgress( object self ){
+		// Is parent, so activate close commands from here.
+		childDialog.stopLoop();
+		childDialog.CloseSelf();
+	}
+	
+	// Starts a loop that listens for a stop signal and refreshes the progress bar. External functions can set the progress bar and end it with other class methods.
+	void ProgressThread (object self){
 		// Loop the thread until a stop signal is encountered
 		while( true )
 		{
-			
 			Try 
 			{
 				// Infinite processing loop which listens for a stop signal
 				while(true)
 				{
-					Delay(1);
 					number CurrentTicks=GetOSTickCount();
 					// Listen for a stop signal from the Stop button in the dialog
 					// Be careful when using very short waitforstopsignal values <0.02s
@@ -5612,34 +5659,24 @@ class ProgressDialog : uiframe
 						number NowTicks=GetOSTickCount();
 						number ElapsedTime=CalcOSSecondsBetween(CurrentTicks, NowTicks);
 						if(ElapsedTime >= refreshProgressEvery){
-							number progressCompleted = (NowTicks - startTick) / (endingTick - startTick)
-							self.setProgressPercent(progressCompleted);
-							result(".")
+							self.dlgsetprogress("progbar", currentProgress);
 							break;
 						}
 					} // end update loop
-					
-					// Check if the total duration has exceeded the process length
-					number FinishingTicks=GetOSTickCount();
-					number TotalTime=CalcOSSecondsBetween(startTick, FinishingTicks);
-					if(TotalTime>=processLength) { // Stop the thread if it has gone on long enough.
-						result("\n Thread Completed.")
-						self.cancelButtonPress()
-					}
 				} // end of processing loop
 			} // end of Try code block
 			
 			Catch // If any exceptions occur or a stop signal is received stop the thread.
 			{
 				// A break was encountered, set the signal back to its starting point and break out of the Try/Catch loop
-				do_break = true
+				GetScriptObjectFromID(DialogID).setDoBreak(1);
 				stopsignal.resetsignal()
 				break;
 			}
 			
 			// Stop the thread by breaking out of the function. Otherwise the start signal is reset to keep the thread running
-			If(do_break == true){
-				break
+			If(GetScriptObjectFromID(DialogID).getDoBreak() == true){
+				break;
 			}	
 		} // end of final loop
 	}
@@ -5693,7 +5730,7 @@ class ProgressDialog : uiframe
 	// The destructor (does nothing)
 	~ProgressDialog(object self)
 	{
-		result("\n Progress Dialog with ID: "+self.ScriptObjectGetID()+" closed.");
+		if(debugMode == true){result("\n Progress Dialog with ID: "+self.ScriptObjectGetID()+" closed.");}
 	}
 
 	void setDebugMode(object self, number input)
@@ -5705,7 +5742,8 @@ class ProgressDialog : uiframe
 	// Function called by an outside source to make the dialog.
 	number makeDialog(object self)
 	{
-		if(debugMode==1){result("\n\tCreating child dialog Object");}
+		do_break = 0;
+		if(debugMode==1){result("\n\tCreating Progress Bar Dialog child dialog Object");}
 		childDialog = self.ScriptObjectClone(); // Make a copy of itself and store it.
 		if(debugMode==1){result("\n\tGenerating child dialog");}
 		childDialog.generateDialog(); // Make the dialog for this copy
@@ -5732,7 +5770,9 @@ class ImagingFunctions
 	number debugMode;
 	number CameraControlObjectID;
 	number ProgressBarDialogID;
-
+	
+	TagGroup StoredImageSet; // the image set to be used during imaging processes.
+	
 	void initialise(object self, number theToolkitID, number theDataObjectID, number theImageSetToolsID, number theCameraControlObjectID, number theProgressBarDialogID)
 	{
 		dataObjectID = theDataObjectID; // The ID of the dataObject
@@ -5758,7 +5798,12 @@ class ImagingFunctions
 		result("\n-------End----------------");
 	}
 	
-	// GetScriptObjectFromID(ProgressBarDialogID).makeDialog(); //command to start the progress bar dialog.
+	// begin darkfield imaging thread.
+	void startDarkfieldImaging(object self, TagGroup theImageSet){
+		result("\n Attempting to start imaging process");
+		StoredImageSet = theImageSet;
+		self.startthread("darkFieldImage");
+	}
 	
 	/* Function to draw the lines on an image used to centre the beam and pick spots (not the central ring marker)
 		canEdit = 0 sets the lines to be non-selectable.
@@ -5829,6 +5874,7 @@ class ImagingFunctions
 	//****************************************************
 	// IMAGING PROCESSES
 	//****************************************************
+	
 	 /*	Function to calculate tilt values used to shadow a spot	
 			Returns a tag group with the information formatted for storage in Spot/Image groups in imageSets.
 	*/
@@ -5978,7 +6024,6 @@ class ImagingFunctions
 		GetScriptObjectFromID(dataObjectID).setSpotTracker(spotTracker);
 	}
 	
-
 	/* Function to take a DF image by reading from the ImageSet Tag group
 		imageSet - the image set Tag group to take data from
 		spotID - the spot number of the desired image
@@ -6686,8 +6731,10 @@ class ImagingFunctions
 	/* Function will use the stored Tilt values to take darkfield images. 1st Image will be Bright Field of site.
 		ImageSet = the image set tag group. Only use the current image set for now.
 	*/
-	number darkFieldImage (object self, TagGroup ImageSet){
-		
+	
+	number darkFieldImage (object self)
+	{
+		TagGroup ImageSet = StoredImageSet;
 		if(ImageSet.TagGroupIsValid() == false){
 			throw("ImageSet Taggroup is Invalid or does not exist.")
 		}
@@ -6703,7 +6750,7 @@ class ImagingFunctions
 		
 		image ReferenceDP = GetScriptObjectFromID(dataObjectID).getReferenceDP();
 		
-		if(debugMode==true){result("\nLoading the variables for this image set for DF imaging...");}
+		if(debugMode==true){result("\n Loading the variables for this image set for DF imaging...");}
 		string DFImageSetID;
 		ImageSet.TagGroupGetTagAsString("ImageSetID", DFImageSetID);
 		if(debugMode==true){result("\n\t ImageSetID is " + DFImageSetID);}
@@ -6777,6 +6824,15 @@ class ImagingFunctions
 			throw("Aborted by User. No data changed.")
 		}
 		
+		// Set up the progress bar system.
+		GetScriptObjectFromID(ProgressBarDialogID).makeDialog(); //command to start the progress bar dialog.
+		GetScriptObjectFromID(ProgressBarDialogID).setProgressPercent(0);
+		// Check if the image acquisition has been cancelled by the user
+		if(GetScriptObjectFromID(ProgressBarDialogID).getDoBreak() == true){
+			result("\n\n Break signal recieved. Ending Darkfield imaging thread.")
+			return 0;
+		}
+		
 		// Create the first image, which will always be a bright field image of the region
 		moveBeamTilt(xTiltCenter, yTiltCenter); // Move to the tilt coords
 		TagGroup BFImageTags;
@@ -6808,6 +6864,16 @@ class ImagingFunctions
 		if(debugMode==true){result("\n Starting to record Darkfield Images.");}
 		number im
 		for(im=1; im < TotalSpots ; im++){
+			// Check if the image acquisition has been cancelled by the user
+			if(GetScriptObjectFromID(ProgressBarDialogID).getDoBreak() == true){
+				result("\n\n Break signal recieved. Ending Darkfield imaging thread.")
+				return 0;
+			}
+			
+			// update the progress bar %
+			number percentComplete = im / TotalSpots;
+			GetScriptObjectFromID(ProgressBarDialogID).setProgressPercent(percentComplete);
+		
 			TagGroup ThisSpotGroup, MiddleImage, HigherImage, LowerImage;
 			TagGroup MiddleImageTags, HigherImageTags, LowerImageTags;			
 			image MiddleDFImage, HigherDFImage, LowerDFImage;
@@ -6826,9 +6892,17 @@ class ImagingFunctions
 			// The loaded groups (LowerImage/HigherImage) will report as invalid if this is the case.
 			// Previous version code used the DoesTagExist() function instead, but this was not correct.
 			if(HigherImage.TagGroupIsValid() == true){
+				if(GetScriptObjectFromID(ProgressBarDialogID).getDoBreak() == true){
+					result("\n\n Break signal recieved. Ending Darkfield imaging thread.")
+					return 0;
+				}
 				HigherDFImage := self.takeDFImage (ImageSet, im, "Higher", HigherImageTags);
 			}
 			if(LowerImage.TagGroupIsValid() == true){
+				if(GetScriptObjectFromID(ProgressBarDialogID).getDoBreak() == true){
+					result("\n\n Break signal recieved. Ending Darkfield imaging thread.")
+					return 0;
+				}
 				LowerDFImage := self.takeDFImage (ImageSet, im, "Lower", LowerImageTags);
 			}
 			
@@ -6935,6 +7009,8 @@ class ImagingFunctions
 		GetScriptObjectFromID(CameraControlObjectID).beamCentre();
 		endBFImage := self.takeBFImage(ImageSet, EndBFImageTags);
 		
+		GetScriptObjectFromID(ProgressBarDialogID).setProgressPercent(1);
+		
 		if(saveImages == 1){
 			GetScriptObjectFromID(ImageSetToolsID).saveImageInImageSet(endBFImage);
 		} else { // If not saving the image...
@@ -6982,10 +7058,11 @@ class ImagingFunctions
 		positionDebugWindow(debugMode); //Return View Window to the front if it is not all ready
 		
 		GetScriptObjectFromID(ImageSetToolsID).exportImageSetAsGTG(ImageSet); // Save the image set tag group as its own file.
+		GetScriptObjectFromID(ProgressBarDialogID).EndProgress();
 		Result("\n------------- Ending Dark Field Imaging Process ---------------\n");
 		return 1;
 	}
-
+	
 	/* 	Function that performs the Calibration process
 			Take image of the DP for reference when storing.
 			// Store the central beam as the first data point. Do we still do this with the new tags?
@@ -7688,6 +7765,7 @@ class DF360Dialog : uiframe
 		ImageSetTools.printAll();
 		DataObject.printAll();
 		ImagingFunctionsObject.printAllValues();
+		ProgressBarDialog.printAllValues();
 	}
 	
 	/* Stores the dataObject */
@@ -7792,7 +7870,7 @@ class DF360Dialog : uiframe
 	{
 		ProgressBarDialog = theProgressBarDialog;
 		ProgressBarDialogID = ProgressBarDialog.ScriptObjectGetID();
-		ProgressBarDialog.initialise(ToolkitID, dataObjectID, imageSetToolsID); // Tell the object who it belongs to
+		ProgressBarDialog.initialise(ToolkitID, dataObjectID, imageSetToolsID, ImagingFunctionsObjectID); // Tell the object who it belongs to
 		ProgressBarDialog.setDebugMode(debugMode);
 	}
 	
@@ -8772,7 +8850,7 @@ class DF360Dialog : uiframe
 			Throw("Image Set has not been finalised");
 		}
 		
-		number DFImagingComplete = ImagingFunctionsObject.darkFieldImage(imageSet);
+		ImagingFunctionsObject.startDarkfieldImaging(imageSet);
 		//ProgressBarDialog.makeDialog(); //command to start the progress bar dialog.
 	}
 	

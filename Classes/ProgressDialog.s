@@ -12,19 +12,38 @@ class ProgressDialog : uiframe
 	Number ToolkitID;
 	Number DialogID;
 	Number ImageSetToolsID;
+	Number ImageFunctionsObjectID;
 	number debugMode;
 	
 	// Control signals for the thread
-	Object StartSignal
-	Object StopSignal
-	number do_break
+	Object StartSignal;
+	Object StopSignal;
+	number do_break; // Note: Only the parent object do_break value is used.
 	
 	number startTick;
-	number processLength; // number of seconds the process should take.
 	number refreshProgressEvery; // number of seconds between updating the progress bar.
+	number currentProgress;
 	
 	object childDialog; // Store a clone of this dialog here. The clone is what the user will actually interact with so it can be safely closed without the object class going out of scope..
 
+	// Used to post variables into the results window for debugging.
+	void printAllValues(object self)
+	{
+		result("\n\nProgress Bar Dialog Debug Values")
+		result("\n--------------------------");
+		string textstring;
+		textstring = "\n\tObjectID: " + DialogID +\
+			"\n DebugMode: " + debugMode +\
+			"\n ToolkitID: " + ToolkitID +\
+			"\n dataObjectID: " + dataObjectID +\
+			"\n imageSetToolsID: " + imageSetToolsID +\
+			"\n ImageFunctionsObjectID: " + ImageFunctionsObjectID +\
+			"\n do_Break: " + do_Break +\
+			"\n currentProgress: " + currentProgress ;
+		result(textstring);
+		result("\n-------End----------------");
+	}
+	
 	// clears the child dialog from this object's memory.
 	void StopChildDialog(object self)
 	{
@@ -55,60 +74,88 @@ class ProgressDialog : uiframe
 		startTick = GetOSTickCount();
 	}
 	
+	void setDoBreak(object self, number theValue)
+	{
+		do_break = theValue;
+	}
+	
+	number getDoBreak(object self)
+	{
+		return do_break;
+	}
+	
 	// Tells the dialog what Toolkit it belongs to and which dataObject to use.
 	// Uses Weak Referencing so it can go out of scope once the Toolkit is destroyed.
-	void initialise(object self, number theToolkitID, number theDataObjectID, number theImageSetToolsID)
+	void initialise(object self, number theToolkitID, number theDataObjectID, number theImageSetToolsID, number theImageFunctionsObjectID)
 	{
 		dataObjectID = theDataObjectID; // The ID of the dataObject
 		ToolkitID = theToolkitID; // ID of the toolkit object this object will be kept inside of.
 		ImageSetToolsID = theImageSetToolsID;
-		processLength = 10;
-	}
-	
-	// Returns the Dialog ID to external functions.
-	number getDialogID(object self){
-		return DialogID;
+		ImageFunctionsObjectID = theImageFunctionsObjectID;
+		refreshProgressEvery = 0.5;
+		currentProgress = 0;
+		do_break = 0;
 	}
 	
 	void startLoop(object self){
-		result("\nAttempting to start imaging process");
+		if(debugMode == true){result("\nAttempting to start imaging process");}
 		startsignal=NewSignal(0);
 		stopsignal=NewSignal(0);
-		self.setStartingTick();
-		self.startthread("ImagingThread")
+		self.startthread("ProgressThread");
 	}
 
-	// Sets the progress bar to a given % completeness.
-	// % is 0 to 1.
-	void setProgressPercent(object self, number percentComplete)
-	{
-		self.dlgsetprogress("progbar", percentComplete);
+	// function to set the current progress variable for use by INTERNAL functions.
+	void setCurrentProgress(object self, Number percentComplete){
+		currentProgress = percentComplete;
 	}
 	
-	/* Function activated when pressing the cancel button. */
-	void cancelButtonPress(object self ){
-		result("\n Stopping imaging process");
-		do_break = 1;
+	// EXTERNAL - This instruction is to be sent to the parent object only.
+	// % is 0 to 1.
+	// Command is issued to the parent object. It will pass the information down to the Child Dialog without the external function needing its ID.
+	void setProgressPercent(object self, number percentComplete)
+	{
+		// Is parent object, so pass to child.
+		if(debugMode == true){
+			result("\n\t Progress bar dialog being set to " + (percentComplete * 100) + "%");
+		}
+		childDialog.setCurrentProgress(percentComplete);
+	}
+	
+	// Function to end the loop for use in INTERNAL processes.
+	void stopLoop(object self){
+		if(debugMode == true){result("\n Stopping progress bar process");}
+		GetScriptObjectFromID(DialogID).setDoBreak(1);
 		stopsignal.setsignal();
-		result("\n Closing dialog");
+	}
+	
+	/* Function activated when pressing the cancel button.
+		The dialog is not aware of the ImagingFunctionsObject's class methods, so it cannot stop the loop there.
+		However, the ImageFunctionsObject will check with the parent dialog at regular intervals to see if do_break == 1
+	*/
+	void cancelButtonPress(object self ){
+		self.stopLoop();
+		if(debugMode == true){result("\n Closing dialog");}
 		self.CloseSelf();
 	}
 	
-	// Runs the Darkfield Imaging process as a thread here. (Or it will eventually)
-	void ImagingThread (object self){
-		do_break = false;
-		number endingTick = startTick + ( processLength * GetOSTicksPerSecond() );
-		result("\n")
+	// EXTERNAL - This instruction is to be sent to the parent object only.
+	// This allows external objects to cancel/close the progress dialog without knowing the child ID.
+	void EndProgress( object self ){
+		// Is parent, so activate close commands from here.
+		childDialog.stopLoop();
+		childDialog.CloseSelf();
+	}
+	
+	// Starts a loop that listens for a stop signal and refreshes the progress bar. External functions can set the progress bar and end it with other class methods.
+	void ProgressThread (object self){
 		// Loop the thread until a stop signal is encountered
 		while( true )
 		{
-			
 			Try 
 			{
 				// Infinite processing loop which listens for a stop signal
 				while(true)
 				{
-					Delay(1);
 					number CurrentTicks=GetOSTickCount();
 					// Listen for a stop signal from the Stop button in the dialog
 					// Be careful when using very short waitforstopsignal values <0.02s
@@ -120,34 +167,24 @@ class ProgressDialog : uiframe
 						number NowTicks=GetOSTickCount();
 						number ElapsedTime=CalcOSSecondsBetween(CurrentTicks, NowTicks);
 						if(ElapsedTime >= refreshProgressEvery){
-							number progressCompleted = (NowTicks - startTick) / (endingTick - startTick)
-							self.setProgressPercent(progressCompleted);
-							result(".")
+							self.dlgsetprogress("progbar", currentProgress);
 							break;
 						}
 					} // end update loop
-					
-					// Check if the total duration has exceeded the process length
-					number FinishingTicks=GetOSTickCount();
-					number TotalTime=CalcOSSecondsBetween(startTick, FinishingTicks);
-					if(TotalTime>=processLength) { // Stop the thread if it has gone on long enough.
-						result("\n Thread Completed.")
-						self.cancelButtonPress()
-					}
 				} // end of processing loop
 			} // end of Try code block
 			
 			Catch // If any exceptions occur or a stop signal is received stop the thread.
 			{
 				// A break was encountered, set the signal back to its starting point and break out of the Try/Catch loop
-				do_break = true
+				GetScriptObjectFromID(DialogID).setDoBreak(1);
 				stopsignal.resetsignal()
 				break;
 			}
 			
 			// Stop the thread by breaking out of the function. Otherwise the start signal is reset to keep the thread running
-			If(do_break == true){
-				break
+			If(GetScriptObjectFromID(DialogID).getDoBreak() == true){
+				break;
 			}	
 		} // end of final loop
 	}
@@ -201,7 +238,7 @@ class ProgressDialog : uiframe
 	// The destructor (does nothing)
 	~ProgressDialog(object self)
 	{
-		result("\n Progress Dialog with ID: "+self.ScriptObjectGetID()+" closed.");
+		if(debugMode == true){result("\n Progress Dialog with ID: "+self.ScriptObjectGetID()+" closed.");}
 	}
 
 	void setDebugMode(object self, number input)
@@ -213,7 +250,8 @@ class ProgressDialog : uiframe
 	// Function called by an outside source to make the dialog.
 	number makeDialog(object self)
 	{
-		if(debugMode==1){result("\n\tCreating child dialog Object");}
+		do_break = 0;
+		if(debugMode==1){result("\n\tCreating Progress Bar Dialog child dialog Object");}
 		childDialog = self.ScriptObjectClone(); // Make a copy of itself and store it.
 		if(debugMode==1){result("\n\tGenerating child dialog");}
 		childDialog.generateDialog(); // Make the dialog for this copy

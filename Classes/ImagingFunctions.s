@@ -13,7 +13,9 @@ class ImagingFunctions
 	number debugMode;
 	number CameraControlObjectID;
 	number ProgressBarDialogID;
-
+	
+	TagGroup StoredImageSet; // the image set to be used during imaging processes.
+	
 	void initialise(object self, number theToolkitID, number theDataObjectID, number theImageSetToolsID, number theCameraControlObjectID, number theProgressBarDialogID)
 	{
 		dataObjectID = theDataObjectID; // The ID of the dataObject
@@ -39,7 +41,12 @@ class ImagingFunctions
 		result("\n-------End----------------");
 	}
 	
-	// GetScriptObjectFromID(ProgressBarDialogID).makeDialog(); //command to start the progress bar dialog.
+	// begin darkfield imaging thread.
+	void startDarkfieldImaging(object self, TagGroup theImageSet){
+		result("\n Attempting to start imaging process");
+		StoredImageSet = theImageSet;
+		self.startthread("darkFieldImage");
+	}
 	
 	/* Function to draw the lines on an image used to centre the beam and pick spots (not the central ring marker)
 		canEdit = 0 sets the lines to be non-selectable.
@@ -110,6 +117,7 @@ class ImagingFunctions
 	//****************************************************
 	// IMAGING PROCESSES
 	//****************************************************
+	
 	 /*	Function to calculate tilt values used to shadow a spot	
 			Returns a tag group with the information formatted for storage in Spot/Image groups in imageSets.
 	*/
@@ -259,7 +267,6 @@ class ImagingFunctions
 		GetScriptObjectFromID(dataObjectID).setSpotTracker(spotTracker);
 	}
 	
-
 	/* Function to take a DF image by reading from the ImageSet Tag group
 		imageSet - the image set Tag group to take data from
 		spotID - the spot number of the desired image
@@ -967,8 +974,10 @@ class ImagingFunctions
 	/* Function will use the stored Tilt values to take darkfield images. 1st Image will be Bright Field of site.
 		ImageSet = the image set tag group. Only use the current image set for now.
 	*/
-	number darkFieldImage (object self, TagGroup ImageSet){
-		
+	
+	number darkFieldImage (object self)
+	{
+		TagGroup ImageSet = StoredImageSet;
 		if(ImageSet.TagGroupIsValid() == false){
 			throw("ImageSet Taggroup is Invalid or does not exist.")
 		}
@@ -984,7 +993,7 @@ class ImagingFunctions
 		
 		image ReferenceDP = GetScriptObjectFromID(dataObjectID).getReferenceDP();
 		
-		if(debugMode==true){result("\nLoading the variables for this image set for DF imaging...");}
+		if(debugMode==true){result("\n Loading the variables for this image set for DF imaging...");}
 		string DFImageSetID;
 		ImageSet.TagGroupGetTagAsString("ImageSetID", DFImageSetID);
 		if(debugMode==true){result("\n\t ImageSetID is " + DFImageSetID);}
@@ -1058,6 +1067,15 @@ class ImagingFunctions
 			throw("Aborted by User. No data changed.")
 		}
 		
+		// Set up the progress bar system.
+		GetScriptObjectFromID(ProgressBarDialogID).makeDialog(); //command to start the progress bar dialog.
+		GetScriptObjectFromID(ProgressBarDialogID).setProgressPercent(0);
+		// Check if the image acquisition has been cancelled by the user
+		if(GetScriptObjectFromID(ProgressBarDialogID).getDoBreak() == true){
+			result("\n\n Break signal recieved. Ending Darkfield imaging thread.")
+			return 0;
+		}
+		
 		// Create the first image, which will always be a bright field image of the region
 		moveBeamTilt(xTiltCenter, yTiltCenter); // Move to the tilt coords
 		TagGroup BFImageTags;
@@ -1089,6 +1107,16 @@ class ImagingFunctions
 		if(debugMode==true){result("\n Starting to record Darkfield Images.");}
 		number im
 		for(im=1; im < TotalSpots ; im++){
+			// Check if the image acquisition has been cancelled by the user
+			if(GetScriptObjectFromID(ProgressBarDialogID).getDoBreak() == true){
+				result("\n\n Break signal recieved. Ending Darkfield imaging thread.")
+				return 0;
+			}
+			
+			// update the progress bar %
+			number percentComplete = im / TotalSpots;
+			GetScriptObjectFromID(ProgressBarDialogID).setProgressPercent(percentComplete);
+		
 			TagGroup ThisSpotGroup, MiddleImage, HigherImage, LowerImage;
 			TagGroup MiddleImageTags, HigherImageTags, LowerImageTags;			
 			image MiddleDFImage, HigherDFImage, LowerDFImage;
@@ -1107,9 +1135,17 @@ class ImagingFunctions
 			// The loaded groups (LowerImage/HigherImage) will report as invalid if this is the case.
 			// Previous version code used the DoesTagExist() function instead, but this was not correct.
 			if(HigherImage.TagGroupIsValid() == true){
+				if(GetScriptObjectFromID(ProgressBarDialogID).getDoBreak() == true){
+					result("\n\n Break signal recieved. Ending Darkfield imaging thread.")
+					return 0;
+				}
 				HigherDFImage := self.takeDFImage (ImageSet, im, "Higher", HigherImageTags);
 			}
 			if(LowerImage.TagGroupIsValid() == true){
+				if(GetScriptObjectFromID(ProgressBarDialogID).getDoBreak() == true){
+					result("\n\n Break signal recieved. Ending Darkfield imaging thread.")
+					return 0;
+				}
 				LowerDFImage := self.takeDFImage (ImageSet, im, "Lower", LowerImageTags);
 			}
 			
@@ -1216,6 +1252,8 @@ class ImagingFunctions
 		GetScriptObjectFromID(CameraControlObjectID).beamCentre();
 		endBFImage := self.takeBFImage(ImageSet, EndBFImageTags);
 		
+		GetScriptObjectFromID(ProgressBarDialogID).setProgressPercent(1);
+		
 		if(saveImages == 1){
 			GetScriptObjectFromID(ImageSetToolsID).saveImageInImageSet(endBFImage);
 		} else { // If not saving the image...
@@ -1263,10 +1301,11 @@ class ImagingFunctions
 		positionDebugWindow(debugMode); //Return View Window to the front if it is not all ready
 		
 		GetScriptObjectFromID(ImageSetToolsID).exportImageSetAsGTG(ImageSet); // Save the image set tag group as its own file.
+		GetScriptObjectFromID(ProgressBarDialogID).EndProgress();
 		Result("\n------------- Ending Dark Field Imaging Process ---------------\n");
 		return 1;
 	}
-
+	
 	/* 	Function that performs the Calibration process
 			Take image of the DP for reference when storing.
 			// Store the central beam as the first data point. Do we still do this with the new tags?

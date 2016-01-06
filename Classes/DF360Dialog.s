@@ -64,6 +64,7 @@ class DF360Dialog : uiframe
 		ImageSetTools.printAll();
 		DataObject.printAll();
 		ImagingFunctionsObject.printAllValues();
+		ProgressBarDialog.printAllValues();
 	}
 	
 	/* Stores the dataObject */
@@ -168,7 +169,7 @@ class DF360Dialog : uiframe
 	{
 		ProgressBarDialog = theProgressBarDialog;
 		ProgressBarDialogID = ProgressBarDialog.ScriptObjectGetID();
-		ProgressBarDialog.initialise(ToolkitID, dataObjectID, imageSetToolsID); // Tell the object who it belongs to
+		ProgressBarDialog.initialise(ToolkitID, dataObjectID, imageSetToolsID, ImagingFunctionsObjectID); // Tell the object who it belongs to
 		ProgressBarDialog.setDebugMode(debugMode);
 	}
 	
@@ -1148,7 +1149,7 @@ class DF360Dialog : uiframe
 			Throw("Image Set has not been finalised");
 		}
 		
-		number DFImagingComplete = ImagingFunctionsObject.darkFieldImage(imageSet);
+		ImagingFunctionsObject.startDarkfieldImaging(imageSet);
 		//ProgressBarDialog.makeDialog(); //command to start the progress bar dialog.
 	}
 	
