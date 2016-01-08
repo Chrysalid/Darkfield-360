@@ -8,7 +8,7 @@
 // Performs a variety of calculations for tilt control and image processing.
 // Loads and saves persistent tags, but not for the individual image sets or images.
 
-class MyDataObject	
+class ToolkitDataObject
 {
 	number dataObjectID;
 	number KeyListenerID;
@@ -50,6 +50,7 @@ class MyDataObject
 	number DFExposure;
 	number BFExposure;
 	number DPExposure;
+	number DisableModeWarnings; // 0 or 1. If 1, the imaging functions will not check to see if the microscope is in an imaging or diffraction mode.
 
 	number getDigitalMicrographVersion(object self){
 		return digitalMicrographVersion;
@@ -256,6 +257,14 @@ class MyDataObject
 		DPExposure = newValue;
 	}
 	
+	number getDisableModeWarnings(object self){
+		return DisableModeWarnings;
+	}
+	
+	void setDisableModeWarnings(object self, number newValue){
+		DisableModeWarnings = newValue;
+	}
+	
 	TagGroup getDFList(object self){
 		return DFList		
 	}
@@ -294,6 +303,7 @@ class MyDataObject
 		"\noriginalScaleString: " + originalScaleString +\
 		"\nrefScale: " + refScale +\
 		"\ncameraLength: " + cameraLength +\
+		"\nDisableModeWarnings: " + DisableModeWarnings +\
 		"\nshadowDistanceNM: " + shadowDistanceNM;
 		
 		result(textString);
@@ -749,6 +759,14 @@ class MyDataObject
 			result("\n\tLoaded Diffraction Mode list");
 		}
 		
+		// Diffraction Alert mode
+		tagPath = "DisableModeWarnings";
+		number DisableModeWarningsDoesExist = TagGroupDoesTagExist(persistentTG, tagPath);
+		if(DisableModeWarningsDoesExist==1){
+			TagGroupGetTagAsNumber(persistentTG, tagPath, DisableModeWarnings);
+			result("\n\tLoaded DisableModeWarnings options");
+		}
+		
 		tagPath = "DFExposure";
 		number DFExposureDoesExist = TagGroupDoesTagExist(persistentTG, tagPath);
 		if(DFExposureDoesExist==1){
@@ -783,6 +801,8 @@ class MyDataObject
 		persistentTG.TagGroupSetTagAsNumber("DFExposure", 30);
 		persistentTG.TagGroupSetTagAsNumber("BFExposure", 1);
 		persistentTG.TagGroupSetTagAsNumber("DPExposure", 0.5);
+		persistentTG.TagGroupSetTagAsNumber("DisableModeWarnings", 0);
+		
 		
 		TagGroup CLValues = NewTagList();
 		CLValues.TagGroupInsertTagAsString(infinity(), "20cm");
@@ -807,7 +827,7 @@ class MyDataObject
 		diffractionData.TagGroupSetTagAsNumber("50cm", 0.0044);
 		// Add the new table to the tag group.
 		persistentTG.TagGroupCreateNewLabeledTag("DiffractionScale");
-		persistentTG.TagGroupSetTagAsTagGroup("DiffractionScale", diffractionData);	
+		persistentTG.TagGroupSetTagAsTagGroup("DiffractionScale", diffractionData);
 		
 		// For each camera length there are new tilt values.
 		TagGroup tiltCalibrationContainer = NewTagGroup();
@@ -835,6 +855,8 @@ class MyDataObject
 		
 		persistentTG.TagGroupCreateNewLabeledTag("ImageSets");
 		persistentTG.TagGroupSetTagAsTagGroup("ImageSets", NewTagGroup());
+		
+		
 		
 		number TagRef;
 		TagGroup defaultImagingModes = NewTagList();
@@ -904,7 +926,7 @@ class MyDataObject
 		number loadedImagingModesDoesExist;
 		TagGroup loadedDiffractionModes;
 		number loadedDiffractionModesDoesExist;
-		number loadedBFExposure, loadedDFExposure, loadedDPExposure; // These will be 0 if a failed load anyway.
+		number loadedBFExposure, loadedDFExposure, loadedDPExposure, loadedDisableModeWarnings; // These will be 0 if a failed load anyway.
 		
 		if(persistentExists == true)
 		{
@@ -915,6 +937,7 @@ class MyDataObject
 			TagGroupGetTagAsNumber(darkfield360, "DFExposure", loadedDFExposure);
 			TagGroupGetTagAsNumber(darkfield360, "BFExposure", loadedBFExposure);
 			TagGroupGetTagAsNumber(darkfield360, "DPExposure", loadedDPExposure);
+			TagGroupGetTagAsNumber(darkfield360, "DisableModeWarnings", loadedDisableModeWarnings);
 			
 			tagPath = "CameraLengths";
 			loadedCameraLengthsDoesExist = TagGroupGetTagAsTagGroup(darkfield360, tagPath, loadedCameraLengths);
@@ -1014,6 +1037,30 @@ class MyDataObject
 		} else {
 			// neither exist, so do nothing to keep default values.
 		}
+		
+		if(DisableModeWarnings != 0 && loadedDisableModeWarnings != 0) // This means that there is a choice of two values
+		{
+			if(dataDominant == true) { // the dataObject will be chosen.
+				if(debugMode==1){result("\n\t Saving DisableModeWarnings from DataObject");}
+				persistentTG.TagGroupSetTagAsNumber("DisableModeWarnings", DisableModeWarnings);
+				if(debugMode==1){result(". Done.");}
+			} else { // The persisten memory value will be chosen
+				if(debugMode==1){result("\n\t Saving DisableModeWarnings from Persistent Memory");}
+				persistentTG.TagGroupSetTagAsNumber("DisableModeWarnings", loadedDisableModeWarnings);
+				if(debugMode==1){result(". Done.");}
+			}
+		} else if(DisableModeWarnings != 0) {
+			if(debugMode==1){result("\n\t Saving DisableModeWarnings from DataObject");}
+			persistentTG.TagGroupSetTagAsNumber("DisableModeWarnings", DisableModeWarnings);
+			if(debugMode==1){result(". Done.");}
+		} else if(loadedDisableModeWarnings != 0) {
+			if(debugMode==1){result("\n\t Saving DisableModeWarnings from Persistent Memory");}
+			persistentTG.TagGroupSetTagAsNumber("DisableModeWarnings", loadedDisableModeWarnings);
+			if(debugMode==1){result(". Done.");}
+		} else {
+			// neither exist, so do nothing to keep default values.
+		}
+		
 		
 		if(CameraLengthsDoesExist == true && loadedCameraLengthsDoesExist == true) // This means that there is a choice of two values
 		{
@@ -1150,7 +1197,7 @@ class MyDataObject
 	}
 	
 	// Constructor
-	MyDataObject(object self)
+	ToolkitDataObject(object self)
 		{
 			dataObjectID = self.ScriptObjectGetID(); // Tell the dataObject its own ID number
 			if(EMIsReady()){ // If there is a microscope attached, then record tilt.
@@ -1176,7 +1223,7 @@ class MyDataObject
 			result("\nToolkit data store has been created with ObjectID " + self.ScriptObjectGetID())
 		}
 	// Function called on any destruction event.
-	~MyDataObject(object self)
+	~ToolkitDataObject(object self)
 		{
 			result("\nToolkit data store with ID " + self.ScriptObjectGetID() + " deleted.");
 		}

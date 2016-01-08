@@ -3,26 +3,26 @@ Required Features
 DisableModeWarnings implementation
 Update moveToCurrentROI to something more useful and bind to a key
 
-Update darkFieldImage to use ImageSet values for things ?
-
 Make a function to produce persistent Image tags for integrated images
 
 Tag group save methods
 	- See the Taggroup_formatting.txt file for information
-	
-Put image acquisition in its own thread that can be stopped.
 
-Make 'reticle' component objects identifiable so that cleaning the reticle from an image does not affect other components.
-	~CreateDF360DialogClass also has this problem.
+Make Auto-Save always on?
 
+Change image names when displaying them.
+
+Use progress dialog for DP imaging too.
+
+Disable adding points commands if no image set there.
 
 Bugs
 ---------
 ImageProcessing processDarkFieldImages() uses camera size, not image sizes.
 StartDPStoring / calibration does not update any current image sets yet
-Either the StartingBFImage or FinalBFImage in DF imaging sequence does not have its filename saved because it always reads index 0.
 see what dataObject.tracker is used for, if anything.
 see what createDFList is used for, if anything
+Press Take DF Images button before image set made.
 
 Desired Features
 ----------------
@@ -36,5 +36,4 @@ Save the central DP and highlight + label the target coordinates in an image set
 
 Currently
 ----------
-Make Auto-Save always on?
-Progress bar + Seperate thread for imaging.
+

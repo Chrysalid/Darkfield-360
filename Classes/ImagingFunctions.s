@@ -309,8 +309,12 @@ class ImagingFunctions
 				result("\nTakeDFImage() called when EM not in imaging mode. Is in mode: " + opticsMode);
 			}
 			result("\nIf this mode is an imaging mode of your microscope then it needs to be added to the DF360 toolkit list of imaging mode names.");
-			if (!ContinueCancelDialog( "Switch to an imaging mode before continuing." )){
-				Throw( "User aborted process." );
+			if(GetScriptObjectFromID(dataObjectID).getDisableModeWarnings() == false){
+				if (!ContinueCancelDialog( "Switch to an imaging mode before continuing." )){
+					Throw( "User aborted process." );
+				}
+			} else if(debugMode == true){
+				result("Images taken despite incorrect imaging mode due to Mode Warning Option setting");
 			}
 		}
 		opticsMode = EMGetImagingOpticsMode();
@@ -426,24 +430,22 @@ class ImagingFunctions
 		string opticsMode = EMGetImagingOpticsMode();
 		// Switch to Diffraction mode manually if it is not in that mode.
 		// "SAMAG" is the name our JEOL2100 uses. VirtualTEM uses "IMAGING". 
-		if ( GetScriptObjectFromID(CameraControlObjectID).isImagingMode() == true ) {
-			if(debugMode==true){
-				result("\nTakeDPImage() called when EM in an imaging mode. Is in mode: " + opticsMode);
-			}
-			if (!ContinueCancelDialog( "Switch to diffraction mode before continuing." )){
-				Throw( "User aborted process." );
-			}
-		}
-		opticsMode = EMGetImagingOpticsMode();
 		if ( GetScriptObjectFromID(CameraControlObjectID).isDiffractionMode() == false ) {
 			if(debugMode==true){
 				result("\nTakeDPImage() called when EM is not in a diffraction mode. It is in mode: " + opticsMode);
 				result("\nIf this mode is a diffraction imaging mode of your microscope then it needs to be added to the DF360 toolkit list of diffraction mode names.");
 			}
-			if (!ContinueCancelDialog( "Switch to diffraction mode before continuing." )){
-				Throw( "User aborted process." );
+			if(GetScriptObjectFromID(dataObjectID).getDisableModeWarnings() == false){
+				if (!ContinueCancelDialog( "Switch to a diffraction mode before continuing." )){
+					Throw( "User aborted process." );
+				}
+			} else if(debugMode == true){
+				result("Images taken despite incorrect imaging mode due to Mode Warning Option setting");
 			}
 		}
+		
+		
+		
 		opticsMode = EMGetImagingOpticsMode();
 		
 		// Take the  Image
@@ -539,15 +541,20 @@ class ImagingFunctions
 		string opticsMode = EMGetImagingOpticsMode();
 		// Switch to imaging manually if it is not in that mode.
 		// "SAMAG" is the name our JEOL2100 uses. VirtualTEM uses "IMAGING". Add your own modes in or replace these ones if your scope is different.
-		if (  GetScriptObjectFromID(CameraControlObjectID).isImagingMode() == false ) {
+		if ( GetScriptObjectFromID(CameraControlObjectID).isImagingMode() == false ) {
 			if(debugMode==true){
 				result("\nTakeBFImage() called when EM not in imaging mode. Is in mode: " + opticsMode);
 			}
 			result("\nIf this mode is an imaging mode of your microscope then it needs to be added to the DF360 toolkit list of imaging mode names.");
-			if (!ContinueCancelDialog( "Switch to an imaging mode before continuing." )){
-				Throw( "User aborted process." );
+			if(GetScriptObjectFromID(dataObjectID).getDisableModeWarnings() == false){
+				if (!ContinueCancelDialog( "Switch to an imaging mode before continuing." )){
+					Throw( "User aborted process." );
+				}
+			} else if(debugMode == true){
+				result("Images taken despite incorrect imaging mode due to Mode Warning Option setting");
 			}
 		}
+		
 		opticsMode = EMGetImagingOpticsMode();
 		
 		

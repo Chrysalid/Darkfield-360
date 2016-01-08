@@ -8,7 +8,7 @@
 object startToolkit () {
 	
 	result("\nCreating toolkit data store...")
-	object dataObject = alloc(MyDataObject); // This is the object that will contain everything else.
+	object dataObject = alloc(ToolkitDataObject); // This is the object that will contain everything else.
 	
 	result("\nSetting Variables.")
 	// Set Variables

@@ -1478,7 +1478,7 @@ class AlignmentDialog : uiframe
 // Performs a variety of calculations for tilt control and image processing.
 // Loads and saves persistent tags, but not for the individual image sets or images.
 
-class MyDataObject	
+class ToolkitDataObject
 {
 	number dataObjectID;
 	number KeyListenerID;
@@ -1520,6 +1520,7 @@ class MyDataObject
 	number DFExposure;
 	number BFExposure;
 	number DPExposure;
+	number DisableModeWarnings; // 0 or 1. If 1, the imaging functions will not check to see if the microscope is in an imaging or diffraction mode.
 
 	number getDigitalMicrographVersion(object self){
 		return digitalMicrographVersion;
@@ -1726,6 +1727,14 @@ class MyDataObject
 		DPExposure = newValue;
 	}
 	
+	number getDisableModeWarnings(object self){
+		return DisableModeWarnings;
+	}
+	
+	void setDisableModeWarnings(object self, number newValue){
+		DisableModeWarnings = newValue;
+	}
+	
 	TagGroup getDFList(object self){
 		return DFList		
 	}
@@ -1764,6 +1773,7 @@ class MyDataObject
 		"\noriginalScaleString: " + originalScaleString +\
 		"\nrefScale: " + refScale +\
 		"\ncameraLength: " + cameraLength +\
+		"\nDisableModeWarnings: " + DisableModeWarnings +\
 		"\nshadowDistanceNM: " + shadowDistanceNM;
 		
 		result(textString);
@@ -2219,6 +2229,14 @@ class MyDataObject
 			result("\n\tLoaded Diffraction Mode list");
 		}
 		
+		// Diffraction Alert mode
+		tagPath = "DisableModeWarnings";
+		number DisableModeWarningsDoesExist = TagGroupDoesTagExist(persistentTG, tagPath);
+		if(DisableModeWarningsDoesExist==1){
+			TagGroupGetTagAsNumber(persistentTG, tagPath, DisableModeWarnings);
+			result("\n\tLoaded DisableModeWarnings options");
+		}
+		
 		tagPath = "DFExposure";
 		number DFExposureDoesExist = TagGroupDoesTagExist(persistentTG, tagPath);
 		if(DFExposureDoesExist==1){
@@ -2253,6 +2271,8 @@ class MyDataObject
 		persistentTG.TagGroupSetTagAsNumber("DFExposure", 30);
 		persistentTG.TagGroupSetTagAsNumber("BFExposure", 1);
 		persistentTG.TagGroupSetTagAsNumber("DPExposure", 0.5);
+		persistentTG.TagGroupSetTagAsNumber("DisableModeWarnings", 0);
+		
 		
 		TagGroup CLValues = NewTagList();
 		CLValues.TagGroupInsertTagAsString(infinity(), "20cm");
@@ -2277,7 +2297,7 @@ class MyDataObject
 		diffractionData.TagGroupSetTagAsNumber("50cm", 0.0044);
 		// Add the new table to the tag group.
 		persistentTG.TagGroupCreateNewLabeledTag("DiffractionScale");
-		persistentTG.TagGroupSetTagAsTagGroup("DiffractionScale", diffractionData);	
+		persistentTG.TagGroupSetTagAsTagGroup("DiffractionScale", diffractionData);
 		
 		// For each camera length there are new tilt values.
 		TagGroup tiltCalibrationContainer = NewTagGroup();
@@ -2305,6 +2325,8 @@ class MyDataObject
 		
 		persistentTG.TagGroupCreateNewLabeledTag("ImageSets");
 		persistentTG.TagGroupSetTagAsTagGroup("ImageSets", NewTagGroup());
+		
+		
 		
 		number TagRef;
 		TagGroup defaultImagingModes = NewTagList();
@@ -2374,7 +2396,7 @@ class MyDataObject
 		number loadedImagingModesDoesExist;
 		TagGroup loadedDiffractionModes;
 		number loadedDiffractionModesDoesExist;
-		number loadedBFExposure, loadedDFExposure, loadedDPExposure; // These will be 0 if a failed load anyway.
+		number loadedBFExposure, loadedDFExposure, loadedDPExposure, loadedDisableModeWarnings; // These will be 0 if a failed load anyway.
 		
 		if(persistentExists == true)
 		{
@@ -2385,6 +2407,7 @@ class MyDataObject
 			TagGroupGetTagAsNumber(darkfield360, "DFExposure", loadedDFExposure);
 			TagGroupGetTagAsNumber(darkfield360, "BFExposure", loadedBFExposure);
 			TagGroupGetTagAsNumber(darkfield360, "DPExposure", loadedDPExposure);
+			TagGroupGetTagAsNumber(darkfield360, "DisableModeWarnings", loadedDisableModeWarnings);
 			
 			tagPath = "CameraLengths";
 			loadedCameraLengthsDoesExist = TagGroupGetTagAsTagGroup(darkfield360, tagPath, loadedCameraLengths);
@@ -2484,6 +2507,30 @@ class MyDataObject
 		} else {
 			// neither exist, so do nothing to keep default values.
 		}
+		
+		if(DisableModeWarnings != 0 && loadedDisableModeWarnings != 0) // This means that there is a choice of two values
+		{
+			if(dataDominant == true) { // the dataObject will be chosen.
+				if(debugMode==1){result("\n\t Saving DisableModeWarnings from DataObject");}
+				persistentTG.TagGroupSetTagAsNumber("DisableModeWarnings", DisableModeWarnings);
+				if(debugMode==1){result(". Done.");}
+			} else { // The persisten memory value will be chosen
+				if(debugMode==1){result("\n\t Saving DisableModeWarnings from Persistent Memory");}
+				persistentTG.TagGroupSetTagAsNumber("DisableModeWarnings", loadedDisableModeWarnings);
+				if(debugMode==1){result(". Done.");}
+			}
+		} else if(DisableModeWarnings != 0) {
+			if(debugMode==1){result("\n\t Saving DisableModeWarnings from DataObject");}
+			persistentTG.TagGroupSetTagAsNumber("DisableModeWarnings", DisableModeWarnings);
+			if(debugMode==1){result(". Done.");}
+		} else if(loadedDisableModeWarnings != 0) {
+			if(debugMode==1){result("\n\t Saving DisableModeWarnings from Persistent Memory");}
+			persistentTG.TagGroupSetTagAsNumber("DisableModeWarnings", loadedDisableModeWarnings);
+			if(debugMode==1){result(". Done.");}
+		} else {
+			// neither exist, so do nothing to keep default values.
+		}
+		
 		
 		if(CameraLengthsDoesExist == true && loadedCameraLengthsDoesExist == true) // This means that there is a choice of two values
 		{
@@ -2620,7 +2667,7 @@ class MyDataObject
 	}
 	
 	// Constructor
-	MyDataObject(object self)
+	ToolkitDataObject(object self)
 		{
 			dataObjectID = self.ScriptObjectGetID(); // Tell the dataObject its own ID number
 			if(EMIsReady()){ // If there is a microscope attached, then record tilt.
@@ -2646,7 +2693,7 @@ class MyDataObject
 			result("\nToolkit data store has been created with ObjectID " + self.ScriptObjectGetID())
 		}
 	// Function called on any destruction event.
-	~MyDataObject(object self)
+	~ToolkitDataObject(object self)
 		{
 			result("\nToolkit data store with ID " + self.ScriptObjectGetID() + " deleted.");
 		}
@@ -6066,8 +6113,12 @@ class ImagingFunctions
 				result("\nTakeDFImage() called when EM not in imaging mode. Is in mode: " + opticsMode);
 			}
 			result("\nIf this mode is an imaging mode of your microscope then it needs to be added to the DF360 toolkit list of imaging mode names.");
-			if (!ContinueCancelDialog( "Switch to an imaging mode before continuing." )){
-				Throw( "User aborted process." );
+			if(GetScriptObjectFromID(dataObjectID).getDisableModeWarnings() == false){
+				if (!ContinueCancelDialog( "Switch to an imaging mode before continuing." )){
+					Throw( "User aborted process." );
+				}
+			} else if(debugMode == true){
+				result("Images taken despite incorrect imaging mode due to Mode Warning Option setting");
 			}
 		}
 		opticsMode = EMGetImagingOpticsMode();
@@ -6183,24 +6234,22 @@ class ImagingFunctions
 		string opticsMode = EMGetImagingOpticsMode();
 		// Switch to Diffraction mode manually if it is not in that mode.
 		// "SAMAG" is the name our JEOL2100 uses. VirtualTEM uses "IMAGING". 
-		if ( GetScriptObjectFromID(CameraControlObjectID).isImagingMode() == true ) {
-			if(debugMode==true){
-				result("\nTakeDPImage() called when EM in an imaging mode. Is in mode: " + opticsMode);
-			}
-			if (!ContinueCancelDialog( "Switch to diffraction mode before continuing." )){
-				Throw( "User aborted process." );
-			}
-		}
-		opticsMode = EMGetImagingOpticsMode();
 		if ( GetScriptObjectFromID(CameraControlObjectID).isDiffractionMode() == false ) {
 			if(debugMode==true){
 				result("\nTakeDPImage() called when EM is not in a diffraction mode. It is in mode: " + opticsMode);
 				result("\nIf this mode is a diffraction imaging mode of your microscope then it needs to be added to the DF360 toolkit list of diffraction mode names.");
 			}
-			if (!ContinueCancelDialog( "Switch to diffraction mode before continuing." )){
-				Throw( "User aborted process." );
+			if(GetScriptObjectFromID(dataObjectID).getDisableModeWarnings() == false){
+				if (!ContinueCancelDialog( "Switch to a diffraction mode before continuing." )){
+					Throw( "User aborted process." );
+				}
+			} else if(debugMode == true){
+				result("Images taken despite incorrect imaging mode due to Mode Warning Option setting");
 			}
 		}
+		
+		
+		
 		opticsMode = EMGetImagingOpticsMode();
 		
 		// Take the  Image
@@ -6296,15 +6345,20 @@ class ImagingFunctions
 		string opticsMode = EMGetImagingOpticsMode();
 		// Switch to imaging manually if it is not in that mode.
 		// "SAMAG" is the name our JEOL2100 uses. VirtualTEM uses "IMAGING". Add your own modes in or replace these ones if your scope is different.
-		if (  GetScriptObjectFromID(CameraControlObjectID).isImagingMode() == false ) {
+		if ( GetScriptObjectFromID(CameraControlObjectID).isImagingMode() == false ) {
 			if(debugMode==true){
 				result("\nTakeBFImage() called when EM not in imaging mode. Is in mode: " + opticsMode);
 			}
 			result("\nIf this mode is an imaging mode of your microscope then it needs to be added to the DF360 toolkit list of imaging mode names.");
-			if (!ContinueCancelDialog( "Switch to an imaging mode before continuing." )){
-				Throw( "User aborted process." );
+			if(GetScriptObjectFromID(dataObjectID).getDisableModeWarnings() == false){
+				if (!ContinueCancelDialog( "Switch to an imaging mode before continuing." )){
+					Throw( "User aborted process." );
+				}
+			} else if(debugMode == true){
+				result("Images taken despite incorrect imaging mode due to Mode Warning Option setting");
 			}
 		}
+		
 		opticsMode = EMGetImagingOpticsMode();
 		
 		
@@ -8147,6 +8201,8 @@ class DF360Dialog : uiframe
 		number initialDPExposure = CameraControlObject.getDPExposure();
 		TagGroup DiffractionImagingExposure = DLGCreateRealField( initialDPExposure, 10, 3, "onDPChange").dlgidentifier("DiffractionExposureFieldInput")
 		panel1.dlgaddelement(DiffractionImagingExposure)
+		TagGroup captureViewButton = DLGCreatePushButton("Capture Live View Window", "captureViewButtonPress");
+		panel1.dlgaddelement(captureViewButton);
 		
 			// Arrange the buttons and things
 		panel1.dlgtablelayout(2,6,0);
@@ -8206,14 +8262,16 @@ class DF360Dialog : uiframe
 		panel6.dlgaddelement(enterScaleButton);
 		TagGroup manualTiltEntryButton = DLGCreatePushButton("Tilt Calibration", "manualTiltCalibrationButtonPress");
 		panel6.dlgaddelement(manualTiltEntryButton);
-		TagGroup captureViewButton = DLGCreatePushButton("Capture View", "captureViewButtonPress");
-		panel6.dlgaddelement(captureViewButton);
 		TagGroup saveSettingsToFile = DLGCreatePushButton("Save Settings File", "saveToolKitVariablesToFilePress");
 		panel6.dlgaddelement(saveSettingsToFile);
 		TagGroup loadSettingsFromFile = DLGCreatePushButton("Load Settings File", "loadToolkitVariablesFromFilePress");
 		panel6.dlgaddelement(loadSettingsFromFile);
 		TagGroup saveSettingsToDM = DLGCreatePushButton("Set as Default", "saveVariablesToMemoryPress");
 		panel6.dlgaddelement(saveSettingsToDM);
+		number initialModeWarningOption = (dataObject.getDisableModeWarnings() == false) ? 1 : 0;
+		TagGroup DisableModeWarnings = DLGCreateCheckBox( "Show Mode Warnings", initialModeWarningOption, "onModeWarningOptionChange");
+		panel6.dlgaddelement(DisableModeWarnings);
+
 		panel6.dlgtablelayout(2,12,0); // Arrange the buttons
 		
 		// Panel 7 is for final Imaging steps
@@ -9010,9 +9068,17 @@ class DF360Dialog : uiframe
 	
 	void debugToggleButtonPress(object self)
 	{
-		string state = (debugMode==0) ? "Deactivated" : "Activated" ;
+		string state = (debugMode==0) ? "Inactive" : "Active" ;
 		result("\nDebugMode Button pressed to make debug mode " + state);
 		self.ToggleDebugMode();
+	}
+	
+	void onModeWarningOptionChange(object self, TagGroup tg)
+	{
+		number setting = tg.dlggetvalue();
+		setting = (setting == 1) ? 0 : 1 ;
+		dataObject.setDisableModeWarnings(setting);
+		if(debugMode == true){result("\n\t DisableModeWarning option changed to " + dataObject.getDisableModeWarnings());}
 	}
 		
 	void saveDirButtonPress(object self)
@@ -9081,7 +9147,7 @@ class DF360Dialog : uiframe
 object startToolkit () {
 	
 	result("\nCreating toolkit data store...")
-	object dataObject = alloc(MyDataObject); // This is the object that will contain everything else.
+	object dataObject = alloc(ToolkitDataObject); // This is the object that will contain everything else.
 	
 	result("\nSetting Variables.")
 	// Set Variables

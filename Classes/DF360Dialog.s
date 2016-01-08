@@ -446,6 +446,8 @@ class DF360Dialog : uiframe
 		number initialDPExposure = CameraControlObject.getDPExposure();
 		TagGroup DiffractionImagingExposure = DLGCreateRealField( initialDPExposure, 10, 3, "onDPChange").dlgidentifier("DiffractionExposureFieldInput")
 		panel1.dlgaddelement(DiffractionImagingExposure)
+		TagGroup captureViewButton = DLGCreatePushButton("Capture Live View Window", "captureViewButtonPress");
+		panel1.dlgaddelement(captureViewButton);
 		
 			// Arrange the buttons and things
 		panel1.dlgtablelayout(2,6,0);
@@ -505,14 +507,16 @@ class DF360Dialog : uiframe
 		panel6.dlgaddelement(enterScaleButton);
 		TagGroup manualTiltEntryButton = DLGCreatePushButton("Tilt Calibration", "manualTiltCalibrationButtonPress");
 		panel6.dlgaddelement(manualTiltEntryButton);
-		TagGroup captureViewButton = DLGCreatePushButton("Capture View", "captureViewButtonPress");
-		panel6.dlgaddelement(captureViewButton);
 		TagGroup saveSettingsToFile = DLGCreatePushButton("Save Settings File", "saveToolKitVariablesToFilePress");
 		panel6.dlgaddelement(saveSettingsToFile);
 		TagGroup loadSettingsFromFile = DLGCreatePushButton("Load Settings File", "loadToolkitVariablesFromFilePress");
 		panel6.dlgaddelement(loadSettingsFromFile);
 		TagGroup saveSettingsToDM = DLGCreatePushButton("Set as Default", "saveVariablesToMemoryPress");
 		panel6.dlgaddelement(saveSettingsToDM);
+		number initialModeWarningOption = (dataObject.getDisableModeWarnings() == false) ? 1 : 0;
+		TagGroup DisableModeWarnings = DLGCreateCheckBox( "Show Mode Warnings", initialModeWarningOption, "onModeWarningOptionChange");
+		panel6.dlgaddelement(DisableModeWarnings);
+
 		panel6.dlgtablelayout(2,12,0); // Arrange the buttons
 		
 		// Panel 7 is for final Imaging steps
@@ -1309,9 +1313,17 @@ class DF360Dialog : uiframe
 	
 	void debugToggleButtonPress(object self)
 	{
-		string state = (debugMode==0) ? "Deactivated" : "Activated" ;
+		string state = (debugMode==0) ? "Inactive" : "Active" ;
 		result("\nDebugMode Button pressed to make debug mode " + state);
 		self.ToggleDebugMode();
+	}
+	
+	void onModeWarningOptionChange(object self, TagGroup tg)
+	{
+		number setting = tg.dlggetvalue();
+		setting = (setting == 1) ? 0 : 1 ;
+		dataObject.setDisableModeWarnings(setting);
+		if(debugMode == true){result("\n\t DisableModeWarning option changed to " + dataObject.getDisableModeWarnings());}
 	}
 		
 	void saveDirButtonPress(object self)
