@@ -290,6 +290,7 @@ interface ToolkitInterface
 	void setRingRadius(object self, number desiredRadiusNM); // Used in Keyhandler
 	void updateRadius(object self); // Used in Keyhandler
 	void beamCentre(object self); // Used in Keyhandler
+	void moveToROI(object self); // Used in Keyhandler
 }
 
 //*******************
@@ -412,6 +413,16 @@ string setAutoSaveDir (){
 }
 
 /* Returns a list of file names and a directory containing them based on user selection.
+	Tag group structure
+		|-	[Directory]: the directory path
+		|-	[files]:
+				|- [0]:
+				|	|- [Name]: filename
+				|
+				|- [1]:
+				|	|- [Name]: fileName
+				|
+				...
 */
 TagGroup makeFileListGroup(){
 	result("\nMaking Filelist...")
@@ -435,6 +446,12 @@ TagGroup makeFileListGroup(){
 
 /* Function to open a list of files, open them and then record their ImageIDs in an indexed TagList for use in other functions
 	the input list is the output of makeFileListGroup();
+	
+	Taggroup format:
+		|- [0]: imageID
+		|- [1]: imageID
+		|- ...
+	
 */
 TagGroup makeImageIDList (TagGroup DFList){
 	result("\nMaking ImageID List...")
@@ -707,58 +724,5 @@ void moveBeamTilt ( number targetX, number targetY ){
 	number yVector = targetY - originY;
 	EMChangeTilt(xVector,yVector);
 	return;
-}
-
-// ************************************
-//  TARGET DIFFRACTION SPOT STORAGE
-// ************************************
-
-/* Create the darkfield taglist to record information about the images taken. */
-TagGroup createDFList (number tracker, number shadowing, number integration, number integrationDistance ){
-	TagGroup DFList = NewTagGroup();
-
-	TagGroupCreateNewLabeledTag( DFList, "Directory" ); // Creates the tag for the file directory
-	TagGroupCreateNewLabeledTag( DFList, "UseImageID" ); // Creates the tag for UseImageID tag.
-	TagGroupCreateNewLabeledTag( DFList, "BaseImage" );
-	
-	TagGroupCreateNewLabeledTag( DFList, "ShadowingMode" );
-	DFList.TagGroupSetTagAsNumber( "ShadowingMode" , shadowing );
-	TagGroupCreateNewLabeledTag( DFList, "IntegrationMode" );
-	DFList.TagGroupSetTagAsNumber( "IntegrationMode" , integration );
-	TagGroupCreateNewLabeledTag( DFList, "IntegrationDistance" );
-	DFList.TagGroupSetTagAsNumber( "IntegrationDistance" , integrationDistance );
-	number i;
-	number spotGroupTotal = tracker / 3;
-	string longSpotID;
-	for(i=1;i<tracker;i++){
-		if(integration){
-			TagGroupCreateNewLabeledTag( DFList, "IntegratedImage" + (i * (tracker / integrationDistance )));
-		}
-		if(!shadowing){
-			longSpotID = PadWithZeroes(i, 4)
-			string tagPath = "Spot" + longSpotID;
-			if(!TagGroupDoesTagExist( DFList, tagPath )){
-				TagGroup SpotGroup = NewTagGroup(); // the tagGroup that will hold this data and then be attached to the DFList.
-				TagGroupCreateNewLabeledTag( SpotGroup, "MIDDLE" );
-				TagGroupAddLabeledTagGroup( DFList, tagPath, SpotGroup );
-			}
-		}
-		if(shadowing){
-			number pointNumber, rem;
-			pointNumber = floor((i-1) / 3) + 1;
-			longSpotID = PadWithZeroes(pointNumber, 4);
-			string tagPath = "Spot" + longSpotID;
-			sum 
-			if(!TagGroupDoesTagExist( DFList, tagPath )){
-				TagGroup SpotGroup = NewTagGroup(); // the tagGroup that will hold this data and then be attached to the DFList.
-				TagGroupCreateNewLabeledTag( SpotGroup, "LOWER" ); // Creates the tag for LOWER data
-				TagGroupCreateNewLabeledTag( SpotGroup, "HIGHER" ); // Creates the tag for HIGHER data
-				TagGroupCreateNewLabeledTag( SpotGroup, "MIDDLE" ); // Creates the tag for MIDDLE data
-				TagGroupAddLabeledTagGroup( DFList, tagPath, SpotGroup ); //Attaches the tag group
-			}
-		}
-	}
-	
-	return DFList;
 }
 

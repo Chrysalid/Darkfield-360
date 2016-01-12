@@ -290,6 +290,7 @@ interface ToolkitInterface
 	void setRingRadius(object self, number desiredRadiusNM); // Used in Keyhandler
 	void updateRadius(object self); // Used in Keyhandler
 	void beamCentre(object self); // Used in Keyhandler
+	void moveToROI(object self); // Used in Keyhandler
 }
 
 //*******************
@@ -412,6 +413,16 @@ string setAutoSaveDir (){
 }
 
 /* Returns a list of file names and a directory containing them based on user selection.
+	Tag group structure
+		|-	[Directory]: the directory path
+		|-	[files]:
+				|- [0]:
+				|	|- [Name]: filename
+				|
+				|- [1]:
+				|	|- [Name]: fileName
+				|
+				...
 */
 TagGroup makeFileListGroup(){
 	result("\nMaking Filelist...")
@@ -435,6 +446,12 @@ TagGroup makeFileListGroup(){
 
 /* Function to open a list of files, open them and then record their ImageIDs in an indexed TagList for use in other functions
 	the input list is the output of makeFileListGroup();
+	
+	Taggroup format:
+		|- [0]: imageID
+		|- [1]: imageID
+		|- ...
+	
 */
 TagGroup makeImageIDList (TagGroup DFList){
 	result("\nMaking ImageID List...")
@@ -707,59 +724,6 @@ void moveBeamTilt ( number targetX, number targetY ){
 	number yVector = targetY - originY;
 	EMChangeTilt(xVector,yVector);
 	return;
-}
-
-// ************************************
-//  TARGET DIFFRACTION SPOT STORAGE
-// ************************************
-
-/* Create the darkfield taglist to record information about the images taken. */
-TagGroup createDFList (number tracker, number shadowing, number integration, number integrationDistance ){
-	TagGroup DFList = NewTagGroup();
-
-	TagGroupCreateNewLabeledTag( DFList, "Directory" ); // Creates the tag for the file directory
-	TagGroupCreateNewLabeledTag( DFList, "UseImageID" ); // Creates the tag for UseImageID tag.
-	TagGroupCreateNewLabeledTag( DFList, "BaseImage" );
-	
-	TagGroupCreateNewLabeledTag( DFList, "ShadowingMode" );
-	DFList.TagGroupSetTagAsNumber( "ShadowingMode" , shadowing );
-	TagGroupCreateNewLabeledTag( DFList, "IntegrationMode" );
-	DFList.TagGroupSetTagAsNumber( "IntegrationMode" , integration );
-	TagGroupCreateNewLabeledTag( DFList, "IntegrationDistance" );
-	DFList.TagGroupSetTagAsNumber( "IntegrationDistance" , integrationDistance );
-	number i;
-	number spotGroupTotal = tracker / 3;
-	string longSpotID;
-	for(i=1;i<tracker;i++){
-		if(integration){
-			TagGroupCreateNewLabeledTag( DFList, "IntegratedImage" + (i * (tracker / integrationDistance )));
-		}
-		if(!shadowing){
-			longSpotID = PadWithZeroes(i, 4)
-			string tagPath = "Spot" + longSpotID;
-			if(!TagGroupDoesTagExist( DFList, tagPath )){
-				TagGroup SpotGroup = NewTagGroup(); // the tagGroup that will hold this data and then be attached to the DFList.
-				TagGroupCreateNewLabeledTag( SpotGroup, "MIDDLE" );
-				TagGroupAddLabeledTagGroup( DFList, tagPath, SpotGroup );
-			}
-		}
-		if(shadowing){
-			number pointNumber, rem;
-			pointNumber = floor((i-1) / 3) + 1;
-			longSpotID = PadWithZeroes(pointNumber, 4);
-			string tagPath = "Spot" + longSpotID;
-			sum 
-			if(!TagGroupDoesTagExist( DFList, tagPath )){
-				TagGroup SpotGroup = NewTagGroup(); // the tagGroup that will hold this data and then be attached to the DFList.
-				TagGroupCreateNewLabeledTag( SpotGroup, "LOWER" ); // Creates the tag for LOWER data
-				TagGroupCreateNewLabeledTag( SpotGroup, "HIGHER" ); // Creates the tag for HIGHER data
-				TagGroupCreateNewLabeledTag( SpotGroup, "MIDDLE" ); // Creates the tag for MIDDLE data
-				TagGroupAddLabeledTagGroup( DFList, tagPath, SpotGroup ); //Attaches the tag group
-			}
-		}
-	}
-	
-	return DFList;
 }
 
 // ********************************
@@ -1484,14 +1448,9 @@ class ToolkitDataObject
 	number KeyListenerID;
 	number imageAlignmentDialogID;
 	number ToolkitID; // DataObject will be kept inside this object
+	image referenceDP; // A Diff. Pattern taken with the beam centred. Used to extract calibration data in some functions. Needs standardizing.
 	
-	number toggle; // Variable available to all functions to act as an on / off value.
-	image dataArray; // Array of values that are stored for future reference.
-	image referenceDP; // A Diff. Pattern taken with the beam centred.
-	image ROIList; // A list of ROI IDs (Row 0) and ROI index numbers (Row 1) so I can keep their order and name them properly.
-	number tracker; // A variable to keep track of the number of stored data points
-	number spotTracker; // A variable to keep track of the spot number. A spot can have several images making it up through shadowing and integration.
-	number ROITracker; // A variable to keep track of which ROI a user looked at last.
+	number ROITracker; // A variable to keep track of which ROI a user looked at last. Used in Toolkit function moveToROI();
 	number ringMarkerColourTracker; // Variable to remember which colour marker rings have all ready been used.
 	number debugMode; // Set to 1 to prevent image saving and provide robust feedback.
 	number xTiltVectorX; // number of pixels moved in the (pixel) X axis per tiltX unit
@@ -1515,12 +1474,11 @@ class ToolkitDataObject
 	TagGroup DiffractionModes;
 	string currentImageSet; // the imageSetID of the imageSet being created at the moment. Do not save this.
 	number shadowDistanceNM;
-	TagGroup DFList;
 	number digitalMicrographVersion; //1 or 2. 2 is newer and uses different close dialog codes.
 	number DFExposure;
 	number BFExposure;
 	number DPExposure;
-	number DisableModeWarnings; // 0 or 1. If 1, the imaging functions will not check to see if the microscope is in an imaging or diffraction mode.
+	number DisableModeWarnings; // 0 or 1. If 1, the imaging functions will not check to see if the microscope is in an imaging or diffraction mode. 0 by default
 
 	number getDigitalMicrographVersion(object self){
 		return digitalMicrographVersion;
@@ -1528,35 +1486,6 @@ class ToolkitDataObject
 	number setDigitalMicrographVersion(object self, number value){
 		digitalMicrographVersion = value;
 		return value;
-	}
-	
-	number getToggle(object self) {
-		return toggle;
-	}
-	number setToggle(object self) {
-		if(debugMode==1){result("\nToggle was " + toggle);}
-		if(toggle==0){
-			toggle = 1;
-			return 1;
-		} else {
-			toggle = 0;
-			return 0;
-		}
-	}
-	
-	number getTracker(object self) {
-		return tracker;
-	}
-	number setTracker(object self, number newValue) {
-		tracker = newValue;
-		return tracker;
-	}
-	
-	number getSpotTracker(object self) {
-		return spotTracker;
-	}
-	void setSpotTracker(object self, number newValue) {
-		spotTracker = newValue;
 	}
 	
 	number getROITracker(object self) {
@@ -1636,14 +1565,6 @@ class ToolkitDataObject
 		return ringRadiusText;
 	}
 	
-	image getDataArray(object self){
-		return DataArray;
-	}
-	image setDataArray(object self, image dataArrayImage){
-		dataArray := dataArrayImage;
-		return dataArray;
-	}
-	
 	image getReferenceDP(object self){
 		return ReferenceDP;
 	}
@@ -1652,23 +1573,6 @@ class ToolkitDataObject
 		return ReferenceDP;
 	}
 	
-	image getROIList(object self){ // returns a dummy image if one is not set. Otherwise the functions throws an exception.
-		if(ROIList.ImageIsValid()){
-			if(debugMode==1){result("\n\tGetting ROIList (valid)");}
-			return ROIList;
-		} else {
-			if(debugMode==1){result("\n\tGetting ROIList (Dummy list)");}
-			image dummyImage := [1,1]: { {0} };
-			return dummyImage;
-		}
-	}
-	image setROIList(object self, image ROIListImage){
-		if(debugMode==1){result("\n\tSetting New ROIList");}
-		if(!ROIListImage.ImageIsValid()){result("\n\tThe Set function does not detect a valid image");}
-		ROIList := ROIListImage;
-		return ROIList;
-	}
-
 	number getOriginalScale(object self) {
 		return originalScale;
 	}
@@ -1734,14 +1638,6 @@ class ToolkitDataObject
 	void setDisableModeWarnings(object self, number newValue){
 		DisableModeWarnings = newValue;
 	}
-	
-	TagGroup getDFList(object self){
-		return DFList		
-	}
-	TagGroup setDFList(object self, TagGroup newValue){
-		DFList = newValue
-		return DFList;
-	}
 
 	void initialise(object self, number theToolkitID){
 		ToolkitID = theToolkitID;
@@ -1756,10 +1652,7 @@ class ToolkitDataObject
 	void printAll(object self){
 		result("\n\nDataObject Debug Values");
 		result("\n------------------------------");
-		string textString = "\ntoggle: " + toggle +\
-		"\ntracker: " + tracker +\
-		"\nspotTracker: " + spotTracker +\
-		"\nROITracker: " + ROITracker +\
+		string textString = "\nROITracker: " + ROITracker +\
 		"\ndebugMode: " + debugMode +\
 		"\nxTiltVectorX: " + xTiltVectorX +\
 		"\nxTiltVectorY: " + xTiltVectorY +\
@@ -1779,36 +1672,6 @@ class ToolkitDataObject
 		result(textString);
 		result("\n-------End----------------");
 	}
-
-	 /* Displays a TagList saved inside the data Object. Used for debugging. */
-	void showDFList(object self){
-		DocumentWindow tagViewWindow = TagGroupOpenBrowserWindow( DFList, 0 );
-	}
-	
-	/* Function to clear the stored data so tilts can be stored again without having to re-run the script. */
-	void resetTiltStore (object self){
-		if(tracker==0){
-			throw("No Data to Delete");
-		}
-		// Boolean TwoButtonDialog( String prompt, String acceptLabel, String rejectLabel )
-		if(TwoButtonDialog( "Delete Calibration Data?", "Yes", "No")){
-			DataArray = 0;
-			ReferenceDP = 0; 
-			self.setTracker(0);
-			self.setSpotTracker(0);
-			self.setTiltVectors(0,0,0,0);
-			result("\nAll stored points and calibration data deleted. Please centre the beam and run the calibrate tilt function again");
-			// Note: NEVER set centreXTilt or centreYTilt to 0, or anything other than real values.
-		} else {
-			self.setTracker(1);
-			self.setSpotTracker(0);
-			number height, width;
-			getSize(dataArray, width, height)
-			//realsubarea operator[( realimage img, number top, number left, number bottom, number right )
-			dataArray[0, 1, height, width] = 0; // Set all values except first to 0
-			result("\nStored points have been cleared. Calibration data are still in memory.")
-		}
-	 }
 	
 	// ************************************
 	//  Tilt calculations
@@ -2673,7 +2536,6 @@ class ToolkitDataObject
 			if(EMIsReady()){ // If there is a microscope attached, then record tilt.
 				setCentreTiltHere(self); // Store the Tilt values IMMEDIATELY to avoid referencing a null value or 0.
 			}
-			DFList = NewTagGroup();
 			xTiltVectorX = 0; // number of pixels moved in the (pixel) X axis per tiltX unit in an unbinned image
 			xTiltVectorY = 0; // number of pixels moved in the (pixel) Y axis per tiltX unit
 			yTiltVectorX = 0; // number of pixels moved in the (pixel) X axis per tiltY unit
@@ -3930,10 +3792,10 @@ class ScaleValueDialog : uiframe
 		scaleValueID = self.ScriptObjectGetID();
 	}
 	
-	// The destructor (does nothing)
+	// The destructor
 	~ScaleValueDialog(object self)
 	{
-		result("\nScale Calibration Dialog with ID: "+self.ScriptObjectGetID()+" closed.");
+		if(debugMode == 1){result("\nScale Calibration Dialog with ID: "+self.ScriptObjectGetID()+" closed.");}
 	}
 		
 	void setDebugMode(object self, number input)
@@ -6041,15 +5903,11 @@ class ImagingFunctions
 	void storeTiltCoord(object self, number xTilt, number yTilt, number shadowDistance)
 	{
 		number DPExposure = GetScriptObjectFromID(CameraControlObjectID).getDPExposure();
-		number tracker = GetScriptObjectFromID(dataObjectID).getTracker();
-		number spotTracker = GetScriptObjectFromID(dataObjectID).getSpotTracker();
 		// Generate the coordinate tags for this tilt value
 		TagGroup MiddleCoordinates, HigherCoordinates, LowerCoordinates;
 		self.createTiltCoord (xTilt, yTilt, shadowDistance, MiddleCoordinates, HigherCoordinates, LowerCoordinates);
 		
 		TagGroup spot = GetScriptObjectFromID(imageSetToolsID).addSpotToCurrentImageSet(); // The 1-3 images here will be placed inside the spot group
-		spotTracker = spotTracker + 1;
-		tracker = tracker + 1;
 		MiddleCoordinates.TagGroupSetTagAsString("ImageType", "DP");
 		MiddleCoordinates.TagGroupSetTagAsNumber("ExposureTime", DPExposure);
 		GetScriptObjectFromID(imageSetToolsID).addImageDataToCurrentSpot(MiddleCoordinates, "Middle"); // this is the middle image and is added to that tag in the spot taggroup
@@ -6057,18 +5915,14 @@ class ImagingFunctions
 		// For images with Shadowing activated...
 		if(shadowDistance!=0)
 		{
-			tracker = tracker + 1;
 			HigherCoordinates.TagGroupSetTagAsString("ImageType", "DP");
 			HigherCoordinates.TagGroupSetTagAsNumber("ExposureTime", DPExposure);
 			GetScriptObjectFromID(imageSetToolsID).addImageDataToCurrentSpot(HigherCoordinates, "Higher");
 			
-			tracker = tracker + 1;
 			LowerCoordinates.TagGroupSetTagAsString("ImageType", "DP");
 			LowerCoordinates.TagGroupSetTagAsNumber("ExposureTime", DPExposure);
 			GetScriptObjectFromID(imageSetToolsID).addImageDataToCurrentSpot(LowerCoordinates, "Lower");
 		}
-		GetScriptObjectFromID(dataObjectID).setTracker(tracker);
-		GetScriptObjectFromID(dataObjectID).setSpotTracker(spotTracker);
 	}
 	
 	/* Function to take a DF image by reading from the ImageSet Tag group
@@ -7127,7 +6981,6 @@ class ImagingFunctions
 	 number startDPStoring(object self){
 		// Load data from dataObject
 		// Not Reference DP. That is set later.
-		number tracker = GetScriptObjectFromID(dataObjectID).getTracker();
 		number DPExposure = GetScriptObjectFromID(CameraControlObjectID).getDPExposure();
 		number xTiltVectorX, xTiltVectorY, yTiltVectorX, yTiltVectorY;
 		GetScriptObjectFromID(dataObjectID).getTiltVectors(xTiltVectorX, xTiltVectorY, yTiltVectorX, yTiltVectorY);
@@ -7149,28 +7002,15 @@ class ImagingFunctions
 		if(!returnViewImage(debugMode, viewImage)){
 			result("\nNo view Image detected. This error should not be possible, but here we are.");
 		}	
-		if(tracker!=0){ //("There is image/calibration data all ready stored.")
-			if(!ContinueCancelDialog( "There is all ready calibration data stores. Would you like to overwrite it?" )){
-				return 1; // system is calibrated.
-			}
-		}
+
 		// Set central Tilt values
 		GetScriptObjectFromID(dataObjectID).setCentreTiltHere();
-		
-		number oldTracker = GetScriptObjectFromID(dataObjectID).getTracker();
-		GetScriptObjectFromID(dataObjectID).setTracker(0);
 		
 		number xTilt, yTilt;
 		EMGetBeamTilt(xTilt, yTilt);
 		number xTiltRelative = 0;
 		number yTiltRelative = 0;
 
-		GetScriptObjectFromID(dataObjectID).setTracker( 1 );
-		
-		if(oldTracker != 0){ // reset tracker so stored spots are still recorded in the totals
-			GetScriptObjectFromID(dataObjectID).setTracker( oldTracker ); 
-		}
-		
 		if(xTiltVectorX != 0){
 			result("\nCurrent Tilt Vector settings are:");
 			result("\n\txTilt(X): " + xTiltVectorX);
@@ -7178,7 +7018,7 @@ class ImagingFunctions
 			result("\n\tyTilt(X): " + yTiltVectorX);
 			result("\n\tyTilt(Y): " + yTiltVectorY);
 			/*Boolean TwoButtonDialog( String prompt, String acceptLabel, String rejectLabel )*/
-			if(TwoButtonDialog("Use existing tilt values?", "Yes", "No")){
+			if(TwoButtonDialog("Use existing tilt vector values?", "Yes", "No")){
 				return 1; // system is calibrated.
 			}
 		}
@@ -7552,11 +7392,6 @@ class ImagingFunctions
 		}
 		if(debugMode==true){result("\nROI List created.");}
 		
-		// Do I need to save the ROI list for future use now that I have image sets to hold data?
-		GetScriptObjectFromID(dataobjectID).setROIList(ROIData);		
-		if(debugMode==true){result("\nROI List loaded to DataObject.");}
-
-		
 		if(debugMode==true){result("\nGenerating tilt coordinates for these ROIs...");}
 		for(i=0; i < totalROI; i++)
 		{
@@ -7619,7 +7454,8 @@ class ImagingFunctions
 void printCommands(){
 	result("\n\nShortcut Keys Available:");
 	result("\n\t'h' to display these commands again.");
-	result("\n\t's' to store a diffraction spot's coordinates.");
+	result("\n\t's' to store a diffraction spot's coordinates. (Disabled for testing)");
+	result("\n\t'n' to cycle through any marked ROI points and the central beam location.")
 	result("\n\t'p' to view the stored image sets.");
 	result("\n\t'p' in debug mode to print out a detailed list of debugging information");
 	result("\n\t'1' to show the ring marker and measuring system.");
@@ -7678,26 +7514,23 @@ class MyKeyHandler
 	*/
 	number HandleKey(object self, imagedisplay imgdisp, object keydescription)
 		{
-			object dataObject = GetScriptObjectFromID(dataObjectID);
-				//string validstring = dataObject.ScriptObjectIsValid() ? "is" : "is not";
-				//if(debugMode==true){result("\n\tKeyListener: dataObject " + validstring + " present.");}
-			object Toolkit = GetScriptObjectFromID(ToolkitID);
-				//validstring = Toolkit.ScriptObjectIsValid() ? "is" : "is not";
-				//if(debugMode==true){result("\n\tKeyListener: Toolkit " + validstring + " present.");}
+
 			if(keydescription.MatchesKeyDescriptor( "s" )) // STORE POINT
 				{
-					if(debugMode==true){result("\nYou pressed s to store this tilt.");}
-					if(dataObject.getTracker()<1){ //The first tiltStore needs to make the reference image as well.
-						result("\nData NOT stored. Please Calibrate the system first.")
-					} else {
-						Toolkit.storeTiltCoord (0, 0);
-					}
+					result("\nYou pressed s to store this tilt. This method is disabled pending testing");
+					return 0;
+				}
+			if(keydescription.MatchesKeyDescriptor( "n" )) // CYCLE THROUGH ROI
+				{
+					if(debugMode==true){result("\nYou pressed n to cycle through marked ROI.");}
+					GetScriptObjectFromID(ToolkitID).moveToROI();
+					return 0;
 				}
 			if(keydescription.MatchesKeyDescriptor( "0" )) // CENTRE BEAM
 				{
 					if(debugMode==true){result("\nYou pressed 0 to centralize the beam.");}
 					// Centralize Beam
-					Toolkit.beamCentre();
+					GetScriptObjectFromID(ToolkitID).beamCentre();
 					return 0;
 				}
 			if(keydescription.MatchesKeyDescriptor( "p" )) // PRINT DATA
@@ -7714,19 +7547,19 @@ class MyKeyHandler
 			if(keydescription.MatchesKeyDescriptor( "1" )) // TOGGLE MARKER RING
 				{	
 					// Make the Marker Ring and radius display visible/hidden;
-					Toolkit.toggleMarkerRing();
+					GetScriptObjectFromID(ToolkitID).toggleMarkerRing();
 					return 0;
 				}
 			if(keydescription.MatchesKeyDescriptor( "2" )) // SET RING TO TARGET RADIUS IN 1/NM UNITS
 				{
 					number desiredRadiusNM;
 					getNumber("Set Marker Ring to (1/nm): ", 2.00, desiredRadiusNM);
-					Toolkit.setRingRadius(desiredRadiusNM);
+					GetScriptObjectFromID(ToolkitID).setRingRadius(desiredRadiusNM);
 					return 0;
 				}
 			if(keydescription.MatchesKeyDescriptor( "3" )) // UPDATE RADIUS MEASUREMENT TEXT
 				{
-					Toolkit.updateRadius();
+					GetScriptObjectFromID(ToolkitID).updateRadius();
 					return 0;
 				}
 			if(keydescription.MatchesKeyDescriptor( "h" )) // HELP
@@ -7765,14 +7598,16 @@ class MyKeyHandler
 class DF360Dialog : uiframe
 {
 	number ToolkitID; // the ID of this object
+	number debugMode;
 	number EMOnline; // Stores 1 if there is a microscope ready for use. 0 if not.
 	number AllowControl; // Only allow control of the microscope if there is a live view image.
 	number isCalibrated; // flag to test if the scope is calibrated or not.
+	
+	/* These objects are the various classes that are brought together in the toolkit to provide functions and record values. */
 	object dataObject;
 	number dataObjectID;
 	object imageSetTools;
 	number imageSetToolsID;
-	number debugMode;
 	object KeyListener;
 	number KeyListenerID;
 	object imageAlignmentDialog;
@@ -7791,6 +7626,9 @@ class DF360Dialog : uiframe
 	number ProgressBarDialogID;
 	object ImagingFunctionsObject;
 	number ImagingFunctionsObjectID;
+	
+	/* These are components displayed on the Live View Window which the toolkit interacts with */
+	
 	component markerRing;
 	component ringRadiusText;
 	
@@ -8085,35 +7923,37 @@ class DF360Dialog : uiframe
 	/* Function to change the Tilt to centre on a marked ROI point */
 	// Number ImageDisplayCountROIs( ImageDisplay imgDisp )
 	// ROI ImageDisplayGetROI( ImageDisplay imgDisp, Number index )
-	void moveToCurrentROI (object self){
+	void moveToROI (object self){
 		if(debugMode==1){result("\nStart moveToCurrentROI function.");}
+		if(isCalibrated == false){
+			throw("The toolkit must be calibrated to use this function");
+		}
 		number ROITracker = dataObject.getROITracker(); // This value determines which ROI to go to.
 		if(debugMode==1){result("\n\tROITracker = " + ROITracker);}
 		ImageDisplay viewDisplay;
 		if(!returnViewImageDisplay(debugMode, viewDisplay)){
 			result("\nNo active View Window detected. This should never happen.");
-			exit(0);
+			return;
 		}
 		number totalROI = viewDisplay.ImageDisplayCountROIs(); // Count ROIs
 		if(debugMode==1){result("\n\tTotal ROIs = " + totalROI);}
 		if( totalROI==0 ){
-			result("\nNo ROI to go to.");
-			exit(0);
+			if(debugMode == true){result("\nNo ROI to go to.");}
+			return;
 		}
-		if ( (ROITracker-1) >= totalROI){ // The tracker is 1 higher than the highest ROI .
+		if ( totalROI <= ROITracker){ // The tracker is higher than the highest ROI (which starts at 0) .
 			//Resets the count to 0 to avoid out-of-bounds errors and goes to Beam Centre instead.
-			ROITracker = 0;
+			if(debugMode==1){result("\nCycled through the available ROI. Returning to centre.");}
 			dataObject.setROITracker(0);
 			if(debugMode==1){result("\nSet ROITracker to 0. Returning to Beam Centre");}
 			CameraControlObject.beamCentre();
-			exit(0);
+			return;
 		}
 		ROI ROItoMoveTo = viewDisplay.ImageDisplayGetROI( ROITracker );
 		number xPixel, yPixel, xTiltTarget, yTiltTarget;
 		if(ROItoMoveTo.ROIIsPoint() != 1){
-			result("\n\tROI #" + ROITracker + " is not a point. Skipping over it.");
-		}
-		else
+			if(debugMode == 1){result("\n\tROI #" + ROITracker + " is not a point. Skipping over it.");}
+		} else
 		{
 			ROItoMoveTo.ROIGetPoint(xPixel, yPixel);
 			if(debugMode==1){result("\n\txPixel = " + xPixel + " yPixel = " + yPixel);}
@@ -8123,8 +7963,8 @@ class DF360Dialog : uiframe
 			dataObject.pixelToTilt(xPixel, yPixel, xTiltTarget, yTiltTarget, 1, 0, 0, binningMultiplier);
 			if(debugMode==1){result("\n\txTiltTarget = " + xTiltTarget + " yTiltTarget = " + yTiltTarget);}
 			moveBeamTilt(xTiltTarget, yTiltTarget);
+			dataObject.setROITracker(ROITracker + 1);
 		}
-		if(debugMode==1){result("\nEnd moveToCurrentROI function.");}
 	}
 	
 	//****************************************************
@@ -8654,7 +8494,7 @@ class DF360Dialog : uiframe
 		image viewImage;
 		if(!returnViewImage(debugMode, viewImage)){
 			if(debugMode==true){result("\nNo View Window detected.");}
-			exit(0); // Stop here if no view window is there.
+			return; // Stop here if no view window is there.
 		}
 		
 		// View image scale
@@ -8727,7 +8567,7 @@ class DF360Dialog : uiframe
 	{
 		if(CameraControlObject.getAllowControl() != true){
 			result("\nToolkit Controls are offline. Ensure there is a live view window active and has been captured.")
-			exit(0);
+			return;
 		}
 		number useValues;
 		TagGroup ImageSet
@@ -8787,7 +8627,7 @@ class DF360Dialog : uiframe
 	{
 		if(CameraControlObject.getAllowControl() != true){
 			result("\nToolkit Controls are offline. Ensure there is a live view window active and has been captured.")
-			exit(0);
+			return;
 		}
 		// Stores a diffraction spot's tilt coordinates and takes a picture to reference the spot in future.
 		if(isCalibrated == 0)
@@ -8910,7 +8750,7 @@ class DF360Dialog : uiframe
 	{
 		if(CameraControlObject.getAllowControl() != true){
 			result("\nToolkit Controls are offline. Ensure there is a live view window active and has been captured.")
-			exit(0);
+			return;
 		}
 		TagGroup imageSet;
 		ImageSetTools.getCurrentImageSet(imageSet);
@@ -8954,7 +8794,7 @@ class DF360Dialog : uiframe
 			}
 			self.binaryAllImages(imageList, targetPercentage, ExportImages, directory)
 			result("Directory Processed");
-			exit(0);
+			return;
 		}		
 		
 		/* This function will take a TagGroup of stored images and then process them based on the input arguments.
@@ -9039,7 +8879,7 @@ class DF360Dialog : uiframe
 	{
 		image imagea, imageb;
 		if(!gettwoimages("Select two images",imagea, imageb)){
-			exit(0);
+			return;
 		} else {
 			number offsetX, offsetY, useValues;
 			useValues = imageAlignmentDialog.alignTwoImages(imagea,imageb,offsetX, offsetY);

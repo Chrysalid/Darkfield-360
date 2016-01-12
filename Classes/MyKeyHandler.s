@@ -10,7 +10,8 @@
 void printCommands(){
 	result("\n\nShortcut Keys Available:");
 	result("\n\t'h' to display these commands again.");
-	result("\n\t's' to store a diffraction spot's coordinates.");
+	result("\n\t's' to store a diffraction spot's coordinates. (Disabled for testing)");
+	result("\n\t'n' to cycle through any marked ROI points and the central beam location.")
 	result("\n\t'p' to view the stored image sets.");
 	result("\n\t'p' in debug mode to print out a detailed list of debugging information");
 	result("\n\t'1' to show the ring marker and measuring system.");
@@ -69,26 +70,23 @@ class MyKeyHandler
 	*/
 	number HandleKey(object self, imagedisplay imgdisp, object keydescription)
 		{
-			object dataObject = GetScriptObjectFromID(dataObjectID);
-				//string validstring = dataObject.ScriptObjectIsValid() ? "is" : "is not";
-				//if(debugMode==true){result("\n\tKeyListener: dataObject " + validstring + " present.");}
-			object Toolkit = GetScriptObjectFromID(ToolkitID);
-				//validstring = Toolkit.ScriptObjectIsValid() ? "is" : "is not";
-				//if(debugMode==true){result("\n\tKeyListener: Toolkit " + validstring + " present.");}
+
 			if(keydescription.MatchesKeyDescriptor( "s" )) // STORE POINT
 				{
-					if(debugMode==true){result("\nYou pressed s to store this tilt.");}
-					if(dataObject.getTracker()<1){ //The first tiltStore needs to make the reference image as well.
-						result("\nData NOT stored. Please Calibrate the system first.")
-					} else {
-						Toolkit.storeTiltCoord (0, 0);
-					}
+					result("\nYou pressed s to store this tilt. This method is disabled pending testing");
+					return 0;
+				}
+			if(keydescription.MatchesKeyDescriptor( "n" )) // CYCLE THROUGH ROI
+				{
+					if(debugMode==true){result("\nYou pressed n to cycle through marked ROI.");}
+					GetScriptObjectFromID(ToolkitID).moveToROI();
+					return 0;
 				}
 			if(keydescription.MatchesKeyDescriptor( "0" )) // CENTRE BEAM
 				{
 					if(debugMode==true){result("\nYou pressed 0 to centralize the beam.");}
 					// Centralize Beam
-					Toolkit.beamCentre();
+					GetScriptObjectFromID(ToolkitID).beamCentre();
 					return 0;
 				}
 			if(keydescription.MatchesKeyDescriptor( "p" )) // PRINT DATA
@@ -105,19 +103,19 @@ class MyKeyHandler
 			if(keydescription.MatchesKeyDescriptor( "1" )) // TOGGLE MARKER RING
 				{	
 					// Make the Marker Ring and radius display visible/hidden;
-					Toolkit.toggleMarkerRing();
+					GetScriptObjectFromID(ToolkitID).toggleMarkerRing();
 					return 0;
 				}
 			if(keydescription.MatchesKeyDescriptor( "2" )) // SET RING TO TARGET RADIUS IN 1/NM UNITS
 				{
 					number desiredRadiusNM;
 					getNumber("Set Marker Ring to (1/nm): ", 2.00, desiredRadiusNM);
-					Toolkit.setRingRadius(desiredRadiusNM);
+					GetScriptObjectFromID(ToolkitID).setRingRadius(desiredRadiusNM);
 					return 0;
 				}
 			if(keydescription.MatchesKeyDescriptor( "3" )) // UPDATE RADIUS MEASUREMENT TEXT
 				{
-					Toolkit.updateRadius();
+					GetScriptObjectFromID(ToolkitID).updateRadius();
 					return 0;
 				}
 			if(keydescription.MatchesKeyDescriptor( "h" )) // HELP

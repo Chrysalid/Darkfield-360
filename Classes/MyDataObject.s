@@ -14,14 +14,9 @@ class ToolkitDataObject
 	number KeyListenerID;
 	number imageAlignmentDialogID;
 	number ToolkitID; // DataObject will be kept inside this object
+	image referenceDP; // A Diff. Pattern taken with the beam centred. Used to extract calibration data in some functions. Needs standardizing.
 	
-	number toggle; // Variable available to all functions to act as an on / off value.
-	image dataArray; // Array of values that are stored for future reference.
-	image referenceDP; // A Diff. Pattern taken with the beam centred.
-	image ROIList; // A list of ROI IDs (Row 0) and ROI index numbers (Row 1) so I can keep their order and name them properly.
-	number tracker; // A variable to keep track of the number of stored data points
-	number spotTracker; // A variable to keep track of the spot number. A spot can have several images making it up through shadowing and integration.
-	number ROITracker; // A variable to keep track of which ROI a user looked at last.
+	number ROITracker; // A variable to keep track of which ROI a user looked at last. Used in Toolkit function moveToROI();
 	number ringMarkerColourTracker; // Variable to remember which colour marker rings have all ready been used.
 	number debugMode; // Set to 1 to prevent image saving and provide robust feedback.
 	number xTiltVectorX; // number of pixels moved in the (pixel) X axis per tiltX unit
@@ -45,12 +40,11 @@ class ToolkitDataObject
 	TagGroup DiffractionModes;
 	string currentImageSet; // the imageSetID of the imageSet being created at the moment. Do not save this.
 	number shadowDistanceNM;
-	TagGroup DFList;
 	number digitalMicrographVersion; //1 or 2. 2 is newer and uses different close dialog codes.
 	number DFExposure;
 	number BFExposure;
 	number DPExposure;
-	number DisableModeWarnings; // 0 or 1. If 1, the imaging functions will not check to see if the microscope is in an imaging or diffraction mode.
+	number DisableModeWarnings; // 0 or 1. If 1, the imaging functions will not check to see if the microscope is in an imaging or diffraction mode. 0 by default
 
 	number getDigitalMicrographVersion(object self){
 		return digitalMicrographVersion;
@@ -58,35 +52,6 @@ class ToolkitDataObject
 	number setDigitalMicrographVersion(object self, number value){
 		digitalMicrographVersion = value;
 		return value;
-	}
-	
-	number getToggle(object self) {
-		return toggle;
-	}
-	number setToggle(object self) {
-		if(debugMode==1){result("\nToggle was " + toggle);}
-		if(toggle==0){
-			toggle = 1;
-			return 1;
-		} else {
-			toggle = 0;
-			return 0;
-		}
-	}
-	
-	number getTracker(object self) {
-		return tracker;
-	}
-	number setTracker(object self, number newValue) {
-		tracker = newValue;
-		return tracker;
-	}
-	
-	number getSpotTracker(object self) {
-		return spotTracker;
-	}
-	void setSpotTracker(object self, number newValue) {
-		spotTracker = newValue;
 	}
 	
 	number getROITracker(object self) {
@@ -166,14 +131,6 @@ class ToolkitDataObject
 		return ringRadiusText;
 	}
 	
-	image getDataArray(object self){
-		return DataArray;
-	}
-	image setDataArray(object self, image dataArrayImage){
-		dataArray := dataArrayImage;
-		return dataArray;
-	}
-	
 	image getReferenceDP(object self){
 		return ReferenceDP;
 	}
@@ -182,23 +139,6 @@ class ToolkitDataObject
 		return ReferenceDP;
 	}
 	
-	image getROIList(object self){ // returns a dummy image if one is not set. Otherwise the functions throws an exception.
-		if(ROIList.ImageIsValid()){
-			if(debugMode==1){result("\n\tGetting ROIList (valid)");}
-			return ROIList;
-		} else {
-			if(debugMode==1){result("\n\tGetting ROIList (Dummy list)");}
-			image dummyImage := [1,1]: { {0} };
-			return dummyImage;
-		}
-	}
-	image setROIList(object self, image ROIListImage){
-		if(debugMode==1){result("\n\tSetting New ROIList");}
-		if(!ROIListImage.ImageIsValid()){result("\n\tThe Set function does not detect a valid image");}
-		ROIList := ROIListImage;
-		return ROIList;
-	}
-
 	number getOriginalScale(object self) {
 		return originalScale;
 	}
@@ -264,14 +204,6 @@ class ToolkitDataObject
 	void setDisableModeWarnings(object self, number newValue){
 		DisableModeWarnings = newValue;
 	}
-	
-	TagGroup getDFList(object self){
-		return DFList		
-	}
-	TagGroup setDFList(object self, TagGroup newValue){
-		DFList = newValue
-		return DFList;
-	}
 
 	void initialise(object self, number theToolkitID){
 		ToolkitID = theToolkitID;
@@ -286,10 +218,7 @@ class ToolkitDataObject
 	void printAll(object self){
 		result("\n\nDataObject Debug Values");
 		result("\n------------------------------");
-		string textString = "\ntoggle: " + toggle +\
-		"\ntracker: " + tracker +\
-		"\nspotTracker: " + spotTracker +\
-		"\nROITracker: " + ROITracker +\
+		string textString = "\nROITracker: " + ROITracker +\
 		"\ndebugMode: " + debugMode +\
 		"\nxTiltVectorX: " + xTiltVectorX +\
 		"\nxTiltVectorY: " + xTiltVectorY +\
@@ -309,36 +238,6 @@ class ToolkitDataObject
 		result(textString);
 		result("\n-------End----------------");
 	}
-
-	 /* Displays a TagList saved inside the data Object. Used for debugging. */
-	void showDFList(object self){
-		DocumentWindow tagViewWindow = TagGroupOpenBrowserWindow( DFList, 0 );
-	}
-	
-	/* Function to clear the stored data so tilts can be stored again without having to re-run the script. */
-	void resetTiltStore (object self){
-		if(tracker==0){
-			throw("No Data to Delete");
-		}
-		// Boolean TwoButtonDialog( String prompt, String acceptLabel, String rejectLabel )
-		if(TwoButtonDialog( "Delete Calibration Data?", "Yes", "No")){
-			DataArray = 0;
-			ReferenceDP = 0; 
-			self.setTracker(0);
-			self.setSpotTracker(0);
-			self.setTiltVectors(0,0,0,0);
-			result("\nAll stored points and calibration data deleted. Please centre the beam and run the calibrate tilt function again");
-			// Note: NEVER set centreXTilt or centreYTilt to 0, or anything other than real values.
-		} else {
-			self.setTracker(1);
-			self.setSpotTracker(0);
-			number height, width;
-			getSize(dataArray, width, height)
-			//realsubarea operator[( realimage img, number top, number left, number bottom, number right )
-			dataArray[0, 1, height, width] = 0; // Set all values except first to 0
-			result("\nStored points have been cleared. Calibration data are still in memory.")
-		}
-	 }
 	
 	// ************************************
 	//  Tilt calculations
@@ -1203,7 +1102,6 @@ class ToolkitDataObject
 			if(EMIsReady()){ // If there is a microscope attached, then record tilt.
 				setCentreTiltHere(self); // Store the Tilt values IMMEDIATELY to avoid referencing a null value or 0.
 			}
-			DFList = NewTagGroup();
 			xTiltVectorX = 0; // number of pixels moved in the (pixel) X axis per tiltX unit in an unbinned image
 			xTiltVectorY = 0; // number of pixels moved in the (pixel) Y axis per tiltX unit
 			yTiltVectorX = 0; // number of pixels moved in the (pixel) X axis per tiltY unit

@@ -10,14 +10,16 @@
 class DF360Dialog : uiframe
 {
 	number ToolkitID; // the ID of this object
+	number debugMode;
 	number EMOnline; // Stores 1 if there is a microscope ready for use. 0 if not.
 	number AllowControl; // Only allow control of the microscope if there is a live view image.
 	number isCalibrated; // flag to test if the scope is calibrated or not.
+	
+	/* These objects are the various classes that are brought together in the toolkit to provide functions and record values. */
 	object dataObject;
 	number dataObjectID;
 	object imageSetTools;
 	number imageSetToolsID;
-	number debugMode;
 	object KeyListener;
 	number KeyListenerID;
 	object imageAlignmentDialog;
@@ -36,6 +38,9 @@ class DF360Dialog : uiframe
 	number ProgressBarDialogID;
 	object ImagingFunctionsObject;
 	number ImagingFunctionsObjectID;
+	
+	/* These are components displayed on the Live View Window which the toolkit interacts with */
+	
 	component markerRing;
 	component ringRadiusText;
 	
@@ -330,35 +335,37 @@ class DF360Dialog : uiframe
 	/* Function to change the Tilt to centre on a marked ROI point */
 	// Number ImageDisplayCountROIs( ImageDisplay imgDisp )
 	// ROI ImageDisplayGetROI( ImageDisplay imgDisp, Number index )
-	void moveToCurrentROI (object self){
+	void moveToROI (object self){
 		if(debugMode==1){result("\nStart moveToCurrentROI function.");}
+		if(isCalibrated == false){
+			throw("The toolkit must be calibrated to use this function");
+		}
 		number ROITracker = dataObject.getROITracker(); // This value determines which ROI to go to.
 		if(debugMode==1){result("\n\tROITracker = " + ROITracker);}
 		ImageDisplay viewDisplay;
 		if(!returnViewImageDisplay(debugMode, viewDisplay)){
 			result("\nNo active View Window detected. This should never happen.");
-			exit(0);
+			return;
 		}
 		number totalROI = viewDisplay.ImageDisplayCountROIs(); // Count ROIs
 		if(debugMode==1){result("\n\tTotal ROIs = " + totalROI);}
 		if( totalROI==0 ){
-			result("\nNo ROI to go to.");
-			exit(0);
+			if(debugMode == true){result("\nNo ROI to go to.");}
+			return;
 		}
-		if ( (ROITracker-1) >= totalROI){ // The tracker is 1 higher than the highest ROI .
+		if ( totalROI <= ROITracker){ // The tracker is higher than the highest ROI (which starts at 0) .
 			//Resets the count to 0 to avoid out-of-bounds errors and goes to Beam Centre instead.
-			ROITracker = 0;
+			if(debugMode==1){result("\nCycled through the available ROI. Returning to centre.");}
 			dataObject.setROITracker(0);
 			if(debugMode==1){result("\nSet ROITracker to 0. Returning to Beam Centre");}
 			CameraControlObject.beamCentre();
-			exit(0);
+			return;
 		}
 		ROI ROItoMoveTo = viewDisplay.ImageDisplayGetROI( ROITracker );
 		number xPixel, yPixel, xTiltTarget, yTiltTarget;
 		if(ROItoMoveTo.ROIIsPoint() != 1){
-			result("\n\tROI #" + ROITracker + " is not a point. Skipping over it.");
-		}
-		else
+			if(debugMode == 1){result("\n\tROI #" + ROITracker + " is not a point. Skipping over it.");}
+		} else
 		{
 			ROItoMoveTo.ROIGetPoint(xPixel, yPixel);
 			if(debugMode==1){result("\n\txPixel = " + xPixel + " yPixel = " + yPixel);}
@@ -368,8 +375,8 @@ class DF360Dialog : uiframe
 			dataObject.pixelToTilt(xPixel, yPixel, xTiltTarget, yTiltTarget, 1, 0, 0, binningMultiplier);
 			if(debugMode==1){result("\n\txTiltTarget = " + xTiltTarget + " yTiltTarget = " + yTiltTarget);}
 			moveBeamTilt(xTiltTarget, yTiltTarget);
+			dataObject.setROITracker(ROITracker + 1);
 		}
-		if(debugMode==1){result("\nEnd moveToCurrentROI function.");}
 	}
 	
 	//****************************************************
@@ -899,7 +906,7 @@ class DF360Dialog : uiframe
 		image viewImage;
 		if(!returnViewImage(debugMode, viewImage)){
 			if(debugMode==true){result("\nNo View Window detected.");}
-			exit(0); // Stop here if no view window is there.
+			return; // Stop here if no view window is there.
 		}
 		
 		// View image scale
@@ -972,7 +979,7 @@ class DF360Dialog : uiframe
 	{
 		if(CameraControlObject.getAllowControl() != true){
 			result("\nToolkit Controls are offline. Ensure there is a live view window active and has been captured.")
-			exit(0);
+			return;
 		}
 		number useValues;
 		TagGroup ImageSet
@@ -1032,7 +1039,7 @@ class DF360Dialog : uiframe
 	{
 		if(CameraControlObject.getAllowControl() != true){
 			result("\nToolkit Controls are offline. Ensure there is a live view window active and has been captured.")
-			exit(0);
+			return;
 		}
 		// Stores a diffraction spot's tilt coordinates and takes a picture to reference the spot in future.
 		if(isCalibrated == 0)
@@ -1155,7 +1162,7 @@ class DF360Dialog : uiframe
 	{
 		if(CameraControlObject.getAllowControl() != true){
 			result("\nToolkit Controls are offline. Ensure there is a live view window active and has been captured.")
-			exit(0);
+			return;
 		}
 		TagGroup imageSet;
 		ImageSetTools.getCurrentImageSet(imageSet);
@@ -1199,7 +1206,7 @@ class DF360Dialog : uiframe
 			}
 			self.binaryAllImages(imageList, targetPercentage, ExportImages, directory)
 			result("Directory Processed");
-			exit(0);
+			return;
 		}		
 		
 		/* This function will take a TagGroup of stored images and then process them based on the input arguments.
@@ -1284,7 +1291,7 @@ class DF360Dialog : uiframe
 	{
 		image imagea, imageb;
 		if(!gettwoimages("Select two images",imagea, imageb)){
-			exit(0);
+			return;
 		} else {
 			number offsetX, offsetY, useValues;
 			useValues = imageAlignmentDialog.alignTwoImages(imagea,imageb,offsetX, offsetY);

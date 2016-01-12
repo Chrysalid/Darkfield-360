@@ -237,15 +237,11 @@ class ImagingFunctions
 	void storeTiltCoord(object self, number xTilt, number yTilt, number shadowDistance)
 	{
 		number DPExposure = GetScriptObjectFromID(CameraControlObjectID).getDPExposure();
-		number tracker = GetScriptObjectFromID(dataObjectID).getTracker();
-		number spotTracker = GetScriptObjectFromID(dataObjectID).getSpotTracker();
 		// Generate the coordinate tags for this tilt value
 		TagGroup MiddleCoordinates, HigherCoordinates, LowerCoordinates;
 		self.createTiltCoord (xTilt, yTilt, shadowDistance, MiddleCoordinates, HigherCoordinates, LowerCoordinates);
 		
 		TagGroup spot = GetScriptObjectFromID(imageSetToolsID).addSpotToCurrentImageSet(); // The 1-3 images here will be placed inside the spot group
-		spotTracker = spotTracker + 1;
-		tracker = tracker + 1;
 		MiddleCoordinates.TagGroupSetTagAsString("ImageType", "DP");
 		MiddleCoordinates.TagGroupSetTagAsNumber("ExposureTime", DPExposure);
 		GetScriptObjectFromID(imageSetToolsID).addImageDataToCurrentSpot(MiddleCoordinates, "Middle"); // this is the middle image and is added to that tag in the spot taggroup
@@ -253,18 +249,14 @@ class ImagingFunctions
 		// For images with Shadowing activated...
 		if(shadowDistance!=0)
 		{
-			tracker = tracker + 1;
 			HigherCoordinates.TagGroupSetTagAsString("ImageType", "DP");
 			HigherCoordinates.TagGroupSetTagAsNumber("ExposureTime", DPExposure);
 			GetScriptObjectFromID(imageSetToolsID).addImageDataToCurrentSpot(HigherCoordinates, "Higher");
 			
-			tracker = tracker + 1;
 			LowerCoordinates.TagGroupSetTagAsString("ImageType", "DP");
 			LowerCoordinates.TagGroupSetTagAsNumber("ExposureTime", DPExposure);
 			GetScriptObjectFromID(imageSetToolsID).addImageDataToCurrentSpot(LowerCoordinates, "Lower");
 		}
-		GetScriptObjectFromID(dataObjectID).setTracker(tracker);
-		GetScriptObjectFromID(dataObjectID).setSpotTracker(spotTracker);
 	}
 	
 	/* Function to take a DF image by reading from the ImageSet Tag group
@@ -1323,7 +1315,6 @@ class ImagingFunctions
 	 number startDPStoring(object self){
 		// Load data from dataObject
 		// Not Reference DP. That is set later.
-		number tracker = GetScriptObjectFromID(dataObjectID).getTracker();
 		number DPExposure = GetScriptObjectFromID(CameraControlObjectID).getDPExposure();
 		number xTiltVectorX, xTiltVectorY, yTiltVectorX, yTiltVectorY;
 		GetScriptObjectFromID(dataObjectID).getTiltVectors(xTiltVectorX, xTiltVectorY, yTiltVectorX, yTiltVectorY);
@@ -1345,28 +1336,15 @@ class ImagingFunctions
 		if(!returnViewImage(debugMode, viewImage)){
 			result("\nNo view Image detected. This error should not be possible, but here we are.");
 		}	
-		if(tracker!=0){ //("There is image/calibration data all ready stored.")
-			if(!ContinueCancelDialog( "There is all ready calibration data stores. Would you like to overwrite it?" )){
-				return 1; // system is calibrated.
-			}
-		}
+
 		// Set central Tilt values
 		GetScriptObjectFromID(dataObjectID).setCentreTiltHere();
-		
-		number oldTracker = GetScriptObjectFromID(dataObjectID).getTracker();
-		GetScriptObjectFromID(dataObjectID).setTracker(0);
 		
 		number xTilt, yTilt;
 		EMGetBeamTilt(xTilt, yTilt);
 		number xTiltRelative = 0;
 		number yTiltRelative = 0;
 
-		GetScriptObjectFromID(dataObjectID).setTracker( 1 );
-		
-		if(oldTracker != 0){ // reset tracker so stored spots are still recorded in the totals
-			GetScriptObjectFromID(dataObjectID).setTracker( oldTracker ); 
-		}
-		
 		if(xTiltVectorX != 0){
 			result("\nCurrent Tilt Vector settings are:");
 			result("\n\txTilt(X): " + xTiltVectorX);
@@ -1374,7 +1352,7 @@ class ImagingFunctions
 			result("\n\tyTilt(X): " + yTiltVectorX);
 			result("\n\tyTilt(Y): " + yTiltVectorY);
 			/*Boolean TwoButtonDialog( String prompt, String acceptLabel, String rejectLabel )*/
-			if(TwoButtonDialog("Use existing tilt values?", "Yes", "No")){
+			if(TwoButtonDialog("Use existing tilt vector values?", "Yes", "No")){
 				return 1; // system is calibrated.
 			}
 		}
@@ -1747,11 +1725,6 @@ class ImagingFunctions
 			setPixel(ROIData, i , 1, i);
 		}
 		if(debugMode==true){result("\nROI List created.");}
-		
-		// Do I need to save the ROI list for future use now that I have image sets to hold data?
-		GetScriptObjectFromID(dataobjectID).setROIList(ROIData);		
-		if(debugMode==true){result("\nROI List loaded to DataObject.");}
-
 		
 		if(debugMode==true){result("\nGenerating tilt coordinates for these ROIs...");}
 		for(i=0; i < totalROI; i++)

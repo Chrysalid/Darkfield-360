@@ -22,6 +22,8 @@ StartDPStoring / calibration does not update any current image sets yet
 see what dataObject.tracker is used for, if anything.
 see what createDFList is used for, if anything
 Press Take DF Images button before image set made.
+Setting camera length to the 'select camera length' option causes an error message.
+Setting camera length with no image present causes error message
 
 Desired Features
 ----------------
