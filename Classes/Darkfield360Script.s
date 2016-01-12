@@ -285,11 +285,9 @@ cameraButton := [32, 32]:
 // All classes need to be able to reference the following methods in the Toolkit class before it is defined.
 interface ToolkitInterface
 {
-	void storeTiltCoord (object self, number shadowDistance, number storeTiltOnly); // Used in Keyhandler
 	void toggleMarkerRing(object self); // Used in Keyhandler
 	void setRingRadius(object self, number desiredRadiusNM); // Used in Keyhandler
 	void updateRadius(object self); // Used in Keyhandler
-	void beamCentre(object self); // Used in Keyhandler
 }
 
 //*******************
@@ -7576,7 +7574,8 @@ class MyKeyHandler
 
 			if(keydescription.MatchesKeyDescriptor( "s" )) // STORE POINT
 				{
-					result("\nYou pressed s to store this tilt. This method is disabled pending testing");
+					if(debugMode==true){result("\nYou pressed s to store this tilt.");}
+					GetScriptObjectFromID(ImagingFunctionsID).StoreDP();
 					return 0;
 				}
 			if(keydescription.MatchesKeyDescriptor( "n" )) // CYCLE THROUGH ROI

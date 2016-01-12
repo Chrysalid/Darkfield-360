@@ -77,7 +77,8 @@ class MyKeyHandler
 
 			if(keydescription.MatchesKeyDescriptor( "s" )) // STORE POINT
 				{
-					result("\nYou pressed s to store this tilt. This method is disabled pending testing");
+					if(debugMode==true){result("\nYou pressed s to store this tilt.");}
+					GetScriptObjectFromID(ImagingFunctionsID).StoreDP();
 					return 0;
 				}
 			if(keydescription.MatchesKeyDescriptor( "n" )) // CYCLE THROUGH ROI

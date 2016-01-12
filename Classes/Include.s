@@ -285,11 +285,9 @@ cameraButton := [32, 32]:
 // All classes need to be able to reference the following methods in the Toolkit class before it is defined.
 interface ToolkitInterface
 {
-	void storeTiltCoord (object self, number shadowDistance, number storeTiltOnly); // Used in Keyhandler
 	void toggleMarkerRing(object self); // Used in Keyhandler
 	void setRingRadius(object self, number desiredRadiusNM); // Used in Keyhandler
 	void updateRadius(object self); // Used in Keyhandler
-	void beamCentre(object self); // Used in Keyhandler
 }
 
 //*******************
