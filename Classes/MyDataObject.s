@@ -11,8 +11,6 @@
 class ToolkitDataObject
 {
 	number dataObjectID;
-	number KeyListenerID;
-	number imageAlignmentDialogID;
 	number ToolkitID; // DataObject will be kept inside this object
 	image referenceDP; // A Diff. Pattern taken with the beam centred. Used to extract calibration data in some functions. Needs standardizing.
 	

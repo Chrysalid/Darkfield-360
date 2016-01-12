@@ -290,7 +290,6 @@ interface ToolkitInterface
 	void setRingRadius(object self, number desiredRadiusNM); // Used in Keyhandler
 	void updateRadius(object self); // Used in Keyhandler
 	void beamCentre(object self); // Used in Keyhandler
-	void moveToROI(object self); // Used in Keyhandler
 }
 
 //*******************
@@ -1445,8 +1444,6 @@ class AlignmentDialog : uiframe
 class ToolkitDataObject
 {
 	number dataObjectID;
-	number KeyListenerID;
-	number imageAlignmentDialogID;
 	number ToolkitID; // DataObject will be kept inside this object
 	image referenceDP; // A Diff. Pattern taken with the beam centred. Used to extract calibration data in some functions. Needs standardizing.
 	
@@ -5413,7 +5410,6 @@ class ProgressDialog : uiframe
 	Number ToolkitID;
 	Number DialogID;
 	Number ImageSetToolsID;
-	Number ImageFunctionsObjectID;
 	number debugMode;
 	
 	// Control signals for the thread
@@ -5438,7 +5434,6 @@ class ProgressDialog : uiframe
 			"\n ToolkitID: " + ToolkitID +\
 			"\n dataObjectID: " + dataObjectID +\
 			"\n imageSetToolsID: " + imageSetToolsID +\
-			"\n ImageFunctionsObjectID: " + ImageFunctionsObjectID +\
 			"\n do_Break: " + do_Break +\
 			"\n currentProgress: " + currentProgress ;
 		result(textstring);
@@ -5487,12 +5482,11 @@ class ProgressDialog : uiframe
 	
 	// Tells the dialog what Toolkit it belongs to and which dataObject to use.
 	// Uses Weak Referencing so it can go out of scope once the Toolkit is destroyed.
-	void initialise(object self, number theToolkitID, number theDataObjectID, number theImageSetToolsID, number theImageFunctionsObjectID)
+	void initialise(object self, number theToolkitID, number theDataObjectID, number theImageSetToolsID)
 	{
 		dataObjectID = theDataObjectID; // The ID of the dataObject
 		ToolkitID = theToolkitID; // ID of the toolkit object this object will be kept inside of.
 		ImageSetToolsID = theImageSetToolsID;
-		ImageFunctionsObjectID = theImageFunctionsObjectID;
 		refreshProgressEvery = 0.5;
 		currentProgress = 0;
 		do_break = 0;
@@ -5679,6 +5673,20 @@ class ImagingFunctions
 	number debugMode;
 	number CameraControlObjectID;
 	number ProgressBarDialogID;
+	
+	number isCalibrated; // 0/1 to check if the calibration is done
+	
+	number getIsCalibrated (object self){
+		return isCalibrated;
+	}
+	
+	void setIsCalibrated (object Self, number theValue){
+		if(theValue == 0 || theValue == 1){
+			isCalibrated = theValue;
+		} else {
+			if(debugMode == true){result("\n\n ImagingFunctions.IsCalibrated attempted to take an illegal value of " + theValue);}
+		}
+	}
 	
 	TagGroup StoredImageSet; // the image set to be used during imaging processes.
 	
@@ -7422,6 +7430,53 @@ class ImagingFunctions
 		return 1;
 	}
 	
+	/* Function to change the Tilt to centre on a marked ROI point */
+	// Number ImageDisplayCountROIs( ImageDisplay imgDisp )
+	// ROI ImageDisplayGetROI( ImageDisplay imgDisp, Number index )
+	void moveToROI (object self){
+		if(debugMode==1){result("\nStart moveToCurrentROI function.");}
+		if(isCalibrated == false){
+			throw("The toolkit must be calibrated to use this function");
+		}
+		number ROITracker = GetScriptObjectFromID(dataObjectID).getROITracker(); // This value determines which ROI to go to.
+		if(debugMode==1){result("\n\tROITracker = " + ROITracker);}
+		ImageDisplay viewDisplay;
+		if(!returnViewImageDisplay(debugMode, viewDisplay)){
+			result("\nNo active View Window detected. This should never happen.");
+			return;
+		}
+		number totalROI = viewDisplay.ImageDisplayCountROIs(); // Count ROIs
+		if(debugMode==1){result("\n\tTotal ROIs = " + totalROI);}
+		if( totalROI==0 ){
+			if(debugMode == true){result("\nNo ROI to go to.");}
+			return;
+		}
+		if ( totalROI <= ROITracker){ // The tracker is higher than the highest ROI (which starts at 0) .
+			//Resets the count to 0 to avoid out-of-bounds errors and goes to Beam Centre instead.
+			if(debugMode==1){result("\nCycled through the available ROI. Returning to centre.");}
+			GetScriptObjectFromID(dataObjectID).setROITracker(0);
+			if(debugMode==1){result("\nSet ROITracker to 0. Returning to Beam Centre");}
+			GetScriptObjectFromID(CameraControlObjectID).beamCentre();
+			return;
+		}
+		ROI ROItoMoveTo = viewDisplay.ImageDisplayGetROI( ROITracker );
+		number xPixel, yPixel, xTiltTarget, yTiltTarget;
+		if(ROItoMoveTo.ROIIsPoint() != 1){
+			if(debugMode == 1){result("\n\tROI #" + ROITracker + " is not a point. Skipping over it.");}
+			GetScriptObjectFromID(dataObjectID).setROITracker(ROITracker + 1);
+		} else
+		{
+			ROItoMoveTo.ROIGetPoint(xPixel, yPixel);
+			if(debugMode==1){result("\n\txPixel = " + xPixel + " yPixel = " + yPixel);}
+			// void pixelToTilt(object dataObject, number xPixel, number yPixel, number &xTiltTarget, number &yTiltTarget,
+			//			number isViewWindow, number tiltShiftOnly, number pixelShiftOnly)
+			number binningMultiplier = GetScriptObjectFromID(CameraControlObjectID).getBinningMultiplier();
+			GetScriptObjectFromID(dataObjectID).pixelToTilt(xPixel, yPixel, xTiltTarget, yTiltTarget, 1, 0, 0, binningMultiplier);
+			if(debugMode==1){result("\n\txTiltTarget = " + xTiltTarget + " yTiltTarget = " + yTiltTarget);}
+			moveBeamTilt(xTiltTarget, yTiltTarget);
+			GetScriptObjectFromID(dataObjectID).setROITracker(ROITracker + 1);
+		}
+	}
 	
 	// The constructor
 	ImagingFunctions(object self)
@@ -7470,6 +7525,8 @@ class MyKeyHandler
 	number dataObjectID; // numerical ID of the dataObject script object.
 	number ToolkitID; // ID of the object this keyhandler will be stored inside of
 	number ImageSetToolsID; // ID of the imageset tools object
+	number ImagingFunctionsID; // ID of the imagingFunctions object
+	number CameraControlObjectID;
 	number debugMode
 
 	// Need undo command?
@@ -7490,11 +7547,13 @@ class MyKeyHandler
 
 	
 	/* Function stores the dataObject's ID so it can reference itself later. */
-	image initialise(object self, number theToolkitID, number theDataObjectID, number theImageSetToolsID)
+	image initialise(object self, number theToolkitID, number theDataObjectID, number theImageSetToolsID, number theImagingFunctionsID, number theCameraControlObjectID)
 	{
 			ToolkitID = theToolkitID;  // the ID of the Object which this entire handler is contained inside.
 			dataObjectID = theDataObjectID;
 			ImageSetToolsID = theImageSetToolsID;
+			ImagingFunctionsID = theImagingFunctionsID;
+			CameraControlObjectID = theCameraControlObjectID;
 	}
 	/* Function stores the ID of a key listener and loads the dataObject's values into itself */
 	image startListening(object self, number KeyTok)
@@ -7523,14 +7582,14 @@ class MyKeyHandler
 			if(keydescription.MatchesKeyDescriptor( "n" )) // CYCLE THROUGH ROI
 				{
 					if(debugMode==true){result("\nYou pressed n to cycle through marked ROI.");}
-					GetScriptObjectFromID(ToolkitID).moveToROI();
+					GetScriptObjectFromID(ImagingFunctionsID).moveToROI();
 					return 0;
 				}
 			if(keydescription.MatchesKeyDescriptor( "0" )) // CENTRE BEAM
 				{
 					if(debugMode==true){result("\nYou pressed 0 to centralize the beam.");}
 					// Centralize Beam
-					GetScriptObjectFromID(ToolkitID).beamCentre();
+					GetScriptObjectFromID(CameraControlObjectID).beamCentre();
 					return 0;
 				}
 			if(keydescription.MatchesKeyDescriptor( "p" )) // PRINT DATA
@@ -7689,7 +7748,7 @@ class DF360Dialog : uiframe
 	{
 		KeyListener = theKeyListener;
 		KeyListenerID = KeyListener.ScriptObjectGetID();
-		KeyListener.initialise(ToolkitID, dataObjectID, imageSetToolsID);
+		KeyListener.initialise(ToolkitID, dataObjectID, imageSetToolsID, ImagingFunctionsObjectID, CameraControlObjectID);
 		KeyListener.setDebugMode(debugMode);
 		return KeyListenerID;
 	}
@@ -7765,7 +7824,7 @@ class DF360Dialog : uiframe
 	{
 		ProgressBarDialog = theProgressBarDialog;
 		ProgressBarDialogID = ProgressBarDialog.ScriptObjectGetID();
-		ProgressBarDialog.initialise(ToolkitID, dataObjectID, imageSetToolsID, ImagingFunctionsObjectID); // Tell the object who it belongs to
+		ProgressBarDialog.initialise(ToolkitID, dataObjectID, imageSetToolsID); // Tell the object who it belongs to
 		ProgressBarDialog.setDebugMode(debugMode);
 	}
 	
@@ -7916,54 +7975,6 @@ class DF360Dialog : uiframe
 		}
 		if(ImageProcessingObject.ScriptObjectIsValid()){
 			ImageProcessingObject.setDebugMode(debugMode);
-		}
-	}
-	
-	
-	/* Function to change the Tilt to centre on a marked ROI point */
-	// Number ImageDisplayCountROIs( ImageDisplay imgDisp )
-	// ROI ImageDisplayGetROI( ImageDisplay imgDisp, Number index )
-	void moveToROI (object self){
-		if(debugMode==1){result("\nStart moveToCurrentROI function.");}
-		if(isCalibrated == false){
-			throw("The toolkit must be calibrated to use this function");
-		}
-		number ROITracker = dataObject.getROITracker(); // This value determines which ROI to go to.
-		if(debugMode==1){result("\n\tROITracker = " + ROITracker);}
-		ImageDisplay viewDisplay;
-		if(!returnViewImageDisplay(debugMode, viewDisplay)){
-			result("\nNo active View Window detected. This should never happen.");
-			return;
-		}
-		number totalROI = viewDisplay.ImageDisplayCountROIs(); // Count ROIs
-		if(debugMode==1){result("\n\tTotal ROIs = " + totalROI);}
-		if( totalROI==0 ){
-			if(debugMode == true){result("\nNo ROI to go to.");}
-			return;
-		}
-		if ( totalROI <= ROITracker){ // The tracker is higher than the highest ROI (which starts at 0) .
-			//Resets the count to 0 to avoid out-of-bounds errors and goes to Beam Centre instead.
-			if(debugMode==1){result("\nCycled through the available ROI. Returning to centre.");}
-			dataObject.setROITracker(0);
-			if(debugMode==1){result("\nSet ROITracker to 0. Returning to Beam Centre");}
-			CameraControlObject.beamCentre();
-			return;
-		}
-		ROI ROItoMoveTo = viewDisplay.ImageDisplayGetROI( ROITracker );
-		number xPixel, yPixel, xTiltTarget, yTiltTarget;
-		if(ROItoMoveTo.ROIIsPoint() != 1){
-			if(debugMode == 1){result("\n\tROI #" + ROITracker + " is not a point. Skipping over it.");}
-		} else
-		{
-			ROItoMoveTo.ROIGetPoint(xPixel, yPixel);
-			if(debugMode==1){result("\n\txPixel = " + xPixel + " yPixel = " + yPixel);}
-			// void pixelToTilt(object dataObject, number xPixel, number yPixel, number &xTiltTarget, number &yTiltTarget,
-			//			number isViewWindow, number tiltShiftOnly, number pixelShiftOnly)
-			number binningMultiplier = CameraControlObject.getBinningMultiplier();
-			dataObject.pixelToTilt(xPixel, yPixel, xTiltTarget, yTiltTarget, 1, 0, 0, binningMultiplier);
-			if(debugMode==1){result("\n\txTiltTarget = " + xTiltTarget + " yTiltTarget = " + yTiltTarget);}
-			moveBeamTilt(xTiltTarget, yTiltTarget);
-			dataObject.setROITracker(ROITracker + 1);
 		}
 	}
 	
@@ -8525,6 +8536,7 @@ class DF360Dialog : uiframe
 			return;
 		}
 		isCalibrated = ImagingFunctionsObject.startDPStoring();
+		ImagingFunctionsObject.setIsCalibrated(isCalibrated);
 	}
 	
 	/* Functions to change the exposure times when the fields on the Calibration Panel are changed by the user. */
@@ -9059,17 +9071,21 @@ object startToolkit () {
 	// Construct the Toolkit.
 	object Toolkit = alloc(DF360Dialog);
 	result("\nAttaching data store to Toolkit...")
-	Toolkit.storeDataObject(dataObject);
-	Toolkit.storeImageSetTools(theImageSetTools);
+	Toolkit.storeDataObject(dataObject); // Needs only Toolkit to be loaded.
+	Toolkit.storeCalibrationDialog(calibrationDialog); // uses dataObject
+	Toolkit.storeAlignmentDialog(alignmentDialog); // uses dataObject
+	Toolkit.storeTiltDialog(tiltDialog); // uses DataObject
+	
+	Toolkit.storeImageSetTools(theImageSetTools); // uses DataObject
+	Toolkit.storeCameraControlObject(theCameraControlObject); // uses Dataobject and ImageSetTools
+	Toolkit.storeImageConfigDialog(ImageConfigDialog); // uses Dataobject and ImageSetTools
+	Toolkit.storeProgressBarDialog(ProgressBarDialog); // uses dataObject; ImageSetToolsID;
+	
+	Toolkit.storeImageProcessingObject(ImageProcessingObject); // uses dataObject, imageSetTools and imageAlignment
+	Toolkit.storeImagingFunctionsObject(ImagingFunctionsObject); // uses dataObjectID; imageSetToolsID; CameraControlObjectID; ProgressBarDialogID;
+	
 	Toolkit.storeKeyListener(KeyListener); 	// Insert it into toolkit. To make it listen for key presses on a display use Toolkit.startListening(ImageDisplay);
-	Toolkit.storeAlignmentDialog(alignmentDialog); // Stored in toolkit object.
-	Toolkit.storeCalibrationDialog(calibrationDialog);
-	Toolkit.storeTiltDialog(tiltDialog);
-	Toolkit.storeCameraControlObject(theCameraControlObject);
-	Toolkit.storeImageProcessingObject(ImageProcessingObject);
-	Toolkit.storeImageConfigDialog(ImageConfigDialog);
-	Toolkit.storeProgressBarDialog(ProgressBarDialog);
-	Toolkit.storeImagingFunctionsObject(ImagingFunctionsObject);
+	//	uses DataObject; ImageSetToolsID; ImagingFunctionsID; CameraControlObjectID
 	Toolkit.updateDialog();
 	return Toolkit;
 }

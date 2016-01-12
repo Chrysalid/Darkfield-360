@@ -290,7 +290,6 @@ interface ToolkitInterface
 	void setRingRadius(object self, number desiredRadiusNM); // Used in Keyhandler
 	void updateRadius(object self); // Used in Keyhandler
 	void beamCentre(object self); // Used in Keyhandler
-	void moveToROI(object self); // Used in Keyhandler
 }
 
 //*******************

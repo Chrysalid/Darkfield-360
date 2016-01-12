@@ -38,7 +38,11 @@ Darkfield360
 
 ImageSetsTools
 ----------------
-ImageSets
+Each Image Set is stored as its own Taggroup and can be saved/loaded to/from files.
+The accessible image sets are stored in the imageSets taggroup in the dataObject.
+In the future these may be stored in the persistent tags, but this would raise issues with updates, reloading etc.
+
+ImageSets (tag group)
 	[0]
 	[1]
 	...

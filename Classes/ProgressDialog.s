@@ -12,7 +12,6 @@ class ProgressDialog : uiframe
 	Number ToolkitID;
 	Number DialogID;
 	Number ImageSetToolsID;
-	Number ImageFunctionsObjectID;
 	number debugMode;
 	
 	// Control signals for the thread
@@ -37,7 +36,6 @@ class ProgressDialog : uiframe
 			"\n ToolkitID: " + ToolkitID +\
 			"\n dataObjectID: " + dataObjectID +\
 			"\n imageSetToolsID: " + imageSetToolsID +\
-			"\n ImageFunctionsObjectID: " + ImageFunctionsObjectID +\
 			"\n do_Break: " + do_Break +\
 			"\n currentProgress: " + currentProgress ;
 		result(textstring);
@@ -86,12 +84,11 @@ class ProgressDialog : uiframe
 	
 	// Tells the dialog what Toolkit it belongs to and which dataObject to use.
 	// Uses Weak Referencing so it can go out of scope once the Toolkit is destroyed.
-	void initialise(object self, number theToolkitID, number theDataObjectID, number theImageSetToolsID, number theImageFunctionsObjectID)
+	void initialise(object self, number theToolkitID, number theDataObjectID, number theImageSetToolsID)
 	{
 		dataObjectID = theDataObjectID; // The ID of the dataObject
 		ToolkitID = theToolkitID; // ID of the toolkit object this object will be kept inside of.
 		ImageSetToolsID = theImageSetToolsID;
-		ImageFunctionsObjectID = theImageFunctionsObjectID;
 		refreshProgressEvery = 0.5;
 		currentProgress = 0;
 		do_break = 0;

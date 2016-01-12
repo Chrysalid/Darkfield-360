@@ -60,17 +60,21 @@ object startToolkit () {
 	// Construct the Toolkit.
 	object Toolkit = alloc(DF360Dialog);
 	result("\nAttaching data store to Toolkit...")
-	Toolkit.storeDataObject(dataObject);
-	Toolkit.storeImageSetTools(theImageSetTools);
+	Toolkit.storeDataObject(dataObject); // Needs only Toolkit to be loaded.
+	Toolkit.storeCalibrationDialog(calibrationDialog); // uses dataObject
+	Toolkit.storeAlignmentDialog(alignmentDialog); // uses dataObject
+	Toolkit.storeTiltDialog(tiltDialog); // uses DataObject
+	
+	Toolkit.storeImageSetTools(theImageSetTools); // uses DataObject
+	Toolkit.storeCameraControlObject(theCameraControlObject); // uses Dataobject and ImageSetTools
+	Toolkit.storeImageConfigDialog(ImageConfigDialog); // uses Dataobject and ImageSetTools
+	Toolkit.storeProgressBarDialog(ProgressBarDialog); // uses dataObject; ImageSetToolsID;
+	
+	Toolkit.storeImageProcessingObject(ImageProcessingObject); // uses dataObject, imageSetTools and imageAlignment
+	Toolkit.storeImagingFunctionsObject(ImagingFunctionsObject); // uses dataObjectID; imageSetToolsID; CameraControlObjectID; ProgressBarDialogID;
+	
 	Toolkit.storeKeyListener(KeyListener); 	// Insert it into toolkit. To make it listen for key presses on a display use Toolkit.startListening(ImageDisplay);
-	Toolkit.storeAlignmentDialog(alignmentDialog); // Stored in toolkit object.
-	Toolkit.storeCalibrationDialog(calibrationDialog);
-	Toolkit.storeTiltDialog(tiltDialog);
-	Toolkit.storeCameraControlObject(theCameraControlObject);
-	Toolkit.storeImageProcessingObject(ImageProcessingObject);
-	Toolkit.storeImageConfigDialog(ImageConfigDialog);
-	Toolkit.storeProgressBarDialog(ProgressBarDialog);
-	Toolkit.storeImagingFunctionsObject(ImagingFunctionsObject);
+	//	uses DataObject; ImageSetToolsID; ImagingFunctionsID; CameraControlObjectID
 	Toolkit.updateDialog();
 	return Toolkit;
 }

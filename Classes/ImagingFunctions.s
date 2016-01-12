@@ -14,6 +14,20 @@ class ImagingFunctions
 	number CameraControlObjectID;
 	number ProgressBarDialogID;
 	
+	number isCalibrated; // 0/1 to check if the calibration is done
+	
+	number getIsCalibrated (object self){
+		return isCalibrated;
+	}
+	
+	void setIsCalibrated (object Self, number theValue){
+		if(theValue == 0 || theValue == 1){
+			isCalibrated = theValue;
+		} else {
+			if(debugMode == true){result("\n\n ImagingFunctions.IsCalibrated attempted to take an illegal value of " + theValue);}
+		}
+	}
+	
 	TagGroup StoredImageSet; // the image set to be used during imaging processes.
 	
 	void initialise(object self, number theToolkitID, number theDataObjectID, number theImageSetToolsID, number theCameraControlObjectID, number theProgressBarDialogID)
@@ -1756,6 +1770,53 @@ class ImagingFunctions
 		return 1;
 	}
 	
+	/* Function to change the Tilt to centre on a marked ROI point */
+	// Number ImageDisplayCountROIs( ImageDisplay imgDisp )
+	// ROI ImageDisplayGetROI( ImageDisplay imgDisp, Number index )
+	void moveToROI (object self){
+		if(debugMode==1){result("\nStart moveToCurrentROI function.");}
+		if(isCalibrated == false){
+			throw("The toolkit must be calibrated to use this function");
+		}
+		number ROITracker = GetScriptObjectFromID(dataObjectID).getROITracker(); // This value determines which ROI to go to.
+		if(debugMode==1){result("\n\tROITracker = " + ROITracker);}
+		ImageDisplay viewDisplay;
+		if(!returnViewImageDisplay(debugMode, viewDisplay)){
+			result("\nNo active View Window detected. This should never happen.");
+			return;
+		}
+		number totalROI = viewDisplay.ImageDisplayCountROIs(); // Count ROIs
+		if(debugMode==1){result("\n\tTotal ROIs = " + totalROI);}
+		if( totalROI==0 ){
+			if(debugMode == true){result("\nNo ROI to go to.");}
+			return;
+		}
+		if ( totalROI <= ROITracker){ // The tracker is higher than the highest ROI (which starts at 0) .
+			//Resets the count to 0 to avoid out-of-bounds errors and goes to Beam Centre instead.
+			if(debugMode==1){result("\nCycled through the available ROI. Returning to centre.");}
+			GetScriptObjectFromID(dataObjectID).setROITracker(0);
+			if(debugMode==1){result("\nSet ROITracker to 0. Returning to Beam Centre");}
+			GetScriptObjectFromID(CameraControlObjectID).beamCentre();
+			return;
+		}
+		ROI ROItoMoveTo = viewDisplay.ImageDisplayGetROI( ROITracker );
+		number xPixel, yPixel, xTiltTarget, yTiltTarget;
+		if(ROItoMoveTo.ROIIsPoint() != 1){
+			if(debugMode == 1){result("\n\tROI #" + ROITracker + " is not a point. Skipping over it.");}
+			GetScriptObjectFromID(dataObjectID).setROITracker(ROITracker + 1);
+		} else
+		{
+			ROItoMoveTo.ROIGetPoint(xPixel, yPixel);
+			if(debugMode==1){result("\n\txPixel = " + xPixel + " yPixel = " + yPixel);}
+			// void pixelToTilt(object dataObject, number xPixel, number yPixel, number &xTiltTarget, number &yTiltTarget,
+			//			number isViewWindow, number tiltShiftOnly, number pixelShiftOnly)
+			number binningMultiplier = GetScriptObjectFromID(CameraControlObjectID).getBinningMultiplier();
+			GetScriptObjectFromID(dataObjectID).pixelToTilt(xPixel, yPixel, xTiltTarget, yTiltTarget, 1, 0, 0, binningMultiplier);
+			if(debugMode==1){result("\n\txTiltTarget = " + xTiltTarget + " yTiltTarget = " + yTiltTarget);}
+			moveBeamTilt(xTiltTarget, yTiltTarget);
+			GetScriptObjectFromID(dataObjectID).setROITracker(ROITracker + 1);
+		}
+	}
 	
 	// The constructor
 	ImagingFunctions(object self)

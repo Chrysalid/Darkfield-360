@@ -1,6 +1,6 @@
 Required Features
 -----------------
-Update moveToCurrentROI to something more useful and bind to a key
+Restore Tilt storing keyboard shortcut
 
 Make a function to produce persistent Image tags for integrated images
 
@@ -19,8 +19,6 @@ Bugs
 ---------
 ImageProcessing processDarkFieldImages() uses camera size, not image sizes.
 StartDPStoring / calibration does not update any current image sets yet
-see what dataObject.tracker is used for, if anything.
-see what createDFList is used for, if anything
 Press Take DF Images button before image set made.
 Setting camera length to the 'select camera length' option causes an error message.
 Setting camera length with no image present causes error message

@@ -26,6 +26,8 @@ class MyKeyHandler
 	number dataObjectID; // numerical ID of the dataObject script object.
 	number ToolkitID; // ID of the object this keyhandler will be stored inside of
 	number ImageSetToolsID; // ID of the imageset tools object
+	number ImagingFunctionsID; // ID of the imagingFunctions object
+	number CameraControlObjectID;
 	number debugMode
 
 	// Need undo command?
@@ -46,11 +48,13 @@ class MyKeyHandler
 
 	
 	/* Function stores the dataObject's ID so it can reference itself later. */
-	image initialise(object self, number theToolkitID, number theDataObjectID, number theImageSetToolsID)
+	image initialise(object self, number theToolkitID, number theDataObjectID, number theImageSetToolsID, number theImagingFunctionsID, number theCameraControlObjectID)
 	{
 			ToolkitID = theToolkitID;  // the ID of the Object which this entire handler is contained inside.
 			dataObjectID = theDataObjectID;
 			ImageSetToolsID = theImageSetToolsID;
+			ImagingFunctionsID = theImagingFunctionsID;
+			CameraControlObjectID = theCameraControlObjectID;
 	}
 	/* Function stores the ID of a key listener and loads the dataObject's values into itself */
 	image startListening(object self, number KeyTok)
@@ -79,14 +83,14 @@ class MyKeyHandler
 			if(keydescription.MatchesKeyDescriptor( "n" )) // CYCLE THROUGH ROI
 				{
 					if(debugMode==true){result("\nYou pressed n to cycle through marked ROI.");}
-					GetScriptObjectFromID(ToolkitID).moveToROI();
+					GetScriptObjectFromID(ImagingFunctionsID).moveToROI();
 					return 0;
 				}
 			if(keydescription.MatchesKeyDescriptor( "0" )) // CENTRE BEAM
 				{
 					if(debugMode==true){result("\nYou pressed 0 to centralize the beam.");}
 					// Centralize Beam
-					GetScriptObjectFromID(ToolkitID).beamCentre();
+					GetScriptObjectFromID(CameraControlObjectID).beamCentre();
 					return 0;
 				}
 			if(keydescription.MatchesKeyDescriptor( "p" )) // PRINT DATA
