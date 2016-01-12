@@ -1,6 +1,5 @@
 Required Features
 -----------------
-DisableModeWarnings implementation
 Update moveToCurrentROI to something more useful and bind to a key
 
 Make a function to produce persistent Image tags for integrated images

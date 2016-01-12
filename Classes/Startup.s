@@ -59,7 +59,6 @@ object startToolkit () {
 	
 	// Construct the Toolkit.
 	object Toolkit = alloc(DF360Dialog);
-	// Toolkit.ToggleDebugMode() // comment out to deactivate debugMode on startup. Can be toggled on toolkit manually
 	result("\nAttaching data store to Toolkit...")
 	Toolkit.storeDataObject(dataObject);
 	Toolkit.storeImageSetTools(theImageSetTools);

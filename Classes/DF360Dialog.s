@@ -39,9 +39,12 @@ class DF360Dialog : uiframe
 	component markerRing;
 	component ringRadiusText;
 	
-	// Function to print out the various saved variables for debugging
+	// Function to print out the various saved variables for debugging. Will only work in Debug Mode
 	void printAllValues(object self)
 	{
+		if(debugMode != 1){
+			return;
+		}
 		result("\n\nToolkit Debug Values")
 		result("\n------------------------")
 		string textstring;
@@ -284,8 +287,7 @@ class DF360Dialog : uiframe
 		return;
 	}
 		
-	void ToggleDebugMode(object self){
-		debugMode = (debugMode == 0) ? 1 : 0 ;
+	void UpdateDebugMode(object self){
 		if(debugMode == 1){
 			result("\nDebug Mode Activated");
 		}
@@ -309,6 +311,18 @@ class DF360Dialog : uiframe
 		}
 		if(ImageSetTools.ScriptObjectIsValid()){
 			ImageSetTools.setDebugMode(debugMode);
+		}
+		if(ProgressBarDialog.ScriptObjectIsValid()){
+			ProgressBarDialog.setDebugMode(debugMode);
+		}
+		if(ImagingFunctionsObject.ScriptObjectIsValid()){
+			ImagingFunctionsObject.setDebugMode(debugMode);
+		}
+		if(CameraControlObject.ScriptObjectIsValid()){
+			CameraControlObject.setDebugMode(debugMode);
+		}
+		if(ImageProcessingObject.ScriptObjectIsValid()){
+			ImageProcessingObject.setDebugMode(debugMode);
 		}
 	}
 	
@@ -499,8 +513,8 @@ class DF360Dialog : uiframe
 		taggroup panel6=dlgcreatepanel();
 		panel6.dlgaddelement(dlgcreatelabel("Options")); // Label
 		panel6.dlgaddelement(dlgcreatelabel("")); // Blank
-		TagGroup dsDebug = DLGCreatePushButton("Debug Mode", "debugToggleButtonPress");
-		panel6.dlgaddelement(dsDebug);
+		TagGroup debugModeCheckBox = DLGCreateCheckBox( "Debug Mode", debugMode, "onDebugOptionChange");
+		panel6.dlgaddelement(debugModeCheckBox);
 		TagGroup changeSaveDir = DLGCreatePushButton("Save Directory", "saveDirButtonPress");
 		panel6.dlgaddelement(changeSaveDir);
 		TagGroup enterScaleButton = DLGCreatePushButton("Set Scale", "enterScaleButtonPress");
@@ -1311,11 +1325,17 @@ class DF360Dialog : uiframe
 	}
 	/* OPTION PANEL BUTTON FUNCTIONS */
 	
-	void debugToggleButtonPress(object self)
+	void onDebugOptionChange(object self, TagGroup tg)
 	{
-		string state = (debugMode==0) ? "Inactive" : "Active" ;
-		result("\nDebugMode Button pressed to make debug mode " + state);
-		self.ToggleDebugMode();
+		number setting = tg.dlggetvalue();
+		if(setting == 0 || setting == 1){
+			debugMode = setting;
+			result("\nDebugMode set to " + debugMode);
+			self.UpdateDebugMode();
+		} else {
+			result("\n There was an error setting the debug mode to " + setting);
+		}
+		
 	}
 	
 	void onModeWarningOptionChange(object self, TagGroup tg)

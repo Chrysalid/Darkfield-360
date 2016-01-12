@@ -196,10 +196,10 @@ class ScaleValueDialog : uiframe
 		scaleValueID = self.ScriptObjectGetID();
 	}
 	
-	// The destructor (does nothing)
+	// The destructor
 	~ScaleValueDialog(object self)
 	{
-		result("\nScale Calibration Dialog with ID: "+self.ScriptObjectGetID()+" closed.");
+		if(debugMode == 1){result("\nScale Calibration Dialog with ID: "+self.ScriptObjectGetID()+" closed.");}
 	}
 		
 	void setDebugMode(object self, number input)
