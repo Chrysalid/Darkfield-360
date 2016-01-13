@@ -489,6 +489,8 @@ class DF360Dialog : uiframe
 		number initialModeWarningOption = (dataObject.getDisableModeWarnings() == false) ? 1 : 0;
 		TagGroup DisableModeWarnings = DLGCreateCheckBox( "Show Mode Warnings", initialModeWarningOption, "onModeWarningOptionChange");
 		panel6.dlgaddelement(DisableModeWarnings);
+		TagGroup ExamineGTGFile = DLGCreatePushButton("View GTG file", "ExamineGTGFilePress");
+		panel6.dlgaddelement(ExamineGTGFile);
 
 		panel6.dlgtablelayout(2,12,0); // Arrange the buttons
 		
@@ -1359,6 +1361,16 @@ class DF360Dialog : uiframe
 	// Stores the current dataObject variables in the permanent memory
 	void saveVariablesToMemoryPress(object self){
 		dataObject.updatePersistent(dataObject.createPersistent(1));
+	}
+	
+	void ExamineGTGFilePress (object self){
+		string path;
+		if(OpenDialog( path )){
+			TagGroup ToLoad = NewTagGroup();
+			if(TagGroupLoadFromFile( ToLoad, path )){
+				TagGroupOpenBrowserWindow( ToLoad , 0 );
+			}		
+		}	
 	}
 	
 }
