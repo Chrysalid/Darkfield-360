@@ -859,9 +859,12 @@ class ImagingFunctions
 			if(AutoDisplayImages == true){
 				if(debugMode==true){result("\n\t Displaying images.");}
 				showImage(DPImage);
+				GetScriptObjectFromID(ImageSetToolsID).nameDisplayedImageInImageSet(DPImage)
 				if(ShadowMode == true && (i > 0)){
 					showImage(DPImageHigher);
 					showImage(DPImageLower);
+					GetScriptObjectFromID(ImageSetToolsID).nameDisplayedImageInImageSet(DPImageHigher)
+					GetScriptObjectFromID(ImageSetToolsID).nameDisplayedImageInImageSet(DPImageLower)
 				}
 			}
 			
@@ -976,10 +979,10 @@ class ImagingFunctions
 					result(".");
 				}
 			}
-			result("\nTilt coordinates have been generated for RingMode DF imaging");
+			result("\n\tTilt coordinates have been generated for RingMode DF imaging");
 		}
 		
-		if(debugMode==true){result("\n\t All Diffraction Patterns imaged. Setting DPsTaken flag to 1");}
+		if(debugMode==true){result("\nAll Diffraction Patterns imaged. Setting DPsTaken flag to 1");}
 		// update the image set to show that DP were taken.
 		targetImageSet.TagGroupSetTagAsNumber("DPsTaken", 1);
 	}
@@ -1094,13 +1097,19 @@ class ImagingFunctions
 		TagGroup BFImageTags;
 		startBFImage := self.takeBFImage(ImageSet, BFImageTags);
 		
-		if(saveImages == 1){
-			GetScriptObjectFromID(ImageSetToolsID).saveImageInImageSet(startBFImage);
-		}
-		
-		if(displayImages == true) // If displaying the image...
+		if(displayImages == true && saveImages == true)
 		{
 			showImage(startBFImage);
+			GetScriptObjectFromID(ImageSetToolsID).nameDisplayedImageInImageSet(startBFImage);
+			GetScriptObjectFromID(ImageSetToolsID).saveImageInImageSet(startBFImage);
+		} else		
+		if(saveImages == true){
+			GetScriptObjectFromID(ImageSetToolsID).saveImageInImageSet(startBFImage);
+		} else
+		if(displayImages == true)
+		{
+			showImage(startBFImage);
+			GetScriptObjectFromID(ImageSetToolsID).nameDisplayedImageInImageSet(startBFImage);
 		}
 		
 		if(debugMode==true){result("\n Bright Field Image taken and saved/displayed.");}
@@ -1188,11 +1197,14 @@ class ImagingFunctions
 			{
 				if((integration == 0) || (displayNonIntegrated == 1)){ // Does not show the integrated images. These must be done seperately.
 					showImage(MiddleDFImage);
+					GetScriptObjectFromID(ImageSetToolsID).nameDisplayedImageInImageSet(MiddleDFImage);
 					if(HigherImage.TagGroupIsValid() == true){
 						showImage(HigherDFImage);
+						GetScriptObjectFromID(ImageSetToolsID).nameDisplayedImageInImageSet(HigherDFImage);
 					}
 					if(LowerImage.TagGroupIsValid() == true){
 						showImage(LowerDFImage);
+						GetScriptObjectFromID(ImageSetToolsID).nameDisplayedImageInImageSet(LowerDFImage);
 					}
 				}
 			}
@@ -1276,6 +1288,7 @@ class ImagingFunctions
 		if(displayImages == true) // If displaying the image...
 		{
 			showImage(endBFImage);
+			GetScriptObjectFromID(ImageSetToolsID).nameDisplayedImageInImageSet(endBFImage);
 		}
 		if(debugMode==true){result("\n BF Image operations complete.");}
 		
