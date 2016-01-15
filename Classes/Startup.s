@@ -26,47 +26,51 @@ object startToolkit () {
 		dataObject.loadPersistent(persistentSave); // Load it into data object
 	}
 	
-	result("\nLoading Image Set Tools...")
+	result("\nLoading Image Set Tools...");
 	object theImageSetTools = alloc(ImageSetTools);
 	
-	result("\nLoading Camera Controls...")
+	result("\nLoading Camera Controls...");
 	object theCameraControlObject = alloc(CameraControl);
 	
-	result("\nCreating KeyListener for shortcut commands...")
-	// Create objects that will be used later but must be created now before the class drops from scope
-	object KeyListener=alloc(MyKeyHandler) // Key handler for the view Window for shortcut key presses. Not attached yet.
+	result("\nLoading View Window Controls...");
+	object theLiveViewControls = alloc(LiveViewControlsClass);
 	
-	result("\nCreating Alignment Dialog System...")
+	result("\nCreating KeyListener for shortcut commands...");
+	// Create objects that will be used later but must be created now before the class drops from scope
+	object KeyListener=alloc(MyKeyHandler); // Key handler for the view Window for shortcut key presses. Not attached yet.
+	
+	result("\nCreating Alignment Dialog System...");
 	object alignmentDialog = alloc(alignmentdialog); // The aligning image dialog. Is not displayed or created yet.
 	
-	result("\nCreating Calibration Input Dialog...")
+	result("\nCreating Calibration Input Dialog...");
 	object calibrationDialog = alloc(ScaleValueDialog);
 	
-	result("\nCreating Tilt Calibration Input Dialog...")
+	result("\nCreating Tilt Calibration Input Dialog...");
 	object tiltDialog = alloc(TiltValueDialog);
 	
-	result("\nLoading Image Processing Functions...")
+	result("\nLoading Image Processing Functions...");
 	object ImageProcessingObject = alloc(ImageProcessing);
 	
-	result("\nLoading Image Set Configuration Dialog...")
+	result("\nLoading Image Set Configuration Dialog...");
 	object ImageConfigDialog = alloc(ImageConfiguration);
 	
-	result("\nLoading Progress Bar Dialog...")
+	result("\nLoading Progress Bar Dialog...");
 	object ProgressBarDialog = alloc(ProgressDialog);
 	
-	result("\nLoading Imaging Functions Object...")
+	result("\nLoading Imaging Functions Object...");
 	object ImagingFunctionsObject = alloc(ImagingFunctions);
 	
 	// Construct the Toolkit.
 	object Toolkit = alloc(DF360Dialog);
-	result("\nAttaching data store to Toolkit...")
+	result("\nAttaching data store to Toolkit...");
 	Toolkit.storeDataObject(dataObject); // Needs only Toolkit to be loaded.
+	Toolkit.storeCameraControlObject(theCameraControlObject); // uses dataObject
+	Toolkit.storeLiveViewControls(theLiveViewControls); // uses dataObject, CameraControls.
 	Toolkit.storeCalibrationDialog(calibrationDialog); // uses dataObject
 	Toolkit.storeAlignmentDialog(alignmentDialog); // uses dataObject
 	Toolkit.storeTiltDialog(tiltDialog); // uses DataObject
-	
 	Toolkit.storeImageSetTools(theImageSetTools); // uses DataObject
-	Toolkit.storeCameraControlObject(theCameraControlObject); // uses Dataobject and ImageSetTools
+	
 	Toolkit.storeImageConfigDialog(ImageConfigDialog); // uses Dataobject and ImageSetTools
 	Toolkit.storeProgressBarDialog(ProgressBarDialog); // uses dataObject; ImageSetToolsID;
 	
@@ -96,7 +100,7 @@ void main()
 	image viewImage;
 	if(!returnViewImage(0, viewImage)){
 		result("\nNo View Window detected. Many controls will not be accessible or could cause crashes."\
-		+ "\nIf you open a live View window later you can 'capture' it on the Options panel.");
+		+ "\nIf you open a live View window later you can 'capture' it on the calibration panel.");
 	} else {
 		Toolkit.captureViewScreen();
 	}

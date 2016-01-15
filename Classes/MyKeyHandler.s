@@ -13,7 +13,6 @@ void printCommands(){
 	result("\n\t's' to store a diffraction spot's coordinates. (Disabled for testing)");
 	result("\n\t'n' to cycle through any marked ROI points and the central beam location.")
 	result("\n\t'p' to view the stored image sets.");
-	result("\n\t'p' in debug mode to print out a detailed list of debugging information");
 	result("\n\t'1' to show the ring marker and measuring system.");
 	result("\n\t'2' to move the marker ring to a different D-Spacing.");
 	result("\n\t'3' to update the ring-mode radius display.");
@@ -28,6 +27,7 @@ class MyKeyHandler
 	number ImageSetToolsID; // ID of the imageset tools object
 	number ImagingFunctionsID; // ID of the imagingFunctions object
 	number CameraControlObjectID;
+	number LiveViewControlsID;
 	number debugMode
 
 	// Need undo command?
@@ -48,13 +48,14 @@ class MyKeyHandler
 
 	
 	/* Function stores the dataObject's ID so it can reference itself later. */
-	image initialise(object self, number theToolkitID, number theDataObjectID, number theImageSetToolsID, number theImagingFunctionsID, number theCameraControlObjectID)
+	image initialise(object self, number theToolkitID, number theDataObjectID, number theImageSetToolsID, number theImagingFunctionsID, number theCameraControlObjectID, number theLiveViewControlsID)
 	{
 			ToolkitID = theToolkitID;  // the ID of the Object which this entire handler is contained inside.
 			dataObjectID = theDataObjectID;
 			ImageSetToolsID = theImageSetToolsID;
 			ImagingFunctionsID = theImagingFunctionsID;
 			CameraControlObjectID = theCameraControlObjectID;
+			LiveViewControlsID = theLiveViewControlsID
 	}
 	/* Function stores the ID of a key listener and loads the dataObject's values into itself */
 	image startListening(object self, number KeyTok)
@@ -97,30 +98,25 @@ class MyKeyHandler
 			if(keydescription.MatchesKeyDescriptor( "p" )) // PRINT DATA
 				{	
 					if(debugMode==true){result("\nYou pressed p to examine stored Tilt Values.");}
-					if(debugMode!=true){
-						GetScriptObjectFromID(ImageSetToolsID).showImageSets();
-					} else {
-						self.printAllValues();
-						GetScriptObjectFromID(ToolkitID).printAllValues();
-					}
+					GetScriptObjectFromID(ImageSetToolsID).showImageSets();
 					return 0;
 				}
 			if(keydescription.MatchesKeyDescriptor( "1" )) // TOGGLE MARKER RING
 				{	
 					// Make the Marker Ring and radius display visible/hidden;
-					GetScriptObjectFromID(ToolkitID).toggleMarkerRing();
+					GetScriptObjectFromID(LiveViewControlsID).toggleMarkerRing();
 					return 0;
 				}
 			if(keydescription.MatchesKeyDescriptor( "2" )) // SET RING TO TARGET RADIUS IN 1/NM UNITS
 				{
 					number desiredRadiusNM;
 					getNumber("Set Marker Ring to (1/nm): ", 2.00, desiredRadiusNM);
-					GetScriptObjectFromID(ToolkitID).setRingRadius(desiredRadiusNM);
+					GetScriptObjectFromID(LiveViewControlsID).setRingRadius(desiredRadiusNM);
 					return 0;
 				}
 			if(keydescription.MatchesKeyDescriptor( "3" )) // UPDATE RADIUS MEASUREMENT TEXT
 				{
-					GetScriptObjectFromID(ToolkitID).updateRadius();
+					GetScriptObjectFromID(LiveViewControlsID).updateRadius();
 					return 0;
 				}
 			if(keydescription.MatchesKeyDescriptor( "h" )) // HELP

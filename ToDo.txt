@@ -1,5 +1,7 @@
 Required Features
 -----------------
+Button on toolkit for printAll function
+
 Use progress dialog for DP imaging too.
 
 Make a function to produce persistent Image tags for integrated images
@@ -30,4 +32,6 @@ Save the central DP and highlight + label the target coordinates in an image set
 
 Currently
 ----------
-
+Putting LiveViewWindow controls into own class
+	Get rid of the interface system
+	Update all objects to use the newly located ReturnView type functions in the LiveViewControls object.

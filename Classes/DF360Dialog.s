@@ -38,11 +38,8 @@ class DF360Dialog : uiframe
 	number ProgressBarDialogID;
 	object ImagingFunctionsObject;
 	number ImagingFunctionsObjectID;
-	
-	/* These are components displayed on the Live View Window which the toolkit interacts with */
-	
-	component markerRing;
-	component ringRadiusText;
+	object LiveViewControls;
+	number LiveViewControlsID;
 	
 	// Function to print out the various saved variables for debugging. Will only work in Debug Mode
 	void printAllValues(object self)
@@ -64,11 +61,13 @@ class DF360Dialog : uiframe
 			"\n scaleCalibrationDialogID: " + scaleCalibrationDialogID + " and " + (scaleCalibrationDialog.ScriptObjectIsValid() ? "is" : "is not") + " valid"+\
 			"\n tiltCalibrationDialogID: " + tiltCalibrationDialogID + " and " + (tiltCalibrationDialog.ScriptObjectIsValid() ? "is" : "is not") + " valid"+\
 			"\n CameraControlObjectID: " + CameraControlObjectID + " and " + (CameraControlObject.ScriptObjectIsValid() ? "is" : "is not") + " valid"+\
+			"\n LiveViewControlsID: " + LiveViewControlsID + " and " + (LiveViewControls.ScriptObjectIsValid() ? "is" : "is not") + " valid"+\
 			"\n ImageProcessingObjectID: " + ImageProcessingObjectID + " and " + (ImageProcessingObject.ScriptObjectIsValid() ? "is" : "is not") + " valid"+\
 			"\n ImageConfigDialogID: " + ImageConfigDialogID + " and " + (ImageConfigDialog.ScriptObjectIsValid() ? "is" : "is not") + " valid";
 		result(textstring);
 		result("\n-------End----------------")
 		CameraControlObject.printAllValues();
+		LiveViewControls.printAllValues();
 		ImageSetTools.printAll();
 		DataObject.printAll();
 		ImagingFunctionsObject.printAllValues();
@@ -101,7 +100,7 @@ class DF360Dialog : uiframe
 	{
 		KeyListener = theKeyListener;
 		KeyListenerID = KeyListener.ScriptObjectGetID();
-		KeyListener.initialise(ToolkitID, dataObjectID, imageSetToolsID, ImagingFunctionsObjectID, CameraControlObjectID);
+		KeyListener.initialise(ToolkitID, dataObjectID, imageSetToolsID, ImagingFunctionsObjectID, CameraControlObjectID, LiveViewControlsID);
 		KeyListener.setDebugMode(debugMode);
 		return KeyListenerID;
 	}
@@ -150,7 +149,7 @@ class DF360Dialog : uiframe
 	{
 		CameraControlObject = theCameraControlObject;
 		CameraControlObjectID = CameraControlObject.ScriptObjectGetID();
-		CameraControlObject.initialise(ToolkitID, dataObjectID, imageSetToolsID); // Tell the object who it belongs to
+		CameraControlObject.initialise(ToolkitID, dataObjectID);
 		CameraControlObject.setDebugMode(debugMode);
 	}
 
@@ -172,7 +171,6 @@ class DF360Dialog : uiframe
 		imageConfigDialog.setDebugMode(debugMode);
 	}
 
-	
 	void storeProgressBarDialog(object self, object theProgressBarDialog)
 	{
 		ProgressBarDialog = theProgressBarDialog;
@@ -189,108 +187,14 @@ class DF360Dialog : uiframe
 		ImagingFunctionsObject.setDebugMode(debugMode);
 	}
 	
-	
-	/* Function to draw the lines on the View Window used to centre the beam and pick spots.
-		If updateToolkit = 1, Adds the ring marker and stores it in the toolkit.
-		Also creates a text component to update with ring diameter.
-	*/
-	
-	void drawReticleOnLiveView(object self, image targetImage)
-	{		
-		ImagingFunctionsObject.drawReticle(targetImage, 0); // draw the aiming lines.
-		
-		number centrex, centreY, radius, width, height;
-		getSize(targetImage, width, height );
-		centreX = (width) / 2;
-		centreY = (height) / 2;
-		
-		ImageDisplay targetDisplay = targetImage.ImageGetImageDisplay(0);
-		Component comp = targetDisplay;
-		
-		/* This is the ring used to mark out a target for the ring collection method. */
-		//Component NewOvalAnnotation( Number top, Number left, Number bottom, Number right )
-		radius = 100; // Radius of the circle in pixels.
-		number cTop, cBottom, cLeft, cRight;
-		cTop = centreY - radius;
-		cBottom = centreY + radius;
-		cLeft = centreX - radius;
-		cRight = centreX + radius;
-		component newMarkerRing
-		newMarkerRing = NewOvalAnnotation( cTop , cLeft, cBottom, cRight ); // This loads the component into the toolkit as well.
-
-		// Set colour and stuff
-		newMarkerRing.componentsetfillmode(2); // mode 2 is not filled. Important for circles.
-		newMarkerRing.componentsetdrawingmode(2); // mode 1 outlines the shape in the background colour
-		newMarkerRing.componentsetforegroundcolor(1,0,0);// Colour that the shape is drawn in
-		newMarkerRing.componentsetbackgroundcolor(0,0,0); // Colour the shape is outlined in.
-
-		// Add the component to the image document
-		comp.ComponentAddChildAtEnd( newMarkerRing );
-		ComponentSetVisible( newMarkerRing, 1 ); // Make it visible on start up
-		ComponentSetDeletable (newMarkerRing, 0); // Cannot be deleted until 'cleaned up'
-		
-		markerRing = newMarkerRing; // stores the marker ring object in the toolkit for future reference.
-
-		/* This is the text component to display the ring radius. */
-		string textString = "D-Spacing: ";
-		// Add text annotations and set their colour, display mode and font
-		component newRingRadiusText;
-		newRingRadiusText=newtextannotation(10,height - 32, textString, 16);
-		newRingRadiusText.componentsetfillmode(2);
-		newRingRadiusText.componentsetdrawingmode(2);
-		newRingRadiusText.componentsetforegroundcolor(1,0,0);
-		newRingRadiusText.componentsetbackgroundcolor(0,0,0);
-		newRingRadiusText.componentsetfontfacename("Microsoft Sans Serif");
-	
-		// Add the component to the image document
-		comp.ComponentAddChildAtEnd( newRingRadiusText );
-		ComponentSetVisible( newRingRadiusText, 1 ); // Show it initially
-		newRingRadiusText.ComponentSetSelectable(0);
-		ringRadiusText = newRingRadiusText;
-	}
-	
-	/* Code run to link an active View image / window to the Toolkit and set up short cut keys and things. */
-	void captureViewScreen (object self)
+	void storeLiveViewControls(object self, object theLiveViewControls)
 	{
-		CameraControlObject.updateEMstatus();
-		if(CameraControlObject.getAllowControl() == 0){
-			result("\nNo Control Permitted. Ensure a live view window is active.")
-			exit(0);
-		}
-		dataObject.setCentreTiltHere(); // set this here to avoid false tilt values.
-		if(debugMode){result("\nCapturing View Window...");}
-		if(CameraControlObject.storeCameraDetails() == 0){  // Stores camera width, height and binning multiplier.
-			result("\nError finding camera information.");
-			throw("Error finding Camera Information");
-		}
-		
-		image viewImage;
-		if(!returnViewImage(debugMode, viewImage)){
-			result("\nNo View Image detected when capturing Live View Window.");
-			return;
-		}
-		self.drawReticleOnLiveView(viewImage);
-		if(debugMode==1){result("\n\tReticle added to View window.");}
-		
-		imageDisplay frontdisp;
-		if(returnViewImageDisplay(debugMode, frontdisp) != true){
-			result("\nNo View Display found.");
-			return;
-		}
-		
-		if(debugMode==1){result("\n\tKeyListener will be attached to a display. Validity: " + ImageDisplayIsValid(frontdisp));}
-		self.attachKeyListener(frontdisp) // attach the keylistener to the live-view display and start it up.
-		if(debugMode==1){result("\n\tKeyListener created and attached. Shortcut keys available.");}
-		
-		number scaleX = ImageGetDimensionScale( viewImage, 0 );
-		dataObject.setOriginalScale(scaleX);
-		string scaleString = ImageGetDimensionUnitString( viewImage, 0 );
-		dataObject.setOriginalScaleString(scaleString);
-		if(debugMode==1){result("\n\tThe View window scale was initially set to " + dataObject.getOriginalScale() + " " + dataObject.getOriginalScaleString());}
-		
-		if(debugMode==true){result("\nView Window Capture complete");}
-		return;
+		LiveViewControls = theLiveViewControls;
+		LiveViewControlsID = LiveViewControls.ScriptObjectGetID();
+		LiveViewControls.initialise(ToolkitID, dataObjectID, CameraControlObjectID);
+		LiveViewControls.setDebugMode(debugMode);
 	}
+	
 		
 	void UpdateDebugMode(object self){
 		if(debugMode == 1){
@@ -328,6 +232,9 @@ class DF360Dialog : uiframe
 		}
 		if(ImageProcessingObject.ScriptObjectIsValid()){
 			ImageProcessingObject.setDebugMode(debugMode);
+		}
+		if(LiveViewControls.ScriptObjectIsValid()){
+			LiveViewControls.setDebugMode(debugMode);
 		}
 	}
 	
@@ -590,187 +497,6 @@ class DF360Dialog : uiframe
 		
 		CameraControlObject.updateEMstatus();
 	}
-	
-	//********************************
-	// RING CONTROL FUNCTIONS
-	//********************************
-	/* Function to make a marker circle component that can be assigned to any image.
-		This is intended as a marker ring that is not linked to the ring-capture controls, just to show things. 
-		Will return the Circle component if you want to use it.
-	*/
-	component makeNewCircle(object self, image targetImage, number radiusPX, string radiusTextString, rgbnumber componentColour)
-	{
-		component greenCircle
-		number centreX, centreY;
-		getSize(targetImage, centreX, centreY);
-		centreX = centreX / 2;
-		centreY = centreY / 2;
-		number cTop = centreY - radiusPX;
-		number cBottom = centreY + radiusPX;
-		number cLeft = centreX - radiusPX;
-		number cRight = centreX + radiusPX;
-		greenCircle = NewOvalAnnotation( cTop , cLeft, cBottom, cRight );
-		
-		// Set colour and stuff
-		number redNumber, blueNumber, greenNumber;
-		redNumber = red(componentColour) / 255;
-		blueNumber = blue(componentColour) / 255;
-		greenNumber = green(componentColour) / 255;
-		greenCircle.componentsetfillmode(2); // mode 2 is not filled. Important for circles.
-		greenCircle.componentsetdrawingmode(2); // mode 1 outlines the shape in the background colour, mode 2 does foreground (?)
-		greenCircle.componentsetforegroundcolor(redNumber, greenNumber, blueNumber);// Colour that the shape is drawn in
-		greenCircle.componentsetbackgroundcolor(0,0,0); // Colour the shape is outlined in.
-
-		// Add the component to the image document
-		ImageDisplay targetDisplay = targetImage.ImageGetImageDisplay(0);
-		Component comp = targetDisplay;
-		comp.ComponentAddChildAtEnd( greenCircle );
-		
-		// Text Stuff
-		component radiusText;
-		radiusText=newtextannotation(10, 10, radiusTextString, 16); // Put this one near the top
-		radiusText.componentsetfillmode(2);
-		radiusText.componentsetdrawingmode(2)			;
-		radiusText.componentsetforegroundcolor(redNumber, greenNumber, blueNumber);
-		radiusText.componentsetbackgroundcolor(0,0,0);
-		radiusText.componentsetfontfacename("Microsoft Sans Serif");
-
-		// Add the component to the image document
-		comp.ComponentAddChildAtEnd( radiusText );
-		return greenCircle;
-	}
-	
-	/* Function to change the visibility of the marker ring and any attached text.
-		Select the component to make it easy to see and work with.
-	*/
-	
-	void toggleMarkerRing (object self)
-	{
-		if(!markerRing.ComponentIsValid()){
-			result("\nNo marker ring found");
-			return;
-		}
-		if(debugMode==true){result("\nmarkerRing object is valid");}
-		if(debugMode==true){result("\n\tmarkerRing Get Visible: " + ComponentGetVisible( markerRing ) );}
-		if( ComponentGetVisible( markerRing ) == 1 ){
-			ComponentSetVisible( markerRing, 0 );
-			ComponentSetVisible( ringRadiusText, 0 );
-			ComponentSetSelected( markerRing, 0 );
-		} else {
-			ComponentSetVisible( markerRing, 1 );
-			ComponentSetVisible( ringRadiusText, 1 );
-			ComponentSetSelected( markerRing, 1 );
-		}
-		return;
-	}
-	
-	/* Function to update a text component with the radius of a diffraction ring. */
-	void updateRadius (object self)
-	{
-		if(!markerRing.ComponentIsValid()){
-			result("\nNo marker ring found");
-			return;
-		}
-		if(debugMode==true){result("\n\tUpdating Radius...");}
-		// void ComponentGetBoundingRect( Component comp, NumberVariable t, NumberVariable l, NumberVariable b, NumberVariable r )
-		number measuredRadiusPX, measuredRadiusNM, top, bottom, left, right, scaleX, scaleY;
-		markerRing.ComponentGetBoundingRect( top, left, bottom, right );
-		measuredRadiusPX = (bottom - top) / 2;
-		if(debugMode==true){result("\nmeasuredRadiusPX = " + measuredRadiusPX);}
-		scaleX = CameraControlObject.getViewScale();
-		if(debugMode==true){result("\nscaleX = " + scaleX);}
-		measuredRadiusNM = measuredRadiusPX * scaleX;
-		number measureRadiusAngstrom = 10 / measuredRadiusNM;
-		ringRadiusText.TextAnnotationSetText("D-Spacing: " + measuredRadiusNM + " (1/nm)   /   " + measureRadiusAngstrom + " A");
-	}
-	
-	/* Function to set the markerRing to a desired radius (in 1/nm) */
-	void setRingRadius (object self, number desiredRadiusNM)
-	{
-		if(!markerRing.ComponentIsValid()){
-			result("\nNo marker ring found");
-			return;
-		}
-		number measuredRadiusPX, desiredRadiusPX, top, bottom, left, right, scaleX, scaleY, centreX, centreY;
-		markerRing.ComponentGetBoundingRect( top, left, bottom, right );
-		measuredRadiusPX = (bottom - top) / 2;
-		centreX = right - measuredRadiusPX;
-		centreY = bottom - measuredRadiusPX;
-		number binningMultiplier = CameraControlObject.getBinningMultiplier();
-		if((binningMultiplier==0) || (binningMultiplier.isNaN())){
-			throw("Please calibrate the toolkit first");
-		}
-		scaleX = CameraControlObject.getViewScale();
-		desiredRadiusPX = desiredRadiusNM / scaleX;
-		if(debugMode==true){result("\nscaleX = " + scaleX);}
-		if(debugMode==true){result("\ndesiredRadiusNM: " + desiredRadiusNM + " (1/nm)");}
-		
-		top = centreY + desiredRadiusPX;
-		bottom = centreY - desiredRadiusPX;
-		right = centreX + desiredRadiusPX;
-		left = centreX - desiredRadiusPX;
-		markerRing.ComponentSetRect( top, left, bottom, right );
-		return;
-	}
-
-	/* Function to put the marker ring back on the central spot and make it circular. */
-	void recenterMarkerRing (object self)
-	{
-		if(!markerRing.ComponentIsValid()){
-			result("\nNo marker ring found");
-			return;
-		}
-		number top, bottom, left, right, centreX, centreY;
-		number binningMultiplier = CameraControlObject.getBinningMultiplier();
-		number cameraHeight = CameraControlObject.getCameraHeight();
-		number cameraWidth = CameraControlObject.getCameraWidth();
-		// Check if calibrated yet. Stop if not.
-		if((binningMultiplier==0) || (binningMultiplier.isNaN())){
-			throw("Please calibrate the toolkit first");
-		}
-		
-		centreX = cameraWidth / (2 * binningMultiplier);
-		centreY = cameraHeight / (2 * binningMultiplier);
-		if(debugMode==true){result("\nCenter of View window = (" + centreX + ", " + centreY + ")");}
-			
-		markerRing.ComponentGetBoundingRect( top, left, bottom, right );
-		number measuredRadiusPXVertical = (bottom - top) / 2;
-		number measuredRadiusPXHorizontal = (right - left) / 2;
-		// Pick the largest one.
-		number measuredRadiusPX = (measuredRadiusPXVertical > measuredRadiusPXHorizontal) ? measuredRadiusPXVertical : measuredRadiusPXHorizontal;
-		if(debugMode==true){result("\nRing radius measured as " + measuredRadiusPX + "px");}
-		
-		top = centreY + measuredRadiusPX;
-		bottom = centreY - measuredRadiusPX;
-		right = centreX + measuredRadiusPX;
-		left = centreX - measuredRadiusPX;
-		markerRing.ComponentSetRect( top, left, bottom, right );
-		if(debugMode==true){result("\nRectangle set to [" + top + ", " + left + ", " + bottom + ", " + right + " ]");}
-		return;
-	}
-
-	/* Function to return the radius of the marker ring in pixels for unbinned images */
-	 number markerRingRadius(object self)
-	 {
-		number cameraWidth = CameraControlObject.getCameraWidth();
-		number cameraHeight = CameraControlObject.getCameraHeight();
-		number binning = CameraControlObject.getBinningMultiplier();
-		number beamPixelCentreX, beamPixelCentreY, tiltVectorX, tiltVectorY, targetRadiusPX, scaleX, scaleY;
-		scaleX = dataObject.getRefScale(); // Scales for an unbinned image
-		scaleY = dataObject.getRefScale(); 
-		beamPixelCentreX = cameraWidth / 2;
-		beamPixelCentreY = cameraHeight / 2;
-		
-		number top, bottom, left, right;
-		markerRing.ComponentGetRect(top, left, bottom, right );
-		if(debugMode==true){result("\nRing rectangle: " + top + ", " + left + ", " + bottom + ", " + right);}
-		
-		targetRadiusPX = ( right - left )/2;
-		if(debugMode==true){result("\nRing radius measured as: " + targetRadiusPX + "px");}
-		targetRadiusPX = targetRadiusPX * binning;
-		if(debugMode==true){result("\nAt full scale this is: " + targetRadiusPX + "px");}
-		return targetRadiusPX;
-	 }
 	 
 	/* TOP LEVEL BUTTON FUNCTIONS */
 	void calibrateButtonPress(object self)
@@ -858,7 +584,7 @@ class DF360Dialog : uiframe
 		
 		
 		image viewImage;
-		if(!returnViewImage(debugMode, viewImage)){
+		if(!LiveViewControls.returnViewImage(viewImage)){
 			if(debugMode==true){result("\nNo View Window detected.");}
 			return; // Stop here if no view window is there.
 		}
@@ -1046,7 +772,7 @@ class DF360Dialog : uiframe
 	{
 		if(debugMode==1){result("\n\tYou have pressed to toggle the marker ring");}
 		// Make the Marker Ring and radius display visible/hidden;
-		self.toggleMarkerRing();
+		LiveViewControls.toggleMarkerRing();
 	}
 	void RingTextButtonPress (object self) // NOT IMPLEMENTED
 	{
@@ -1058,18 +784,18 @@ class DF360Dialog : uiframe
 		// Take the value in the ringMarkerField text box and set the ring radius to it.
 		taggroup intfield=self.lookupelement("ringMarkerFieldInput")
 		number desiredRadiusNM = dlggetvalue(intfield)
-		self.setRingRadius (desiredRadiusNM);
-		self.updateRadius();
+		LiveViewControls.setRingRadius (desiredRadiusNM);
+		LiveViewControls.updateRadius();
 	}
 		
 	void updateRingRadiusButtonPress(object self)
 	{
-		self.updateRadius();
+		LiveViewControls.updateRadius();
 	}
 
 	void recenterRingButtonPress (object self)
 	{
-		self.recenterMarkerRing();
+		LiveViewControls.recenterMarkerRing();
 	}
 
 	void addRingButtonPress (object self)
@@ -1108,7 +834,7 @@ class DF360Dialog : uiframe
 		result("\nscaleX: " + scaleX);
 		result("\nradiusPX: " + radiusPX);
 		// create circle
-		self.makeNewCircle(targetImage, radiusPX, radiusTextString, componentColour);
+		LiveViewControls.makeNewCircle(targetImage, radiusPX, radiusTextString, componentColour);
 	}
 
 	/* Imaging & Processing Panel Functions */
@@ -1334,7 +1060,14 @@ class DF360Dialog : uiframe
 	
 	void captureViewButtonPress (object self)
 	{
-		self.captureViewScreen();
+		LiveViewControls.captureViewScreen();
+		/* Needs to be in toolkit, not in LiveViewControls object */
+		ImageDisplay frontdisp
+		if(LiveViewControls.returnViewImageDisplay(frontdisp))
+		{
+			self.attachKeyListener(frontdisp) // attach the keylistener to the live-view display and start it up.
+			if(debugMode==1){result("\n\tKeyListener created and attached. Shortcut keys available.");}
+		}
 	}
 	
 	// Saves the DataObject variables into a settings file. Any gaps will be filled from permanent memory.

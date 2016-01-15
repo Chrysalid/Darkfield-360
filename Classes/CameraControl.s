@@ -11,7 +11,6 @@ class CameraControl
 	number CameraControlID; // the ID of this object
 	number ToolkitID; // the ID of the toolkit
 	number dataObjectID;
-	number imageSetToolsID;
 
 	number EMOnline; // Stores 1 if there is a microscope ready for use. 0 if not.
 	number AllowControl; // Only allow control of the microscope if there is a live view image. Is 0 or 1.
@@ -37,7 +36,6 @@ class CameraControl
 			"\n EMonline: " + EMOnline +\
 			"\n AllowControl: " + AllowControl +\
 			"\n dataObjectID: " + dataObjectID +\
-			"\n imageSetToolsID: " + imageSetToolsID +\
 			"\n cameraWidth: " + cameraWidth +\
 			"\n cameraHeight: " + cameraHeight +\
 			"\n binningMultiplier: " + binningMultiplier +\
@@ -99,10 +97,9 @@ class CameraControl
 	}
 	
 	
-	void initialise(object self, number theToolkitID, number theDataObjectID, number theImageSetToolsID){
+	void initialise(object self, number theToolkitID, number theDataObjectID){
 		ToolkitID = theToolkitID;
 		dataObjectID = theDataObjectID;
-		imageSetToolsID = theImageSetToolsID;
 		
 		self.updateEMstatus(); // set the AllowControl variable asap.
 		

@@ -280,15 +280,19 @@ cameraButton := [32, 32]:
 // Interfaces
 //******************************
 // These are Forward Declarations of methods used in classes. You can force them to run on ANY object, which can break things easily.
-// However, it helps avoid the problem of classes calling class methods in other, undefined classes.
+// However, it helps avoid the problem of classes calling class methods in other, not-yet-defined classes.
+// Ideally these should not be used and the dependancies should be fixed.
 
 // All classes need to be able to reference the following methods in the Toolkit class before it is defined.
+
+/* -- no longer used, but kept here for reference ---
 interface ToolkitInterface
 {
 	void toggleMarkerRing(object self); // Used in Keyhandler
 	void setRingRadius(object self, number desiredRadiusNM); // Used in Keyhandler
 	void updateRadius(object self); // Used in Keyhandler
 }
+*/
 
 //*******************
 //  BASE FUNCTIONS - These do not require any interaction with classes and can be used by any other functions
@@ -441,7 +445,7 @@ TagGroup makeFileListGroup(){
 	return DFList;
 }
 
-/* Function to open a list of files, open them and then record their ImageIDs in an indexed TagList for use in other functions
+/* Function to open a list of files, open the files and then record their ImageIDs in an indexed TagList for use in other functions
 	the input list is the output of makeFileListGroup();
 	
 	Taggroup format:

@@ -61,72 +61,7 @@ class ImagingFunctions
 		StoredImageSet = theImageSet;
 		self.startthread("darkFieldImage");
 	}
-	
-	/* Function to draw the lines on an image used to centre the beam and pick spots (not the central ring marker)
-		canEdit = 0 sets the lines to be non-selectable.
-	*/
-	
-	void drawReticle(object self, image targetImage, number canEdit)
-	{
-		number centrex, centreY, radius, width, height;
-		getSize(targetImage, width, height );
 		
-		centreX = (width) / 2;
-		centreY = (height) / 2;
-		
-		//Component NewLineAnnotation( Number top, Number left, Number bottom, Number right )
-		Component line1 = NewLineAnnotation( 0, 0, height, width );
-		Component line2 = NewLineAnnotation( height, 0, 0, width );
-		
-		//Component NewOvalAnnotation( Number top, Number left, Number bottom, Number right )
-		radius = 10; // Radius of the circle in pixels.
-		number cTop = centreY - radius;
-		number cBottom = centreY + radius;
-		number cLeft = centreX - radius;
-		number cRight = centreX + radius;
-		Component circle1 = NewOvalAnnotation( cTop , cLeft, cBottom, cRight );
-
-		// Set colour and stuff
-		line1.componentsetfillmode(2); // mode 2 is not filled. Important for circles.
-		line2.componentsetfillmode(2);
-		circle1.componentsetfillmode(2);
-		line1.componentsetdrawingmode(2); // mode 1 outlines the shape in the background colour
-		line2.componentsetdrawingmode(2);
-		circle1.componentsetdrawingmode(2);
-		line1.componentsetforegroundcolor(1,0,0); // Colour that the shape is drawn in
-		line2.componentsetforegroundcolor(1,0,0);
-		circle1.componentsetforegroundcolor(1,0,0);
-		line1.componentsetbackgroundcolor(0,0,0); // Colour the shape is outlined in.
-		line2.componentsetbackgroundcolor(0,0,0);
-		circle1.componentsetbackgroundcolor(0,0,0);
-		// Add the components to the image display
-		ImageDisplay targetDisplay = targetImage.ImageGetImageDisplay(0);
-		Component comp = targetDisplay;
-		comp.ComponentAddChildAtEnd( line1 );
-		comp.ComponentAddChildAtEnd( line2 );
-		comp.ComponentAddChildAtEnd( circle1 );
-
-		if(canEdit == false)
-		{
-			// Make the lines not selectable.
-			line1.ComponentSetSelectable(0);
-			line2.ComponentSetSelectable(0);
-			circle1.ComponentSetSelectable(0);
-		}
-	}
-	
-	/* Function to make the reticle, lines, etc. of any image deletable and selectable */
-	void cleanReticle(object self, image myImage)
-	{
-		ImageDisplay imageDisp = myImage.ImageGetImageDisplay( 0 );
-		Number compCount =  ComponentCountChildren( imageDisp );
-		for(number i=0;i < compCount;i++){
-			component annotid=imageDisp.ComponentGetChild(i);	
-			annotid.ComponentSetSelectable(1);
-			annotid.ComponentSetDeletable(1);
-		}	
-	}
-	
 	
 	//****************************************************
 	// IMAGING PROCESSES
