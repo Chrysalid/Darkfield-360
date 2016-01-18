@@ -749,7 +749,23 @@ class DF360Dialog : uiframe
 	
 	void FinalizeImageSetButtonPress(object self)
 	{
-		ImagingFunctionsObject.finalizeImageSet();
+		if(CameraControlObject.getAllowControl() != true){
+			result("\nToolkit Controls are offline. Ensure there is a live view window active and has been captured.")
+			return;
+		}
+		TagGroup imageSet;
+		ImageSetTools.getCurrentImageSet(imageSet);
+		number DPsTaken
+		imageSet.TagGroupGetTagAsNumber("DPsTaken", DPsTaken)
+		
+		if(DPsTaken == true)
+		{
+			if(ContinueCancelDialog("Image set has all ready been finalized. Take additional diffraction patterns?") == false){
+				return;
+			}
+		}
+		
+		ImagingFunctionsObject.startDiffractionPatternImaging(imageSet);
 	}
 	
 	

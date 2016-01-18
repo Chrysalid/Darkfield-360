@@ -68,7 +68,13 @@ class ImagingFunctions
 		StoredImageSet = theImageSet;
 		self.startthread("darkFieldImage");
 	}
-		
+	
+	// begin spot recording (DP) imaging thread.
+	void startDiffractionPatternImaging(object self, TagGroup theImageSet){
+		result("\n Attempting to start imaging process");
+		StoredImageSet = theImageSet;
+		self.startthread("diffractionPatternImage");
+	}
 	
 	//****************************************************
 	// IMAGING PROCESSES
@@ -544,22 +550,9 @@ class ImagingFunctions
 			Uses function: image takeDPImage(object self, TagGroup imageSet, number spotID, string imageLabel)
 	*/
 	
-	void finalizeImageSet(object self){
+	void diffractionPatternImage(object self){
 		if(debugMode==true){result("\nFinalizing Image Set...");}
 		
-		/* These checking functions should be run before this function is called and inside the Toolkit.
-		if(GetScriptObjectFromID(CameraControlObjectID).getAllowControl() != true){
-			result("\nToolkit Controls are offline. Ensure there is a live view window active and has been captured.")
-			exit(0);
-		}
-		if(GetScriptObjectFromID(ToolkitID).getIsCalibrated() == 0){ // Has the system been calibrated?
-			Throw("The system must be calibrated before you store points.");
-		}
-		ImageDisplay viewDisplay
-		if(!returnViewImageDisplay(debugMode, viewDisplay)){
-			throw("No Live View window found");
-		}
-		*/
 		// Is there an open imageSet?
 		TagGroup targetImageSet
 		number isCurrent = GetScriptObjectFromID(imageSetToolsID).getCurrentImageSet(targetImageSet)
@@ -585,7 +578,6 @@ class ImagingFunctions
 			result("\n\tImage Set does not have the ImageSetID tag. This is an error.");
 			Throw("Image Set Error: No ImageSetID flag.");
 		} 
-		
 		
 		// Shadow mode settings check
 		number shadowDistanceNM, shadowMode;
@@ -655,19 +647,20 @@ class ImagingFunctions
 			Throw("Image Set Error: No AutoDisplayNonInt flag.");
 		}
 		
+		number DPExposure = GetScriptObjectFromID(CameraControlObjectID).getDPExposure();
+		number DFExposure = GetScriptObjectFromID(CameraControlObjectID).getDFExposure();
+		number xTiltVectorX, xTiltVectorY, yTiltVectorX, yTiltVectorY;
+		GetScriptObjectFromID(dataObjectID).getTiltVectors(xTiltVectorX, xTiltVectorY, yTiltVectorX, yTiltVectorY);
+		number cameraWidth = GetScriptObjectFromID(CameraControlObjectID).getCameraWidth();
+		number cameraHeight = GetScriptObjectFromID(CameraControlObjectID).getCameraHeight();
+		number binning = GetScriptObjectFromID(CameraControlObjectID).getBinningMultiplier();
+		number beamCentreX = GetScriptObjectFromID(dataObjectID).getCentreXTilt();
+		number beamCentreY = GetScriptObjectFromID(dataObjectID).getCentreYTilt();
+		number RefScale = GetScriptObjectFromID(dataObjectID).getRefScale();
+		
 		// Generate Ring Mode Coordinates
 		if(RingMode == true){
 			if(debugMode==true){result("\nStarting to create Ring Data Points.");}
-			number DPExposure = GetScriptObjectFromID(CameraControlObjectID).getDPExposure();
-			number DFExposure = GetScriptObjectFromID(CameraControlObjectID).getDFExposure();
-			number xTiltVectorX, xTiltVectorY, yTiltVectorX, yTiltVectorY;
-			GetScriptObjectFromID(dataObjectID).getTiltVectors(xTiltVectorX, xTiltVectorY, yTiltVectorX, yTiltVectorY);
-			number cameraWidth = GetScriptObjectFromID(CameraControlObjectID).getCameraWidth();
-			number cameraHeight = GetScriptObjectFromID(CameraControlObjectID).getCameraHeight();
-			number binning = GetScriptObjectFromID(CameraControlObjectID).getBinningMultiplier();
-			number beamCentreX = GetScriptObjectFromID(dataObjectID).getCentreXTilt();
-			number beamCentreY = GetScriptObjectFromID(dataObjectID).getCentreYTilt();
-			number RefScale = GetScriptObjectFromID(dataObjectID).getRefScale();
 			
 			// Ask the user how many DPs will be taken when the image set is finalized (not how many darkfield images will be taken)
 			number NumberOfPoints;
@@ -752,8 +745,26 @@ class ImagingFunctions
 			// Save +/ show images
 			// update image set with image ID or file name for DP image
 			
+		// Set up the progress bar system.
+		GetScriptObjectFromID(ProgressBarDialogID).makeDialog(); //command to start the progress bar dialog.
+		GetScriptObjectFromID(ProgressBarDialogID).setProgressPercent(0);
+		// Check if the image acquisition has been cancelled by the user
+		if(GetScriptObjectFromID(ProgressBarDialogID).getDoBreak() == true){
+			result("\n\n Break signal recieved. Ending Diffraction Pattern imaging thread.")
+			return
+		}
+		
 		number i;
 		for(i=0; i < NumberOfSpots; i++){
+			// Check if the image acquisition has been cancelled by the user
+			if(GetScriptObjectFromID(ProgressBarDialogID).getDoBreak() == true){
+				result("\n\n Break signal recieved. Ending Diffraction Pattern imaging thread.")
+				return
+			}
+			// update the progress bar %
+			number percentComplete = i / NumberOfSpots;
+			GetScriptObjectFromID(ProgressBarDialogID).setProgressPercent(percentComplete);
+			
 			if(debugMode==true){result("\n\t Recording spot " + i + " (Middle)...");}
 			TagGroup newDFImageData;
 			image DPImage := self.takeDPImage( targetImageSet, i, "Middle", newDFImageData)
@@ -787,6 +798,11 @@ class ImagingFunctions
 				NewHigherDF.TagGroupSetTagAsNumber("ExposureTime", GetScriptObjectFromID(CameraControlObjectID).getDFExposure());
 				// add the tag group to the new 'image' spot set
 				NewSpotSet.TagGroupSetTagAsTagGroup("Higher", NewHigherDF);
+				// test for a cancelled progress dialog.
+				if(GetScriptObjectFromID(ProgressBarDialogID).getDoBreak() == true){
+					result("\n\n Break signal recieved. Ending Diffraction Pattern imaging thread.")
+					return
+				}
 				
 				if(debugMode==true){result("\n\t Shadowing spot " + i + " (Lower)...");}
 				DPImageLower := self.takeDPImage( targetImageSet, i, "Lower", lowerImageData);
@@ -795,6 +811,11 @@ class ImagingFunctions
 				NewLowerDF.TagGroupSetTagAsNumber("ExposureTime", GetScriptObjectFromID(CameraControlObjectID).getDFExposure());
 				// add the tag group to the new 'image' spot set
 				NewSpotSet.TagGroupSetTagAsTagGroup("Lower", NewLowerDF);
+				// test for a cancelled progress dialog.
+				if(GetScriptObjectFromID(ProgressBarDialogID).getDoBreak() == true){
+					result("\n\n Break signal recieved. Ending Diffraction Pattern imaging thread.")
+					return
+				}
 			}
 			
 			if(debugMode==true){result("\n\t Images taken.");}
@@ -927,6 +948,7 @@ class ImagingFunctions
 		if(debugMode==true){result("\nAll Diffraction Patterns imaged. Setting DPsTaken flag to 1");}
 		// update the image set to show that DP were taken.
 		targetImageSet.TagGroupSetTagAsNumber("DPsTaken", 1);
+		GetScriptObjectFromID(ProgressBarDialogID).EndProgress(); // end the progress dialog
 	}
 	
 	/* Function will use the stored Tilt values to take darkfield images. 1st Image will be Bright Field of site.

@@ -1,12 +1,8 @@
 Required Features
 -----------------
-Button on toolkit for printAll function
-
-Use progress dialog for DP imaging too.
+Save image sets in text format, at least to read.
 
 Make a function to produce persistent Image tags for integrated images
-
-Save image sets in text format, at least to read.
 
 Make Auto-Save always on?
 
@@ -32,3 +28,4 @@ Save the central DP and highlight + label the target coordinates in an image set
 
 Currently
 ----------
+Save image sets in text format, at least to read.
