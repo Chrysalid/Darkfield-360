@@ -61,6 +61,7 @@ object startToolkit () {
 	object Toolkit = alloc(DF360Dialog);
 	result("\nAttaching data store to Toolkit...");
 	Toolkit.storeDataObject(dataObject); // Needs only Toolkit to be loaded.
+	result("\nInitializing Camera Controls...");
 	Toolkit.storeCameraControlObject(theCameraControlObject); // uses dataObject
 	Toolkit.storeCalibrationDialog(calibrationDialog); // uses dataObject
 	Toolkit.storeAlignmentDialog(alignmentDialog); // uses dataObject

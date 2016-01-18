@@ -32,9 +32,3 @@ Save the central DP and highlight + label the target coordinates in an image set
 
 Currently
 ----------
-Putting LiveViewWindow controls into own class
-	Get rid of the interface system
-	Update all objects to use the newly located ReturnView type functions in the LiveViewControls object.
-
-Change CameraControlObject / LiveViewControls to resovle dependancies issues
-Remove view control functions from include.s

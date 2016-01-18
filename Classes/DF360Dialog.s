@@ -383,8 +383,10 @@ class DF360Dialog : uiframe
 		panel6.dlgaddelement(DisableModeWarnings);
 		TagGroup ExamineGTGFile = DLGCreatePushButton("View GTG file", "ExamineGTGFilePress");
 		panel6.dlgaddelement(ExamineGTGFile);
+		TagGroup PrintDebugData = DLGCreatePushButton("Debug Data Dump", "PrintDebugDataPress");
+		panel6.dlgaddelement(PrintDebugData);
 
-		panel6.dlgtablelayout(2,12,0); // Arrange the buttons
+		panel6.dlgtablelayout(2,10,0); // Arrange the buttons
 		
 		// Panel 7 is for final Imaging steps
 		taggroup panel7=dlgcreatepanel()
@@ -1091,4 +1093,7 @@ class DF360Dialog : uiframe
 		}	
 	}
 	
+	void PrintDebugDataPress (object self){
+		self.printAllValues();	
+	}
 }

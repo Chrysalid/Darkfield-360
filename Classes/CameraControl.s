@@ -40,21 +40,23 @@ class CameraControl
 	{
 		result("\n\nCamera Control Debug Values")
 		result("\n------------------------")
-		string textstring;
-		textstring = "\n\tObjectID: " + CameraControlID +\
-			"\n DebugMode: " + debugMode +\
-			"\n EMonline: " + EMOnline +\
-			"\n AllowControl: " + AllowControl +\
-			"\n dataObjectID: " + dataObjectID +\
-			"\n cameraWidth: " + cameraWidth +\
-			"\n cameraHeight: " + cameraHeight +\
-			"\n binningMultiplier: " + binningMultiplier +\
-			"\n DFExposure: " + DFExposure +\
-			"\n DPExposure: " + DPExposure +\
-			"\n BFExposure: " + BFExposure +\
-			"\n Imaging Modes saved: " + ImagingModes.TagGroupCountTags() +\
-			"\n Diffraction Modes saved: " + DiffractionModes.TagGroupCountTags();
-		result(textstring);
+		result("\nObjectID: " + CameraControlID);
+		result("\n DebugMode: " + debugMode);
+		result("\n EMonline: " + EMOnline);
+		result("\n AllowControl: " + AllowControl);
+		result("\n dataObjectID: " + dataObjectID);
+		result("\n cameraWidth: " + cameraWidth);
+		result("\n cameraHeight: " + cameraHeight);
+		result("\n binningMultiplier: " + binningMultiplier);
+		result("\n DFExposure: " + DFExposure);
+		result("\n DPExposure: " + DPExposure);
+		result("\n BFExposure: " + BFExposure);
+		result("\n ViewImage: " + ViewImage.ImageIsValid());
+		if(ViewImage.ImageIsValid() == true){
+			result("\n ViewImageID: " + ViewImage.ImageGetID() );
+		}
+		result("\n Imaging Modes saved: " + ImagingModes.TagGroupCountTags());
+		result("\n Diffraction Modes saved: " + DiffractionModes.TagGroupCountTags());
 		result("\n-------End----------------");
 	}
 	
@@ -80,9 +82,10 @@ class CameraControl
 			window = GetDocumentWindow( i );
 		}
 		if(!thisViewWindow.WindowIsValid()){
-			result("\nView window not present.")
+			if(debugMode == true){result("\nView window not present.");}
 			return 0;
 		} else {
+			if(debugMode == true){result("\nView window present.");}
 			viewWindow = thisViewWindow;
 			viewImageDocument = viewWindow.ImageWindowGetImageDocument();
 			viewImage := viewImageDocument.ImageDocumentGetImage(0);
@@ -98,8 +101,7 @@ class CameraControl
 		if(EMOnline == false){
 			AllowControl = 0;
 		} else {
-			image viewImage
-			if(viewImage.ImageIsValid() == false){
+			if(ViewImage.ImageIsValid() == false){
 				AllowControl = 0; //No View image, so no live camera control yet.
 			} else {
 				AllowControl = 1; // View window and microscope detected.
@@ -179,7 +181,6 @@ class CameraControl
 		if(debugMode){result("\n\tReference exposure added to toolkit data store.");}
 		
 		// Find binning by comparing raw camera width with view window width
-		image viewImage;
 		if(viewImage.ImageIsValid() == false){
 			result("\nView Image is invalid.")
 			return 0;
@@ -452,6 +453,7 @@ class CameraControl
 	
 	void captureViewScreen (object self)
 	{
+		if(debugMode == true){result("\nCapturing View Window...");}
 		self.findLiveView();
 		self.updateEMstatus();
 		
@@ -459,8 +461,8 @@ class CameraControl
 			result("\n\nNo Control Permitted. Ensure a live view window is active and the microscope is online.");
 			return;
 		}
+		if(debugMode == true){result("\nView Window found.");}
 		GetScriptObjectFromID(dataObjectID).setCentreTiltHere(); // set this here to avoid false tilt values.
-		if(debugMode == true){result("\nCapturing View Window...");}
 		if(self.storeCameraDetails() == 0){  // Stores camera width, height and binning multiplier.
 			result("\nError finding camera information.");
 			throw("Error finding Camera Information");
