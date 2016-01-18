@@ -27,7 +27,6 @@ class MyKeyHandler
 	number ImageSetToolsID; // ID of the imageset tools object
 	number ImagingFunctionsID; // ID of the imagingFunctions object
 	number CameraControlObjectID;
-	number LiveViewControlsID;
 	number debugMode
 
 	// Need undo command?
@@ -48,14 +47,13 @@ class MyKeyHandler
 
 	
 	/* Function stores the dataObject's ID so it can reference itself later. */
-	image initialise(object self, number theToolkitID, number theDataObjectID, number theImageSetToolsID, number theImagingFunctionsID, number theCameraControlObjectID, number theLiveViewControlsID)
+	image initialise(object self, number theToolkitID, number theDataObjectID, number theImageSetToolsID, number theImagingFunctionsID, number theCameraControlObjectID)
 	{
 			ToolkitID = theToolkitID;  // the ID of the Object which this entire handler is contained inside.
 			dataObjectID = theDataObjectID;
 			ImageSetToolsID = theImageSetToolsID;
 			ImagingFunctionsID = theImagingFunctionsID;
 			CameraControlObjectID = theCameraControlObjectID;
-			LiveViewControlsID = theLiveViewControlsID
 	}
 	/* Function stores the ID of a key listener and loads the dataObject's values into itself */
 	image startListening(object self, number KeyTok)
@@ -104,19 +102,19 @@ class MyKeyHandler
 			if(keydescription.MatchesKeyDescriptor( "1" )) // TOGGLE MARKER RING
 				{	
 					// Make the Marker Ring and radius display visible/hidden;
-					GetScriptObjectFromID(LiveViewControlsID).toggleMarkerRing();
+					GetScriptObjectFromID(CameraControlObjectID).toggleMarkerRing();
 					return 0;
 				}
 			if(keydescription.MatchesKeyDescriptor( "2" )) // SET RING TO TARGET RADIUS IN 1/NM UNITS
 				{
 					number desiredRadiusNM;
 					getNumber("Set Marker Ring to (1/nm): ", 2.00, desiredRadiusNM);
-					GetScriptObjectFromID(LiveViewControlsID).setRingRadius(desiredRadiusNM);
+					GetScriptObjectFromID(CameraControlObjectID).setRingRadius(desiredRadiusNM);
 					return 0;
 				}
 			if(keydescription.MatchesKeyDescriptor( "3" )) // UPDATE RADIUS MEASUREMENT TEXT
 				{
-					GetScriptObjectFromID(LiveViewControlsID).updateRadius();
+					GetScriptObjectFromID(CameraControlObjectID).updateRadius();
 					return 0;
 				}
 			if(keydescription.MatchesKeyDescriptor( "h" )) // HELP

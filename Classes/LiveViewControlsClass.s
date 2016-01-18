@@ -72,7 +72,8 @@ class LiveViewControlsClass
 		}
 	}
 	
-	/* Function to return the VIEW window to a variable. It will return 1 if the window is real and 0 if it has not been set. */
+	/* Function to return the VIEW window to a variable.
+		It will return 1 if the window is real and 0 if it has not been set. */
 	
 	number returnViewWindow(object self, DocumentWindow &theViewWindow)
 	{
@@ -274,7 +275,9 @@ class LiveViewControlsClass
 		ringRadiusText = newRingRadiusText;
 	}
 	
-	/* Code run to link an active View image / window to the Toolkit and set up short cut keys and things. */
+	/* Code run to link an active View image / window to the Toolkit and set up short cut keys and things.
+		Requires CameraControlObject and DataObject	
+	*/
 	void captureViewScreen (object self)
 	{
 		GetScriptObjectFromID(CameraControlObjectID).updateEMstatus();

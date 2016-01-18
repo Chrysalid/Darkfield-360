@@ -38,8 +38,6 @@ class DF360Dialog : uiframe
 	number ProgressBarDialogID;
 	object ImagingFunctionsObject;
 	number ImagingFunctionsObjectID;
-	object LiveViewControls;
-	number LiveViewControlsID;
 	
 	// Function to print out the various saved variables for debugging. Will only work in Debug Mode
 	void printAllValues(object self)
@@ -61,13 +59,11 @@ class DF360Dialog : uiframe
 			"\n scaleCalibrationDialogID: " + scaleCalibrationDialogID + " and " + (scaleCalibrationDialog.ScriptObjectIsValid() ? "is" : "is not") + " valid"+\
 			"\n tiltCalibrationDialogID: " + tiltCalibrationDialogID + " and " + (tiltCalibrationDialog.ScriptObjectIsValid() ? "is" : "is not") + " valid"+\
 			"\n CameraControlObjectID: " + CameraControlObjectID + " and " + (CameraControlObject.ScriptObjectIsValid() ? "is" : "is not") + " valid"+\
-			"\n LiveViewControlsID: " + LiveViewControlsID + " and " + (LiveViewControls.ScriptObjectIsValid() ? "is" : "is not") + " valid"+\
 			"\n ImageProcessingObjectID: " + ImageProcessingObjectID + " and " + (ImageProcessingObject.ScriptObjectIsValid() ? "is" : "is not") + " valid"+\
 			"\n ImageConfigDialogID: " + ImageConfigDialogID + " and " + (ImageConfigDialog.ScriptObjectIsValid() ? "is" : "is not") + " valid";
 		result(textstring);
 		result("\n-------End----------------")
 		CameraControlObject.printAllValues();
-		LiveViewControls.printAllValues();
 		ImageSetTools.printAll();
 		DataObject.printAll();
 		ImagingFunctionsObject.printAllValues();
@@ -100,7 +96,7 @@ class DF360Dialog : uiframe
 	{
 		KeyListener = theKeyListener;
 		KeyListenerID = KeyListener.ScriptObjectGetID();
-		KeyListener.initialise(ToolkitID, dataObjectID, imageSetToolsID, ImagingFunctionsObjectID, CameraControlObjectID, LiveViewControlsID);
+		KeyListener.initialise(ToolkitID, dataObjectID, imageSetToolsID, ImagingFunctionsObjectID, CameraControlObjectID);
 		KeyListener.setDebugMode(debugMode);
 		return KeyListenerID;
 	}
@@ -187,14 +183,6 @@ class DF360Dialog : uiframe
 		ImagingFunctionsObject.setDebugMode(debugMode);
 	}
 	
-	void storeLiveViewControls(object self, object theLiveViewControls)
-	{
-		LiveViewControls = theLiveViewControls;
-		LiveViewControlsID = LiveViewControls.ScriptObjectGetID();
-		LiveViewControls.initialise(ToolkitID, dataObjectID, CameraControlObjectID);
-		LiveViewControls.setDebugMode(debugMode);
-	}
-	
 		
 	void UpdateDebugMode(object self){
 		if(debugMode == 1){
@@ -232,9 +220,6 @@ class DF360Dialog : uiframe
 		}
 		if(ImageProcessingObject.ScriptObjectIsValid()){
 			ImageProcessingObject.setDebugMode(debugMode);
-		}
-		if(LiveViewControls.ScriptObjectIsValid()){
-			LiveViewControls.setDebugMode(debugMode);
 		}
 	}
 	
@@ -455,7 +440,7 @@ class DF360Dialog : uiframe
 	~DF360Dialog(object self)
 	{
 		imageDisplay imgdisp;
-		if(returnViewImageDisplay(debugMode,imgdisp)){
+		if(CameraControlObject.returnViewImageDisplay(imgdisp) == true){
 			component annotid=imgdisp.ComponentGetChild(0)
 			while (annotid.ComponentIsValid()){
 				annotid.componentremovefromparent();
@@ -584,7 +569,7 @@ class DF360Dialog : uiframe
 		
 		
 		image viewImage;
-		if(!LiveViewControls.returnViewImage(viewImage)){
+		if(!CameraControlObject.returnViewImage(viewImage)){
 			if(debugMode==true){result("\nNo View Window detected.");}
 			return; // Stop here if no view window is there.
 		}
@@ -772,7 +757,7 @@ class DF360Dialog : uiframe
 	{
 		if(debugMode==1){result("\n\tYou have pressed to toggle the marker ring");}
 		// Make the Marker Ring and radius display visible/hidden;
-		LiveViewControls.toggleMarkerRing();
+		CameraControlObject.toggleMarkerRing();
 	}
 	void RingTextButtonPress (object self) // NOT IMPLEMENTED
 	{
@@ -784,18 +769,18 @@ class DF360Dialog : uiframe
 		// Take the value in the ringMarkerField text box and set the ring radius to it.
 		taggroup intfield=self.lookupelement("ringMarkerFieldInput")
 		number desiredRadiusNM = dlggetvalue(intfield)
-		LiveViewControls.setRingRadius (desiredRadiusNM);
-		LiveViewControls.updateRadius();
+		CameraControlObject.setRingRadius (desiredRadiusNM);
+		CameraControlObject.updateRadius();
 	}
 		
 	void updateRingRadiusButtonPress(object self)
 	{
-		LiveViewControls.updateRadius();
+		CameraControlObject.updateRadius();
 	}
 
 	void recenterRingButtonPress (object self)
 	{
-		LiveViewControls.recenterMarkerRing();
+		CameraControlObject.recenterMarkerRing();
 	}
 
 	void addRingButtonPress (object self)
@@ -818,7 +803,7 @@ class DF360Dialog : uiframe
 		// convert this to pixels. Can use image scale unless it is view image.
 		image viewImage;
 		radiusNM = 1 / (radiusAng / 10); // radius in units of 1/nm
-		if(returnViewImage(debugMode, viewImage)){ // if View image present...
+		if(CameraControlObject.returnViewImage(viewImage) == true){ // if View image present...
 			number targetImageID = targetImage.ImageGetID();
 			number viewImageID = viewImage.ImageGetID();
 			if(targetImageID == viewImageID){ // AND the view image is being refered to
@@ -834,7 +819,7 @@ class DF360Dialog : uiframe
 		result("\nscaleX: " + scaleX);
 		result("\nradiusPX: " + radiusPX);
 		// create circle
-		LiveViewControls.makeNewCircle(targetImage, radiusPX, radiusTextString, componentColour);
+		CameraControlObject.makeNewCircle(targetImage, radiusPX, radiusTextString, componentColour);
 	}
 
 	/* Imaging & Processing Panel Functions */
@@ -1060,10 +1045,10 @@ class DF360Dialog : uiframe
 	
 	void captureViewButtonPress (object self)
 	{
-		LiveViewControls.captureViewScreen();
-		/* Needs to be in toolkit, not in LiveViewControls object */
+		CameraControlObject.captureViewScreen();
+		/* Needs to be in toolkit, not in CameraControlObject object */
 		ImageDisplay frontdisp
-		if(LiveViewControls.returnViewImageDisplay(frontdisp))
+		if(CameraControlObject.returnViewImageDisplay(frontdisp))
 		{
 			self.attachKeyListener(frontdisp) // attach the keylistener to the live-view display and start it up.
 			if(debugMode==1){result("\n\tKeyListener created and attached. Shortcut keys available.");}

@@ -2,7 +2,14 @@
 // IMAGE TAKING FUNCTIONS
 //****************************************************
 
-// The Image-taking functions. These use the data from other classes to take images, save them.
+// Requires the following objects be loaded before it:
+//		dataObject
+//		imageSetTools
+//		CameraControlObject
+//		ProgressBarDialog
+//		LiveViewControls
+
+// The Image-taking functions. These use the data from other classes to take images and save them.
 
 class ImagingFunctions
 {
@@ -10,10 +17,10 @@ class ImagingFunctions
 	number ToolkitID;
 	number dataObjectID;
 	number imageSetToolsID;
-	number debugMode;
 	number CameraControlObjectID;
 	number ProgressBarDialogID;
 	
+	number debugMode;
 	number isCalibrated; // 0/1 to check if the calibration is done
 	
 	number getIsCalibrated (object self){
@@ -143,7 +150,7 @@ class ImagingFunctions
 		if(debugMode==true)
 		{
 			result("\nCreating the tilt coordinate. Shadowing distance is set to " + shadowDistance + "(1/nm)");
-			positionDebugWindow(debugMode);
+			GetScriptObjectFromID(CameraControlObjectID).positionViewWindow();
 		}
 		
 		number xTiltRelative, yTiltRelative; // tilt values relative to centre tilt
@@ -1259,7 +1266,7 @@ class ImagingFunctions
 			}
 		}
 
-		positionDebugWindow(debugMode); //Return View Window to the front if it is not all ready
+		GetScriptObjectFromID(CameraControlObjectID).positionViewWindow(); //Return View Window to the front if it is not all ready
 		
 		GetScriptObjectFromID(ImageSetToolsID).exportImageSetAsGTG(ImageSet); // Save the image set tag group as its own file.
 		GetScriptObjectFromID(ProgressBarDialogID).EndProgress();
@@ -1295,7 +1302,7 @@ class ImagingFunctions
 		GetScriptObjectFromID(CameraControlObjectID).storeCameraDetails();
 		
 		image viewImage;
-		if(!returnViewImage(debugMode, viewImage)){
+		if(GetScriptObjectFromID(CameraControlObjectID).returnViewImage(viewImage) == false){
 			result("\nNo view Image detected. This error should not be possible, but here we are.");
 		}	
 
@@ -1624,7 +1631,7 @@ class ImagingFunctions
 	{
 		// Get the total number of ROI on the screen
 		ImageDisplay viewDisplay
-		if(!returnViewImageDisplay(debugMode, viewDisplay)){
+		if(GetScriptObjectFromID(CameraControlObjectID).returnViewImageDisplay(viewDisplay) == false){
 			result("\n\n No Live View window found");
 			return 0;
 		}
@@ -1729,7 +1736,7 @@ class ImagingFunctions
 		number ROITracker = GetScriptObjectFromID(dataObjectID).getROITracker(); // This value determines which ROI to go to.
 		if(debugMode==1){result("\n\tROITracker = " + ROITracker);}
 		ImageDisplay viewDisplay;
-		if(!returnViewImageDisplay(debugMode, viewDisplay)){
+		if(GetScriptObjectFromID(CameraControlObjectID).returnViewImageDisplay(viewDisplay) == false){
 			result("\nNo active View Window detected. This should never happen.");
 			return;
 		}

@@ -32,9 +32,6 @@ object startToolkit () {
 	result("\nLoading Camera Controls...");
 	object theCameraControlObject = alloc(CameraControl);
 	
-	result("\nLoading View Window Controls...");
-	object theLiveViewControls = alloc(LiveViewControlsClass);
-	
 	result("\nCreating KeyListener for shortcut commands...");
 	// Create objects that will be used later but must be created now before the class drops from scope
 	object KeyListener=alloc(MyKeyHandler); // Key handler for the view Window for shortcut key presses. Not attached yet.
@@ -65,7 +62,6 @@ object startToolkit () {
 	result("\nAttaching data store to Toolkit...");
 	Toolkit.storeDataObject(dataObject); // Needs only Toolkit to be loaded.
 	Toolkit.storeCameraControlObject(theCameraControlObject); // uses dataObject
-	Toolkit.storeLiveViewControls(theLiveViewControls); // uses dataObject, CameraControls.
 	Toolkit.storeCalibrationDialog(calibrationDialog); // uses dataObject
 	Toolkit.storeAlignmentDialog(alignmentDialog); // uses dataObject
 	Toolkit.storeTiltDialog(tiltDialog); // uses DataObject
@@ -96,14 +92,6 @@ void main()
 	
 	result("\nLoading complete.");
 	Toolkit.printAllValues();
-		// Note: The script looks for a view window here.
-	image viewImage;
-	if(!returnViewImage(0, viewImage)){
-		result("\nNo View Window detected. Many controls will not be accessible or could cause crashes."\
-		+ "\nIf you open a live View window later you can 'capture' it on the calibration panel.");
-	} else {
-		Toolkit.captureViewScreen();
-	}
 	
 	// Forces the user to choose the save directory
 	result("\nPlease select an auto-save directory for images made by this script.")

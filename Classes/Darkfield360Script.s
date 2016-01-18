@@ -1,6 +1,6 @@
 /*
 	This file goes at the very start of the DF360 script. It contains functions and variables that can be used globally.
-	The toolkit button icons are also defined here.
+	The toolkit buttons are also defined here.
 */
 
 
@@ -620,95 +620,6 @@ void findImageShift(image refIm, image newIm, number &XShift, number &YShift, nu
 	XShift = mpX - trunc( xSize / 2 ); // Shift in x-pixel coord.
 	YShift = mpY - trunc( ySize / 2 ); // Shift in y-pixel coord.
 	result("\n\txShift = " + xShift + "\n\tyShift = " + yShift);
-}
-
-// ************************************
-//  IMAGE / WINDOW ID AND POSITIONING
-// ************************************
-
-/* Function to pass the VIEW window to a variable. It will return 1 if the window is real and 0 if it is not present */
-number returnViewWindow (number debugMode, DocumentWindow &viewWindow){
-	number i = 0;
-	DocumentWindow thisViewWindow;
-	DocumentWindow window = GetDocumentWindow( i );
-	while( window.WindowIsValid( ) ) {
-		string titleString = window.WindowGetTitle();
-		number index = titleString.find(":"); // Looks for : to ID windows
-		if(index != -1){ //No ':' means no letter-ID at the title start, and it isn't the View window
-			string cutTitle = titleString.right(titleString.len() - index - 2); // Gets rid of : and a space
-			if(cutTitle=="View"){ // If it is this window...
-				thisViewWindow = GetDocumentWindowByTitle( titleString );
-				break;
-			}
-		}
-		i++;
-		window = GetDocumentWindow( i );
-	}
-	if(!thisViewWindow.WindowIsValid()){
-		result("\nView window not present.")
-		return 0;
-	} else {
-		viewWindow = thisViewWindow;
-		return 1;
-	}
-}
-
-/* Function to pass the VIEW window's image document to other functions. */
-number returnViewImageDocument(number debugMode, ImageDocument &viewImageDocument){
-	//if(debugMode==1){result("\nReturnViewImageDocument()");}
-	DocumentWindow viewWindow;
-	if(returnViewWindow(debugMode, viewWindow)){
-		viewImageDocument = viewWindow.ImageWindowGetImageDocument();
-		return 1;
-	} else {
-		return 0;
-	}
-}
-
-/* Function to pass the VIEW window's image to other functions. */
-number returnViewImage(number debugMode, image &viewImage){
-	ImageDocument viewImageDocument;
-	if(returnViewImageDocument(debugMode, viewImageDocument)){
-		viewImage := viewImageDocument.ImageDocumentGetImage(0);
-		return 1;
-	} else {
-		return 0;
-	}
-}
-
-/* Function to pass the VIEW window's imageDisplay to other functions. */
-number  returnViewImageDisplay(number debugMode, imageDisplay &viewImageDisplay){
-	Image viewImage;
-	if(returnViewImage(debugMode, viewImage)){
-		viewImageDisplay = viewImage.ImageGetImageDisplay(0);
-		return 1;
-	} else {
-		return 0;
-	}
-}
-
-/* Function to reposition the window positions when debug mode is active.
-	the view window will be brought back to the front.
-	Could be done in the debug functions themselves with a quick call,
-		but this might be further customized later.
-	Idea: Make the new images cascade
-*/
-void positionDebugWindow(number debugMode){
- //void WindowSetFramePosition( DocumentWindow window, Number x, Number y ) 
- //Sets the position of the top-left corner of the frame area of the 'window'.
- //void WindowGetFramePosition( DocumentWindow window, NumberVariable x, NumberVariable y ) 
- //Gets the position of the top-left corner of the frame area of the 'window'.
-
- //void WindowSelect( DocumentWindow window )
- //Brings 'window' to the front. 
-	documentWindow viewWindow;
-	image viewImage;
-	if(returnViewWindow(debugMode, viewWindow)){
-		WindowSelect( viewWindow );
-		if(returnViewImage(debugMode, viewImage)){
-			UpdateImage(viewImage);
-		}
-	}
 }
 
 // ************************************
@@ -4125,6 +4036,16 @@ class CameraControl
 	TagGroup ImagingModes; // Taglist of the names used for imaging modes
 	TagGroup DiffractionModes;// Taglist of names used for diffraction modes
 
+	/* These are components displayed on the Live View Window which the user interacts with */
+	component markerRing;
+	component ringRadiusText;
+	
+	/* The various aspects of the View Window the toolkit needs to know about */
+	DocumentWindow ViewWindow;
+	Image ViewImage;
+	ImageDocument ViewImageDocument;
+	ImageDisplay ViewImageDisplay;
+	
 	// Function to print out the various saved variables for debugging
 	void printAllValues(object self)
 	{
@@ -4147,15 +4068,49 @@ class CameraControl
 		result(textstring);
 		result("\n-------End----------------");
 	}
-	// Check if the microscope is online and if there is a Live View Image
+	
+	/* Function to locate and store the VIEW window and its various components.
+			It will return 1 if the window is found and 0 if it is not present
+	*/
+	
+	number findLiveView (object self){
+		number i = 0;
+		DocumentWindow thisViewWindow;
+		DocumentWindow window = GetDocumentWindow( i );
+		while( window.WindowIsValid( ) ) {
+			string titleString = window.WindowGetTitle();
+			number index = titleString.find(":"); // Looks for : to ID windows
+			if(index != -1){ //No ':' means no letter-ID at the title start, and it isn't the View window
+				string cutTitle = titleString.right(titleString.len() - index - 2); // Gets rid of : and a space
+				if(cutTitle=="View"){ // If it is this window...
+					thisViewWindow = GetDocumentWindowByTitle( titleString );
+					break;
+				}
+			}
+			i++;
+			window = GetDocumentWindow( i );
+		}
+		if(!thisViewWindow.WindowIsValid()){
+			result("\nView window not present.")
+			return 0;
+		} else {
+			viewWindow = thisViewWindow;
+			viewImageDocument = viewWindow.ImageWindowGetImageDocument();
+			viewImage := viewImageDocument.ImageDocumentGetImage(0);
+			viewImageDisplay = viewImage.ImageGetImageDisplay(0);
+			return 1;
+		}
+	}
+	
+	// Check if the microscope is online and if there is a Live View Image captured
 	void updateEMstatus(object self)
 	{
 		EMOnline = EMIsReady();
-		if(!EMOnline){
+		if(EMOnline == false){
 			AllowControl = 0;
 		} else {
 			image viewImage
-			if(!returnViewImage(debugMode, viewImage)){
+			if(viewImage.ImageIsValid() == false){
 				AllowControl = 0; //No View image, so no live camera control yet.
 			} else {
 				AllowControl = 1; // View window and microscope detected.
@@ -4196,21 +4151,14 @@ class CameraControl
 		return 0;
 	}
 	
-	
-	void initialise(object self, number theToolkitID, number theDataObjectID){
-		ToolkitID = theToolkitID;
-		dataObjectID = theDataObjectID;
-		
-		self.updateEMstatus(); // set the AllowControl variable asap.
-		
-		DFExposure = GetScriptObjectFromID(dataObjectID).getDFExposure(); // # of seconds to expose the camera for taking DarkField images.
-		DPExposure = GetScriptObjectFromID(dataObjectID).getDPExposure(); // # of seconds to expose the camera for taking Diffraction Pattern images.
-		BFExposure = GetScriptObjectFromID(dataObjectID).getBFExposure(); // # of seconds to expose the camera for taking BrightField images.
-
-		// Default starting values for the different imaging modes. A way to edit these can be added later.
-		DiffractionModes = GetScriptObjectFromID(dataObjectID).getDiffractionModes();
-		ImagingModes = GetScriptObjectFromID(dataObjectID).getImagingModes();		
-	}
+	/* Function to centre beam */
+	void beamCentre(object self){
+		if(AllowControl == true){
+			number centreXTilt = GetScriptObjectFromID(dataObjectID).getCentreXTilt();
+			number centreYTilt = GetScriptObjectFromID(dataObjectID).getCentreYTilt();
+			moveBeamTilt ( centreXTilt, centreYTilt );
+		}
+	}	
 
 	void setDebugMode(object self, number input)
 	{
@@ -4243,12 +4191,12 @@ class CameraControl
 		
 		// Find binning by comparing raw camera width with view window width
 		image viewImage;
-		if(!returnViewImage(debugMode, viewImage)){
-			result("\nNo View Image detected when capturing Live View Window.")
+		if(viewImage.ImageIsValid() == false){
+			result("\nView Image is invalid.")
 			return 0;
 		}
 		number viewWidth, viewHeight;
-		getSize(viewImage, viewWidth, viewHeight);
+		ViewImage.getSize(viewWidth, viewHeight);
 		binningMultiplier = cameraWidth / viewWidth;
 		if(binningMultiplier < 1){
 			result("\nBinning Multiplier found to be out of range (<1). Setting multiplier to 1.")
@@ -4262,15 +4210,9 @@ class CameraControl
 	number getCameraWidth(object self) {
 		return cameraWidth;
 	}
-	void setCameraWidth(object self, number newValue) {
-		cameraWidth = newValue;
-	}
 	
 	number getCameraHeight(object self) {
 		return cameraHeight;
-	}
-	void setCameraHeight(object self, number newValue) {
-		cameraHeight = newValue;
 	}
 
 	number getDFExposure(object self) {
@@ -4301,21 +4243,451 @@ class CameraControl
 		return binningMultiplier;
 	}
 
-	/* Function to get VIEW image xscale despite the mis-calibration of our 2100 */
+	// ************************************
+	//  IMAGE / WINDOW ID AND POSITIONING
+	// ************************************
+	
+	/* Function to return the VIEW window to a variable.
+		It will return 1 if the window is real and 0 if it has not been set. */
+	
+	number returnViewWindow(object self, DocumentWindow &theViewWindow)
+	{
+		if(!ViewWindow.WindowIsValid()){
+			result("\nView window not present.");
+			return 0;
+		} else {
+			theViewWindow = viewWindow;
+			return 1;
+		}
+	}
+	
+	/* Function to pass the VIEW window's image document to other functions.
+			It will return 1 if the window is real and 0 if it has not been set. */
+	
+	number returnViewImageDocument(object self, ImageDocument &theViewImageDocument)
+	{
+		if(!ViewWindow.WindowIsValid()){
+			result("\nView window not present.");
+			return 0;
+		} else {
+			theViewImageDocument = ViewImageDocument;
+			return 1;
+		}
+	}
+
+	/* Function to pass the VIEW window's image to other functions.
+		It will return 1 if the window is real and 0 if it has not been set. */
+		
+	number returnViewImage(object self, image &theViewImage)
+	{
+		if(!ViewWindow.WindowIsValid()){
+			result("\nView window not present.");
+			return 0;
+		} else {
+			theViewImage := ViewImage;
+			return 1;
+		}
+	}
+
+	/* Function to pass the VIEW window's imageDisplay to other functions.
+		It will return 1 if the window is real and 0 if it has not been set. */
+		
+	number  returnViewImageDisplay(object self, imageDisplay &theViewImageDisplay)
+	{
+		if(!ViewWindow.WindowIsValid()){
+			result("\nView window not present.");
+			return 0;
+		} else {
+			theViewImageDisplay = ViewImageDisplay;
+			return 1;
+		}
+	}
+
+	/* Function to reposition the window */
+	
+	void positionViewWindow(object self)
+	{
+		//void WindowSetFramePosition( DocumentWindow window, Number x, Number y ) 
+		//Sets the position of the top-left corner of the frame area of the 'window'.
+		//void WindowGetFramePosition( DocumentWindow window, NumberVariable x, NumberVariable y ) 
+		//Gets the position of the top-left corner of the frame area of the 'window'.
+		//void WindowSelect( DocumentWindow window )
+		//Brings 'window' to the front. 
+		if(!ViewWindow.WindowIsValid()){
+			return;
+		} else {
+			WindowSelect( ViewWindow );
+			UpdateImage(ViewImage);
+		}
+	}
+	
+	/* Function to get VIEW image xscale despite the mis-calibration of our 2100 and the use of a binning multiplier */
 	number getViewScale(object self){
 		number xscale=1;
 		xscale = binningMultiplier * GetScriptObjectFromID(dataObjectID).getRefScale();
 		return xscale;
 	}
 	
-	/* Function to centre beam */
-	void beamCentre(object self){
-		if(self.getAllowControl() == true){
-			number centreXTilt = GetScriptObjectFromID(dataObjectID).getCentreXTilt();
-			number centreYTilt = GetScriptObjectFromID(dataObjectID).getCentreYTilt();
-			moveBeamTilt ( centreXTilt, centreYTilt );
+	
+	// ************************************
+	//  Component Drawing (no dependancies)
+	// ************************************
+	
+	/* Function to draw the lines on an image used to centre the beam and pick spots (not the central ring marker)
+		canEdit = 0 sets the lines to be non-selectable.
+	*/
+	
+	void drawReticle(object self, image targetImage, number canEdit)
+	{
+		number centrex, centreY, radius, width, height;
+		getSize(targetImage, width, height );
+		
+		centreX = (width) / 2;
+		centreY = (height) / 2;
+		
+		//Component NewLineAnnotation( Number top, Number left, Number bottom, Number right )
+		Component line1 = NewLineAnnotation( 0, 0, height, width );
+		Component line2 = NewLineAnnotation( height, 0, 0, width );
+		
+		//Component NewOvalAnnotation( Number top, Number left, Number bottom, Number right )
+		radius = 10; // Radius of the circle in pixels.
+		number cTop = centreY - radius;
+		number cBottom = centreY + radius;
+		number cLeft = centreX - radius;
+		number cRight = centreX + radius;
+		Component circle1 = NewOvalAnnotation( cTop , cLeft, cBottom, cRight );
+
+		// Set colour and stuff
+		line1.componentsetfillmode(2); // mode 2 is not filled. Important for circles.
+		line2.componentsetfillmode(2);
+		circle1.componentsetfillmode(2);
+		line1.componentsetdrawingmode(2); // mode 1 outlines the shape in the background colour
+		line2.componentsetdrawingmode(2);
+		circle1.componentsetdrawingmode(2);
+		line1.componentsetforegroundcolor(1,0,0); // Colour that the shape is drawn in
+		line2.componentsetforegroundcolor(1,0,0);
+		circle1.componentsetforegroundcolor(1,0,0);
+		line1.componentsetbackgroundcolor(0,0,0); // Colour the shape is outlined in.
+		line2.componentsetbackgroundcolor(0,0,0);
+		circle1.componentsetbackgroundcolor(0,0,0);
+		// Add the components to the image display
+		ImageDisplay targetDisplay = targetImage.ImageGetImageDisplay(0);
+		Component comp = targetDisplay;
+		comp.ComponentAddChildAtEnd( line1 );
+		comp.ComponentAddChildAtEnd( line2 );
+		comp.ComponentAddChildAtEnd( circle1 );
+
+		if(canEdit == false)
+		{
+			// Make the lines not selectable.
+			line1.ComponentSetSelectable(0);
+			line2.ComponentSetSelectable(0);
+			circle1.ComponentSetSelectable(0);
 		}
-	}	
+	}
+	
+	/* Function to make the reticle, lines, etc. of any image deletable and selectable */
+	void cleanReticle(object self, image targetImage)
+	{
+		ImageDisplay imageDisp = targetImage.ImageGetImageDisplay( 0 );
+		Number compCount =  ComponentCountChildren( imageDisp );
+		for(number i=0;i < compCount;i++){
+			component annotid=imageDisp.ComponentGetChild(i);	
+			annotid.ComponentSetSelectable(1);
+			annotid.ComponentSetDeletable(1);
+		}	
+	}
+	
+	/* Function to draw the lines on the View Window used to centre the beam and pick spots.
+		If updateToolkit = 1, Adds the ring marker and stores it in the toolkit.
+		Also creates a text component to update with ring diameter.
+	*/
+	
+	void drawReticleOnLiveView(object self)
+	{		
+		self.drawReticle(ViewImage, 0); // draw the aiming lines.
+		
+		Component comp = ViewImageDisplay;
+		
+		number width, height;
+		getSize(ViewImage, width, height );
+		
+		number centreX = (width) / 2;
+		number centreY = (height) / 2;
+		
+		/* This is the ring used to mark out a target for the ring collection method. */
+		//Component NewOvalAnnotation( Number top, Number left, Number bottom, Number right )
+		number radius = 100; // Radius of the circle in pixels.
+		number cTop, cBottom, cLeft, cRight;
+		cTop = centreY - radius;
+		cBottom = centreY + radius;
+		cLeft = centreX - radius;
+		cRight = centreX + radius;
+		component newMarkerRing
+		newMarkerRing = NewOvalAnnotation( cTop , cLeft, cBottom, cRight ); // This loads the component into the toolkit as well.
+
+		// Set colour and stuff
+		newMarkerRing.componentsetfillmode(2); // mode 2 is not filled. Important for circles.
+		newMarkerRing.componentsetdrawingmode(2); // mode 1 outlines the shape in the background colour
+		newMarkerRing.componentsetforegroundcolor(1,0,0);// Colour that the shape is drawn in
+		newMarkerRing.componentsetbackgroundcolor(0,0,0); // Colour the shape is outlined in.
+
+		// Add the component to the image document
+		comp.ComponentAddChildAtEnd( newMarkerRing );
+		ComponentSetVisible( newMarkerRing, 1 ); // Make it visible on start up
+		ComponentSetDeletable (newMarkerRing, 0); // Cannot be deleted until 'cleaned up'
+		
+		markerRing = newMarkerRing; // stores the marker ring object in the toolkit for future reference.
+
+		/* This is the text component to display the ring radius. */
+		string textString = "D-Spacing: ";
+		// Add text annotations and set their colour, display mode and font
+		component newRingRadiusText;
+		newRingRadiusText=newtextannotation(10,height - 32, textString, 16);
+		newRingRadiusText.componentsetfillmode(2);
+		newRingRadiusText.componentsetdrawingmode(2);
+		newRingRadiusText.componentsetforegroundcolor(1,0,0);
+		newRingRadiusText.componentsetbackgroundcolor(0,0,0);
+		newRingRadiusText.componentsetfontfacename("Microsoft Sans Serif");
+	
+		// Add the component to the image document
+		comp.ComponentAddChildAtEnd( newRingRadiusText );
+		ComponentSetVisible( newRingRadiusText, 1 ); // Show it initially
+		newRingRadiusText.ComponentSetSelectable(0);
+		ringRadiusText = newRingRadiusText;
+	}
+	
+	/* Code run to link an active View image / window to the Toolkit and set up short cut keys and things.
+		Requires DataObject	
+	*/
+	
+	void captureViewScreen (object self)
+	{
+		self.findLiveView();
+		self.updateEMstatus();
+		
+		if(AllowControl == false){
+			result("\n\nNo Control Permitted. Ensure a live view window is active and the microscope is online.");
+			return;
+		}
+		GetScriptObjectFromID(dataObjectID).setCentreTiltHere(); // set this here to avoid false tilt values.
+		if(debugMode == true){result("\nCapturing View Window...");}
+		if(self.storeCameraDetails() == 0){  // Stores camera width, height and binning multiplier.
+			result("\nError finding camera information.");
+			throw("Error finding Camera Information");
+		}
+		
+		self.drawReticleOnLiveView();
+		if(debugMode==1){result("\n\tReticle added to View window.");}
+
+		number scaleX = ImageGetDimensionScale( viewImage, 0 );
+		GetScriptObjectFromID(dataObjectID).setOriginalScale(scaleX);
+		string scaleString = ImageGetDimensionUnitString( viewImage, 0 );
+		GetScriptObjectFromID(dataObjectID).setOriginalScaleString(scaleString);
+		if(debugMode==1){
+			result("\n\tThe View window scale was initially set to " + GetScriptObjectFromID(dataObjectID).getOriginalScale() + " " + GetScriptObjectFromID(dataObjectID).getOriginalScaleString());
+		}
+		return;
+	}
+	
+	//********************************
+	// RING CONTROL FUNCTIONS
+	//********************************
+	
+	/* Function to make a marker circle component that can be assigned to any image.
+		This is intended as a marker ring that is not linked to the ring-capture controls, just to show things. 
+		Will return the Circle component if you want to use it.
+	*/
+	
+	component makeNewCircle(object self, image targetImage, number radiusPX, string radiusTextString, rgbnumber componentColour)
+	{
+		component greenCircle;
+		number centreX, centreY;
+		getSize(targetImage, centreX, centreY);
+		centreX = centreX / 2;
+		centreY = centreY / 2;
+		number cTop = centreY - radiusPX;
+		number cBottom = centreY + radiusPX;
+		number cLeft = centreX - radiusPX;
+		number cRight = centreX + radiusPX;
+		greenCircle = NewOvalAnnotation( cTop , cLeft, cBottom, cRight );
+		
+		// Set colour and stuff
+		number redNumber, blueNumber, greenNumber;
+		redNumber = red(componentColour) / 255;
+		blueNumber = blue(componentColour) / 255;
+		greenNumber = green(componentColour) / 255;
+		greenCircle.componentsetfillmode(2); // mode 2 is not filled. Important for circles.
+		greenCircle.componentsetdrawingmode(2); // mode 1 outlines the shape in the background colour, mode 2 does foreground (?)
+		greenCircle.componentsetforegroundcolor(redNumber, greenNumber, blueNumber);// Colour that the shape is drawn in
+		greenCircle.componentsetbackgroundcolor(0,0,0); // Colour the shape is outlined in.
+
+		// Add the component to the image document
+		ImageDisplay targetDisplay = targetImage.ImageGetImageDisplay(0);
+		Component comp = targetDisplay;
+		comp.ComponentAddChildAtEnd( greenCircle );
+		
+		// Text Stuff
+		component radiusText;
+		radiusText=newtextannotation(10, 10, radiusTextString, 16); // Put this one near the top
+		radiusText.componentsetfillmode(2);
+		radiusText.componentsetdrawingmode(2)			;
+		radiusText.componentsetforegroundcolor(redNumber, greenNumber, blueNumber);
+		radiusText.componentsetbackgroundcolor(0,0,0);
+		radiusText.componentsetfontfacename("Microsoft Sans Serif");
+
+		// Add the component to the image document
+		comp.ComponentAddChildAtEnd( radiusText );
+		return greenCircle;
+	}
+	
+	/* Function to change the visibility of the marker ring and any attached text.
+		Select the component to make it easy to see and work with. */
+	
+	void toggleMarkerRing (object self)
+	{
+		if(!markerRing.ComponentIsValid()){
+			result("\nNo marker ring found");
+			return;
+		}
+		if(debugMode==true){result("\nmarkerRing object is valid");}
+		if(debugMode==true){result("\n\tmarkerRing Get Visible: " + ComponentGetVisible( markerRing ) );}
+		if( ComponentGetVisible( markerRing ) == 1 ){
+			ComponentSetVisible( markerRing, 0 );
+			ComponentSetVisible( ringRadiusText, 0 );
+			ComponentSetSelected( markerRing, 0 );
+		} else {
+			ComponentSetVisible( markerRing, 1 );
+			ComponentSetVisible( ringRadiusText, 1 );
+			ComponentSetSelected( markerRing, 1 );
+		}
+		return;
+	}
+	
+	/* Function to update a text component with the radius of a diffraction ring. */
+	void updateRadius (object self)
+	{
+		if(!markerRing.ComponentIsValid()){
+			result("\nNo marker ring found");
+			return;
+		}
+		if(debugMode==true){result("\n\tUpdating Radius...");}
+		// void ComponentGetBoundingRect( Component comp, NumberVariable t, NumberVariable l, NumberVariable b, NumberVariable r )
+		number measuredRadiusPX, measuredRadiusNM, top, bottom, left, right, scaleX, scaleY;
+		markerRing.ComponentGetBoundingRect( top, left, bottom, right );
+		measuredRadiusPX = (bottom - top) / 2;
+		if(debugMode==true){result("\nmeasuredRadiusPX = " + measuredRadiusPX);}
+		scaleX = self.getViewScale();
+		if(debugMode==true){result("\nscaleX = " + scaleX);}
+		measuredRadiusNM = measuredRadiusPX * scaleX;
+		number measureRadiusAngstrom = 10 / measuredRadiusNM;
+		ringRadiusText.TextAnnotationSetText("D-Spacing: " + measuredRadiusNM + " (1/nm)   /   " + measureRadiusAngstrom + " A");
+		return;
+	}
+	
+	/* Function to set the markerRing to a desired radius (in 1/nm) */
+	
+	void setRingRadius (object self, number desiredRadiusNM)
+	{
+		if(!markerRing.ComponentIsValid()){
+			result("\nNo marker ring found");
+			return;
+		}
+		number measuredRadiusPX, desiredRadiusPX, top, bottom, left, right, scaleX, scaleY, centreX, centreY;
+		markerRing.ComponentGetBoundingRect( top, left, bottom, right );
+		measuredRadiusPX = (bottom - top) / 2;
+		centreX = right - measuredRadiusPX;
+		centreY = bottom - measuredRadiusPX;
+		if((binningMultiplier==0) || (binningMultiplier.isNaN())){
+			throw("Please calibrate the toolkit first");
+		}
+		scaleX = self.getViewScale();
+		desiredRadiusPX = desiredRadiusNM / scaleX;
+		if(debugMode==true){result("\nscaleX = " + scaleX);}
+		if(debugMode==true){result("\ndesiredRadiusNM: " + desiredRadiusNM + " (1/nm)");}
+		
+		top = centreY + desiredRadiusPX;
+		bottom = centreY - desiredRadiusPX;
+		right = centreX + desiredRadiusPX;
+		left = centreX - desiredRadiusPX;
+		markerRing.ComponentSetRect( top, left, bottom, right );
+		return;
+	}
+
+	/* Function to put the marker ring back on the central spot and make it circular. */
+	void recenterMarkerRing (object self)
+	{
+		if(!markerRing.ComponentIsValid()){
+			result("\nNo marker ring found");
+			return;
+		}
+		number top, bottom, left, right, centreX, centreY;
+		// Check if calibrated yet. Stop if not.
+		if((binningMultiplier==0) || (binningMultiplier.isNaN())){
+			throw("Please calibrate the toolkit first");
+		}
+		
+		centreX = cameraWidth / (2 * binningMultiplier);
+		centreY = cameraHeight / (2 * binningMultiplier);
+		if(debugMode==true){result("\nCenter of View window = (" + centreX + ", " + centreY + ")");}
+			
+		markerRing.ComponentGetBoundingRect( top, left, bottom, right );
+		number measuredRadiusPXVertical = (bottom - top) / 2;
+		number measuredRadiusPXHorizontal = (right - left) / 2;
+		// Pick the largest one.
+		number measuredRadiusPX = (measuredRadiusPXVertical > measuredRadiusPXHorizontal) ? measuredRadiusPXVertical : measuredRadiusPXHorizontal;
+		if(debugMode==true){result("\nRing radius measured as " + measuredRadiusPX + "px");}
+		
+		top = centreY + measuredRadiusPX;
+		bottom = centreY - measuredRadiusPX;
+		right = centreX + measuredRadiusPX;
+		left = centreX - measuredRadiusPX;
+		markerRing.ComponentSetRect( top, left, bottom, right );
+		if(debugMode==true){result("\nRectangle set to [" + top + ", " + left + ", " + bottom + ", " + right + " ]");}
+		return;
+	}
+
+	/* Function to return the radius of the marker ring in pixels for unbinned images */
+	
+	 number markerRingRadius(object self)
+	 {
+		number beamPixelCentreX, beamPixelCentreY, tiltVectorX, tiltVectorY, targetRadiusPX, scaleX, scaleY;
+		scaleX = GetScriptObjectFromID(dataObjectID).getRefScale(); // Scales for an unbinned image
+		scaleY = GetScriptObjectFromID(dataObjectID).getRefScale(); 
+		beamPixelCentreX = cameraWidth / 2;
+		beamPixelCentreY = cameraHeight / 2;
+		
+		number top, bottom, left, right;
+		markerRing.ComponentGetRect(top, left, bottom, right );
+		if(debugMode==true){result("\nRing rectangle: " + top + ", " + left + ", " + bottom + ", " + right);}
+		
+		targetRadiusPX = ( right - left )/2;
+		if(debugMode==true){result("\nRing radius measured as: " + targetRadiusPX + "px");}
+		targetRadiusPX = targetRadiusPX * binningMultiplier;
+		if(debugMode==true){result("\nAt full scale this is: " + targetRadiusPX + "px");}
+		return targetRadiusPX;
+	 }
+	
+	void initialise(object self, number theToolkitID, number theDataObjectID){
+		ToolkitID = theToolkitID;
+		dataObjectID = theDataObjectID;
+		
+		self.findLiveView(); // Look for a Live View window and store it.
+		self.updateEMstatus(); // set the AllowControl variable. Uses results of findLiveView and checks if microscope is turned on.
+		
+		DFExposure = GetScriptObjectFromID(dataObjectID).getDFExposure(); // # of seconds to expose the camera for taking DarkField images.
+		DPExposure = GetScriptObjectFromID(dataObjectID).getDPExposure(); // # of seconds to expose the camera for taking Diffraction Pattern images.
+		BFExposure = GetScriptObjectFromID(dataObjectID).getBFExposure(); // # of seconds to expose the camera for taking BrightField images.
+
+		// Default starting values for the different imaging modes. A way to edit these can be added later.
+		DiffractionModes = GetScriptObjectFromID(dataObjectID).getDiffractionModes();
+		ImagingModes = GetScriptObjectFromID(dataObjectID).getImagingModes();
+		
+		// The CameraControlObject can try to capture the view screen here since this initialisation is done on start up only.
+		if(ViewImage.ImageIsValid()){
+			self.captureViewScreen();
+		}
+	}
 	
 	// constructor
 	CameraControl(object self){
@@ -4324,7 +4696,7 @@ class CameraControl
 	
 	// destructor
 	~CameraControl(object self){
-		if(debugMode == 1){result("\nCameraControl object deleted.");}
+		if(debugMode == 1){result("\nCameraControl object " + self.ScriptObjectGetID() + " deleted.");}
 	}
 }
 
@@ -4402,7 +4774,8 @@ class LiveViewControlsClass
 		}
 	}
 	
-	/* Function to return the VIEW window to a variable. It will return 1 if the window is real and 0 if it has not been set. */
+	/* Function to return the VIEW window to a variable.
+		It will return 1 if the window is real and 0 if it has not been set. */
 	
 	number returnViewWindow(object self, DocumentWindow &theViewWindow)
 	{
@@ -4604,7 +4977,9 @@ class LiveViewControlsClass
 		ringRadiusText = newRingRadiusText;
 	}
 	
-	/* Code run to link an active View image / window to the Toolkit and set up short cut keys and things. */
+	/* Code run to link an active View image / window to the Toolkit and set up short cut keys and things.
+		Requires CameraControlObject and DataObject	
+	*/
 	void captureViewScreen (object self)
 	{
 		GetScriptObjectFromID(CameraControlObjectID).updateEMstatus();
@@ -6236,7 +6611,14 @@ class ProgressDialog : uiframe
 // IMAGE TAKING FUNCTIONS
 //****************************************************
 
-// The Image-taking functions. These use the data from other classes to take images, save them.
+// Requires the following objects be loaded before it:
+//		dataObject
+//		imageSetTools
+//		CameraControlObject
+//		ProgressBarDialog
+//		LiveViewControls
+
+// The Image-taking functions. These use the data from other classes to take images and save them.
 
 class ImagingFunctions
 {
@@ -6244,10 +6626,10 @@ class ImagingFunctions
 	number ToolkitID;
 	number dataObjectID;
 	number imageSetToolsID;
-	number debugMode;
 	number CameraControlObjectID;
 	number ProgressBarDialogID;
 	
+	number debugMode;
 	number isCalibrated; // 0/1 to check if the calibration is done
 	
 	number getIsCalibrated (object self){
@@ -6377,7 +6759,7 @@ class ImagingFunctions
 		if(debugMode==true)
 		{
 			result("\nCreating the tilt coordinate. Shadowing distance is set to " + shadowDistance + "(1/nm)");
-			positionDebugWindow(debugMode);
+			GetScriptObjectFromID(CameraControlObjectID).positionViewWindow();
 		}
 		
 		number xTiltRelative, yTiltRelative; // tilt values relative to centre tilt
@@ -7493,7 +7875,7 @@ class ImagingFunctions
 			}
 		}
 
-		positionDebugWindow(debugMode); //Return View Window to the front if it is not all ready
+		GetScriptObjectFromID(CameraControlObjectID).positionViewWindow(); //Return View Window to the front if it is not all ready
 		
 		GetScriptObjectFromID(ImageSetToolsID).exportImageSetAsGTG(ImageSet); // Save the image set tag group as its own file.
 		GetScriptObjectFromID(ProgressBarDialogID).EndProgress();
@@ -7529,7 +7911,7 @@ class ImagingFunctions
 		GetScriptObjectFromID(CameraControlObjectID).storeCameraDetails();
 		
 		image viewImage;
-		if(!returnViewImage(debugMode, viewImage)){
+		if(GetScriptObjectFromID(CameraControlObjectID).returnViewImage(viewImage) == false){
 			result("\nNo view Image detected. This error should not be possible, but here we are.");
 		}	
 
@@ -7858,7 +8240,7 @@ class ImagingFunctions
 	{
 		// Get the total number of ROI on the screen
 		ImageDisplay viewDisplay
-		if(!returnViewImageDisplay(debugMode, viewDisplay)){
+		if(GetScriptObjectFromID(CameraControlObjectID).returnViewImageDisplay(viewDisplay) == false){
 			result("\n\n No Live View window found");
 			return 0;
 		}
@@ -7963,7 +8345,7 @@ class ImagingFunctions
 		number ROITracker = GetScriptObjectFromID(dataObjectID).getROITracker(); // This value determines which ROI to go to.
 		if(debugMode==1){result("\n\tROITracker = " + ROITracker);}
 		ImageDisplay viewDisplay;
-		if(!returnViewImageDisplay(debugMode, viewDisplay)){
+		if(GetScriptObjectFromID(CameraControlObjectID).returnViewImageDisplay(viewDisplay) == false){
 			result("\nNo active View Window detected. This should never happen.");
 			return;
 		}
@@ -8034,7 +8416,6 @@ void printCommands(){
 	result("\n\t's' to store a diffraction spot's coordinates. (Disabled for testing)");
 	result("\n\t'n' to cycle through any marked ROI points and the central beam location.")
 	result("\n\t'p' to view the stored image sets.");
-	result("\n\t'p' in debug mode to print out a detailed list of debugging information");
 	result("\n\t'1' to show the ring marker and measuring system.");
 	result("\n\t'2' to move the marker ring to a different D-Spacing.");
 	result("\n\t'3' to update the ring-mode radius display.");
@@ -8049,7 +8430,6 @@ class MyKeyHandler
 	number ImageSetToolsID; // ID of the imageset tools object
 	number ImagingFunctionsID; // ID of the imagingFunctions object
 	number CameraControlObjectID;
-	number LiveViewControlsID;
 	number debugMode
 
 	// Need undo command?
@@ -8070,14 +8450,13 @@ class MyKeyHandler
 
 	
 	/* Function stores the dataObject's ID so it can reference itself later. */
-	image initialise(object self, number theToolkitID, number theDataObjectID, number theImageSetToolsID, number theImagingFunctionsID, number theCameraControlObjectID, number theLiveViewControlsID)
+	image initialise(object self, number theToolkitID, number theDataObjectID, number theImageSetToolsID, number theImagingFunctionsID, number theCameraControlObjectID)
 	{
 			ToolkitID = theToolkitID;  // the ID of the Object which this entire handler is contained inside.
 			dataObjectID = theDataObjectID;
 			ImageSetToolsID = theImageSetToolsID;
 			ImagingFunctionsID = theImagingFunctionsID;
 			CameraControlObjectID = theCameraControlObjectID;
-			LiveViewControlsID = theLiveViewControlsID
 	}
 	/* Function stores the ID of a key listener and loads the dataObject's values into itself */
 	image startListening(object self, number KeyTok)
@@ -8120,29 +8499,25 @@ class MyKeyHandler
 			if(keydescription.MatchesKeyDescriptor( "p" )) // PRINT DATA
 				{	
 					if(debugMode==true){result("\nYou pressed p to examine stored Tilt Values.");}
-					if(debugMode!=true){
-						GetScriptObjectFromID(ImageSetToolsID).showImageSets();
-					} else {
-						self.printAllValues();
-					}
+					GetScriptObjectFromID(ImageSetToolsID).showImageSets();
 					return 0;
 				}
 			if(keydescription.MatchesKeyDescriptor( "1" )) // TOGGLE MARKER RING
 				{	
 					// Make the Marker Ring and radius display visible/hidden;
-					GetScriptObjectFromID(LiveViewControlsID).toggleMarkerRing();
+					GetScriptObjectFromID(CameraControlObjectID).toggleMarkerRing();
 					return 0;
 				}
 			if(keydescription.MatchesKeyDescriptor( "2" )) // SET RING TO TARGET RADIUS IN 1/NM UNITS
 				{
 					number desiredRadiusNM;
 					getNumber("Set Marker Ring to (1/nm): ", 2.00, desiredRadiusNM);
-					GetScriptObjectFromID(LiveViewControlsID).setRingRadius(desiredRadiusNM);
+					GetScriptObjectFromID(CameraControlObjectID).setRingRadius(desiredRadiusNM);
 					return 0;
 				}
 			if(keydescription.MatchesKeyDescriptor( "3" )) // UPDATE RADIUS MEASUREMENT TEXT
 				{
-					GetScriptObjectFromID(LiveViewControlsID).updateRadius();
+					GetScriptObjectFromID(CameraControlObjectID).updateRadius();
 					return 0;
 				}
 			if(keydescription.MatchesKeyDescriptor( "h" )) // HELP
@@ -8209,8 +8584,6 @@ class DF360Dialog : uiframe
 	number ProgressBarDialogID;
 	object ImagingFunctionsObject;
 	number ImagingFunctionsObjectID;
-	object LiveViewControls;
-	number LiveViewControlsID;
 	
 	// Function to print out the various saved variables for debugging. Will only work in Debug Mode
 	void printAllValues(object self)
@@ -8232,13 +8605,11 @@ class DF360Dialog : uiframe
 			"\n scaleCalibrationDialogID: " + scaleCalibrationDialogID + " and " + (scaleCalibrationDialog.ScriptObjectIsValid() ? "is" : "is not") + " valid"+\
 			"\n tiltCalibrationDialogID: " + tiltCalibrationDialogID + " and " + (tiltCalibrationDialog.ScriptObjectIsValid() ? "is" : "is not") + " valid"+\
 			"\n CameraControlObjectID: " + CameraControlObjectID + " and " + (CameraControlObject.ScriptObjectIsValid() ? "is" : "is not") + " valid"+\
-			"\n LiveViewControlsID: " + LiveViewControlsID + " and " + (LiveViewControls.ScriptObjectIsValid() ? "is" : "is not") + " valid"+\
 			"\n ImageProcessingObjectID: " + ImageProcessingObjectID + " and " + (ImageProcessingObject.ScriptObjectIsValid() ? "is" : "is not") + " valid"+\
 			"\n ImageConfigDialogID: " + ImageConfigDialogID + " and " + (ImageConfigDialog.ScriptObjectIsValid() ? "is" : "is not") + " valid";
 		result(textstring);
 		result("\n-------End----------------")
 		CameraControlObject.printAllValues();
-		LiveViewControls.printAllValues();
 		ImageSetTools.printAll();
 		DataObject.printAll();
 		ImagingFunctionsObject.printAllValues();
@@ -8271,7 +8642,7 @@ class DF360Dialog : uiframe
 	{
 		KeyListener = theKeyListener;
 		KeyListenerID = KeyListener.ScriptObjectGetID();
-		KeyListener.initialise(ToolkitID, dataObjectID, imageSetToolsID, ImagingFunctionsObjectID, CameraControlObjectID, LiveViewControlsID);
+		KeyListener.initialise(ToolkitID, dataObjectID, imageSetToolsID, ImagingFunctionsObjectID, CameraControlObjectID);
 		KeyListener.setDebugMode(debugMode);
 		return KeyListenerID;
 	}
@@ -8358,14 +8729,6 @@ class DF360Dialog : uiframe
 		ImagingFunctionsObject.setDebugMode(debugMode);
 	}
 	
-	void storeLiveViewControls(object self, object theLiveViewControls)
-	{
-		LiveViewControls = theLiveViewControls;
-		LiveViewControlsID = LiveViewControls.ScriptObjectGetID();
-		LiveViewControls.initialise(ToolkitID, dataObjectID, CameraControlObjectID);
-		LiveViewControls.setDebugMode(debugMode);
-	}
-	
 		
 	void UpdateDebugMode(object self){
 		if(debugMode == 1){
@@ -8403,9 +8766,6 @@ class DF360Dialog : uiframe
 		}
 		if(ImageProcessingObject.ScriptObjectIsValid()){
 			ImageProcessingObject.setDebugMode(debugMode);
-		}
-		if(LiveViewControls.ScriptObjectIsValid()){
-			LiveViewControls.setDebugMode(debugMode);
 		}
 	}
 	
@@ -8626,7 +8986,7 @@ class DF360Dialog : uiframe
 	~DF360Dialog(object self)
 	{
 		imageDisplay imgdisp;
-		if(returnViewImageDisplay(debugMode,imgdisp)){
+		if(CameraControlObject.returnViewImageDisplay(imgdisp) == true){
 			component annotid=imgdisp.ComponentGetChild(0)
 			while (annotid.ComponentIsValid()){
 				annotid.componentremovefromparent();
@@ -8755,7 +9115,7 @@ class DF360Dialog : uiframe
 		
 		
 		image viewImage;
-		if(!LiveViewControls.returnViewImage(viewImage)){
+		if(!CameraControlObject.returnViewImage(viewImage)){
 			if(debugMode==true){result("\nNo View Window detected.");}
 			return; // Stop here if no view window is there.
 		}
@@ -8943,7 +9303,7 @@ class DF360Dialog : uiframe
 	{
 		if(debugMode==1){result("\n\tYou have pressed to toggle the marker ring");}
 		// Make the Marker Ring and radius display visible/hidden;
-		LiveViewControls.toggleMarkerRing();
+		CameraControlObject.toggleMarkerRing();
 	}
 	void RingTextButtonPress (object self) // NOT IMPLEMENTED
 	{
@@ -8955,18 +9315,18 @@ class DF360Dialog : uiframe
 		// Take the value in the ringMarkerField text box and set the ring radius to it.
 		taggroup intfield=self.lookupelement("ringMarkerFieldInput")
 		number desiredRadiusNM = dlggetvalue(intfield)
-		LiveViewControls.setRingRadius (desiredRadiusNM);
-		LiveViewControls.updateRadius();
+		CameraControlObject.setRingRadius (desiredRadiusNM);
+		CameraControlObject.updateRadius();
 	}
 		
 	void updateRingRadiusButtonPress(object self)
 	{
-		LiveViewControls.updateRadius();
+		CameraControlObject.updateRadius();
 	}
 
 	void recenterRingButtonPress (object self)
 	{
-		LiveViewControls.recenterMarkerRing();
+		CameraControlObject.recenterMarkerRing();
 	}
 
 	void addRingButtonPress (object self)
@@ -8989,7 +9349,7 @@ class DF360Dialog : uiframe
 		// convert this to pixels. Can use image scale unless it is view image.
 		image viewImage;
 		radiusNM = 1 / (radiusAng / 10); // radius in units of 1/nm
-		if(returnViewImage(debugMode, viewImage)){ // if View image present...
+		if(CameraControlObject.returnViewImage(viewImage) == true){ // if View image present...
 			number targetImageID = targetImage.ImageGetID();
 			number viewImageID = viewImage.ImageGetID();
 			if(targetImageID == viewImageID){ // AND the view image is being refered to
@@ -9005,7 +9365,7 @@ class DF360Dialog : uiframe
 		result("\nscaleX: " + scaleX);
 		result("\nradiusPX: " + radiusPX);
 		// create circle
-		LiveViewControls.makeNewCircle(targetImage, radiusPX, radiusTextString, componentColour);
+		CameraControlObject.makeNewCircle(targetImage, radiusPX, radiusTextString, componentColour);
 	}
 
 	/* Imaging & Processing Panel Functions */
@@ -9231,10 +9591,10 @@ class DF360Dialog : uiframe
 	
 	void captureViewButtonPress (object self)
 	{
-		LiveViewControls.captureViewScreen();
-		/* Needs to be in toolkit, not in LiveViewControls object */
+		CameraControlObject.captureViewScreen();
+		/* Needs to be in toolkit, not in CameraControlObject object */
 		ImageDisplay frontdisp
-		if(LiveViewControls.returnViewImageDisplay(frontdisp))
+		if(CameraControlObject.returnViewImageDisplay(frontdisp))
 		{
 			self.attachKeyListener(frontdisp) // attach the keylistener to the live-view display and start it up.
 			if(debugMode==1){result("\n\tKeyListener created and attached. Shortcut keys available.");}
@@ -9312,9 +9672,6 @@ object startToolkit () {
 	result("\nLoading Camera Controls...");
 	object theCameraControlObject = alloc(CameraControl);
 	
-	result("\nLoading View Window Controls...");
-	object theLiveViewControls = alloc(LiveViewControlsClass);
-	
 	result("\nCreating KeyListener for shortcut commands...");
 	// Create objects that will be used later but must be created now before the class drops from scope
 	object KeyListener=alloc(MyKeyHandler); // Key handler for the view Window for shortcut key presses. Not attached yet.
@@ -9345,7 +9702,6 @@ object startToolkit () {
 	result("\nAttaching data store to Toolkit...");
 	Toolkit.storeDataObject(dataObject); // Needs only Toolkit to be loaded.
 	Toolkit.storeCameraControlObject(theCameraControlObject); // uses dataObject
-	Toolkit.storeLiveViewControls(theLiveViewControls); // uses dataObject, CameraControls.
 	Toolkit.storeCalibrationDialog(calibrationDialog); // uses dataObject
 	Toolkit.storeAlignmentDialog(alignmentDialog); // uses dataObject
 	Toolkit.storeTiltDialog(tiltDialog); // uses DataObject
@@ -9376,14 +9732,6 @@ void main()
 	
 	result("\nLoading complete.");
 	Toolkit.printAllValues();
-		// Note: The script looks for a view window here.
-	image viewImage;
-	if(!returnViewImage(0, viewImage)){
-		result("\nNo View Window detected. Many controls will not be accessible or could cause crashes."\
-		+ "\nIf you open a live View window later you can 'capture' it on the calibration panel.");
-	} else {
-		Toolkit.captureViewScreen();
-	}
 	
 	// Forces the user to choose the save directory
 	result("\nPlease select an auto-save directory for images made by this script.")
