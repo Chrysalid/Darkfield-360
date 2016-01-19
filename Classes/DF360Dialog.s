@@ -328,6 +328,8 @@ class DF360Dialog : uiframe
 		panel2.dlgaddelement(DarkFieldROIButton)
 		TagGroup TakeDPImagesButton = DLGCreatePushButton("Finalise Image Set", "FinalizeImageSetButtonPress")
 		panel2.dlgaddelement(TakeDPImagesButton)
+		TagGroup ExportSetAsTextButton = DLGCreatePushButton("Image Set -> txt", "ExportSetAsTextButtonPress")
+		panel2.dlgaddelement(ExportSetAsTextButton)
 		
 		// Panel 3 is for controlling the Marker Ring
 		taggroup panel3=dlgcreatepanel()
@@ -768,7 +770,16 @@ class DF360Dialog : uiframe
 		ImagingFunctionsObject.startDiffractionPatternImaging(imageSet);
 	}
 	
-	
+	void ExportSetAsTextButtonPress(object self)
+	{
+		if(debugMode==true){result("\nButton pressed to export image set as text file...");}
+		TagGroup imageSet;
+		if(ImageSetTools.getCurrentImageSet(imageSet) == true){
+			ImageSetTools.exportImageSetAsTXT(imageSet);
+		} else {
+			result("\n No image set loaded.");
+		}
+	}	
 		
 	/* RING PANEL BUTTON FUNCTIONS*/
 	void RingToggleButtonPress (object self)

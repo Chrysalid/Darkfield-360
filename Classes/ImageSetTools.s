@@ -67,6 +67,51 @@ class ImageSetTools
 		result("\n-------End----------------")
 	}
 	
+	/* Returns a text string of an image's Image Tags for use in debugging and saving image sets as text files. */
+	
+	string getImageTagsAsString(object self, TagGroup ImageTags)
+	{	
+		string CreationTime, FileName, ImageMode, ImageType;
+		number SavedAsFile, ExposureTime, XTiltValue, YTiltValue, XTiltRelative, YTiltRelative, DSpacingAng, ShadowValue;
+		number ShadowDistance, XShift, YShift;
+		
+		ImageTags.TagGroupGetTagAsString("CreationTime", CreationTime);
+		ImageTags.TagGroupGetTagAsString("FileName", FileName);
+		ImageTags.TagGroupGetTagAsString("ImageMode", ImageMode);
+		ImageTags.TagGroupGetTagAsString("ImageType", ImageType);
+		ImageTags.TagGroupGetTagAsNumber("SavedAsFile", SavedAsFile);
+		ImageTags.TagGroupGetTagAsNumber("ExposureTime", ExposureTime);
+		ImageTags.TagGroupGetTagAsNumber("XTiltValue", XTiltValue);
+		ImageTags.TagGroupGetTagAsNumber("YTiltValue", YTiltValue);
+		ImageTags.TagGroupGetTagAsNumber("XTiltRelative", XTiltRelative);
+		ImageTags.TagGroupGetTagAsNumber("YTiltRelative", YTiltRelative);
+		ImageTags.TagGroupGetTagAsNumber("DSpacingAng", DSpacingAng);
+		ImageTags.TagGroupGetTagAsNumber("ShadowValue", ShadowValue);
+		ImageTags.TagGroupGetTagAsNumber("ShadowDistance", ShadowDistance);
+		ImageTags.TagGroupGetTagAsNumber("XShift", XShift);
+		ImageTags.TagGroupGetTagAsNumber("YShift", YShift);
+		
+		string Tab = "\n\t\t\t"
+		
+		string textString = Tab + "Created: " + CreationTime +\
+			Tab + "File: " + FileName +\
+			Tab + "Imaging Mode: " + ImageMode +\
+			Tab + "Image Type: " + ImageType +\
+			Tab + "Saved: " + SavedAsFile +\
+			Tab + "Exposure Time: " + ExposureTime +\
+			Tab + "xTilt: " + XTiltValue +\
+			Tab + "yTilt: " + YTiltValue +\
+			Tab + "xTilt Relative to Centre: " + XTiltRelative +\
+			Tab + "yTilt Relative to Centre: " + YTiltRelative +\
+			Tab + "D-Spacing (Angstroms): " + DSpacingAng +\
+			Tab + "Shadow Flag: " + ShadowValue +\
+			Tab + "Shadowing Distance: " + ShadowDistance +\
+			Tab + "Pixel Shift from centre (x): " + XShift +\
+			Tab + "Pixel Shift from centre (y): " + YShift;
+		
+		return textString
+	}
+	
 	/* Returns the image set id string for a given image set tag group. Used to simplify using image sets in external functions.*/
 	number getImageSetID(object self, TagGroup ImageSet, string &ImageSetIDvariable){
 		string value;
@@ -635,10 +680,41 @@ class ImageSetTools
 	*/
 	number exportImageSetAsTXT(object self, TagGroup ImageSet){
 		String path;
-		string defaultName, imageSetID;
+		string defaultName, imageSetID, CreationTime, ImageNotes;
+		number ImagesTaken, DPsTaken, DiffractionScale, CameraLength, RingMode, NumberOfRingPoints, RingDSpacing, DegreeStep;
+		number AutoSaveImages, AutoDisplayImages, ShadowMode, ShadowDistance, IntegratedImage, NumberOfIntegrations, AutoSaveNonInt;
+		number AutoDisplayNonInt, TiltXCenter, TiltYCenter, xTiltx, xTilty, yTiltx, yTilty;
+		
+		// Load values from imageSet
 		ImageSet.TagGroupGetTagAsString("SetName", defaultName);
 		ImageSet.TagGroupGetTagAsString("ImageSetID", imageSetID);
-		number SavePathSelected = SaveAsDialog( "Save Image Set to...", imageSetID, path );
+		ImageSet.TagGroupGetTagAsString("CreationTime", CreationTime);
+		ImageSet.TagGroupGetTagAsString("ImageNotes", ImageNotes);
+		ImageSet.TagGroupGetTagAsNumber("ImagesTaken", ImagesTaken);
+		ImageSet.TagGroupGetTagAsNumber("DPsTaken", DPsTaken);
+		ImageSet.TagGroupGetTagAsNumber("DiffractionScale", DiffractionScale);
+		ImageSet.TagGroupGetTagAsNumber("CameraLength", CameraLength);
+		ImageSet.TagGroupGetTagAsNumber("RingMode", RingMode);
+		ImageSet.TagGroupGetTagAsNumber("NumberOfRingPoints", NumberOfRingPoints);
+		ImageSet.TagGroupGetTagAsNumber("RingDSpacing", RingDSpacing);
+		ImageSet.TagGroupGetTagAsNumber("DegreeStep", DegreeStep);
+		ImageSet.TagGroupGetTagAsNumber("AutoSaveImages", AutoSaveImages);
+		ImageSet.TagGroupGetTagAsNumber("AutoDisplayImages", AutoDisplayImages);
+		ImageSet.TagGroupGetTagAsNumber("ShadowMode", ShadowMode);
+		ImageSet.TagGroupGetTagAsNumber("ShadowDistance", ShadowDistance);
+		ImageSet.TagGroupGetTagAsNumber("IntegratedImage", IntegratedImage);
+		ImageSet.TagGroupGetTagAsNumber("NumberOfIntegrations", NumberOfIntegrations);
+		ImageSet.TagGroupGetTagAsNumber("AutoSaveNonInt", AutoSaveNonInt);
+		ImageSet.TagGroupGetTagAsNumber("AutoDisplayNonInt", AutoDisplayNonInt);
+		ImageSet.TagGroupGetTagAsNumber("TiltXCenter", TiltXCenter);
+		ImageSet.TagGroupGetTagAsNumber("TiltYCenter", TiltYCenter);
+		ImageSet.TagGroupGetTagAsNumber("TiltCalibration:xTiltx", xTiltx);
+		ImageSet.TagGroupGetTagAsNumber("TiltCalibration:xTilty", xTilty);
+		ImageSet.TagGroupGetTagAsNumber("TiltCalibration:yTiltx", yTiltx);
+		ImageSet.TagGroupGetTagAsNumber("TiltCalibration:yTilty", yTilty);
+		
+		// Choose a save location + filename
+		number SavePathSelected = SaveAsDialog( "Save Image Set to...", imageSetID + ".txt", path );
 		if(SavePathSelected == 0){
 			return 0;
 		}
@@ -650,17 +726,105 @@ class ImageSetTools
 		
 		// Write text with: textwin.EditorWindowAddText( "Indicated Magnification : "+tagvalue+"\n" )
 		string textPart1 = defaultName + "\n" +\
-			"Image Set ID:" + ImageSetID + "\n" +\
-			"Put Data Here";
+			"Image Set ID: " + ImageSetID + "\n" +\
+			"Time of Creation: " + CreationTime + "\n" +\
+			"Notes: " + ImageNotes + "\n" +\
+			"Diffraction Patterns Taken: " + DPsTaken + "\n" +\
+			"Darkfield Images Taken: " + ImagesTaken + "\n" +\
+			"Image Scale: " + DiffractionScale + "\n" +\
+			"Camera Length: " + CameraLength + "\n" +\
+			"Autosave Images: " + AutoSaveImages + "\n" +\
+			"Auto-Display Images: " + AutoDisplayImages + "\n" +\
+			"Shadow Each Point: " + ShadowMode + "\n" +\
+			"Shadowing Distance: " + ShadowDistance;
+			
+		string textPart2 = "\nRing Mode: " + RingMode +\
+		"\nD-Spacing of ring: " + RingDSpacing +\
+		"\nNumber of targetted points: " + NumberOfRingPoints +\
+		"\nDegrees between points: " + DegreeStep;
 		
+		string textPart3 = "\nUse Integrated Images: " + IntegratedImage +\
+		"\nNumber of Images to Integrate: " + NumberOfIntegrations +\
+		"\nAuto Save component images: " + AutoSaveNonInt +\
+		"\nAuto Display component images: " + AutoDisplayNonInt;
+		
+		string textPart4 = "\nCentre Tilt Coordinates: (" + TiltXCenter + ", " + TiltYCenter + ")" +\
+		"\nTilt Vectors:\n\t xTilt: " + xTiltx + ", " + xTilty + \
+		"\n\t yTilt: " + yTiltx + ", " + yTilty;		
+		
+		string targetSpots = "\nDiffraction Targets:";
+		TagGroup Spots;
+		ImageSet.TagGroupGetTagAsTagGroup("Spots", Spots);
+		if(Spots.TagGroupIsValid() == true){
+			number totalSpots = Spots.TagGroupCountTags();
+			number i;
+			for(i=0; i < totalSpots; i++){
+				targetSpots = targetSpots + "\n\t[" + i + "]";
+				TagGroup SpotSet;
+				Spots.TagGroupGetIndexedTagAsTagGroup(i, SpotSet);
+				TagGroup MiddleImageTags, HigherImageTags, LowerImageTags;
+				SpotSet.TagGroupGetTagAsTagGroup("Middle", MiddleImageTags);
+				SpotSet.TagGroupGetTagAsTagGroup("Higher", HigherImageTags);
+				SpotSet.TagGroupGetTagAsTagGroup("Lower", LowerImageTags);
+				
+				if(MiddleImageTags.TagGroupIsValid() == true){
+					targetSpots = targetSpots + "\n\t\tMiddle";
+					targetSpots = targetSpots + self.getImageTagsAsString(MiddleImageTags);
+				}
+				if(HigherImageTags.TagGroupIsValid() == true){
+					targetSpots = targetSpots + "\n\t\tHigher";
+					targetSpots = targetSpots + self.getImageTagsAsString(HigherImageTags);
+				}
+				if(LowerImageTags.TagGroupIsValid() == true){
+					targetSpots = targetSpots + "\n\t\tLower";
+					targetSpots = targetSpots + self.getImageTagsAsString(LowerImageTags);
+				}
+			}
+		}
+		
+		string darkfieldImages = "\nDarkfield Images:";
+		TagGroup DFImages;
+		ImageSet.TagGroupGetTagAsTagGroup("Images", DFImages);
+		if(DFImages.TagGroupIsValid() == true){
+			number totalImages = DFImages.TagGroupCountTags();
+			number i;
+			for(i=0; i < totalImages; i++){
+				darkfieldImages = darkfieldImages + "\n\t[" + i + "]";
+				TagGroup SpotSet;
+				DFImages.TagGroupGetIndexedTagAsTagGroup(i, SpotSet);
+				TagGroup MiddleImageTags, HigherImageTags, LowerImageTags;
+				SpotSet.TagGroupGetTagAsTagGroup("Middle", MiddleImageTags);
+				SpotSet.TagGroupGetTagAsTagGroup("Higher", HigherImageTags);
+				SpotSet.TagGroupGetTagAsTagGroup("Lower", LowerImageTags);
+				
+				if(MiddleImageTags.TagGroupIsValid() == true){
+					darkfieldImages = darkfieldImages + "\n\t\tMiddle";
+					darkfieldImages = darkfieldImages + self.getImageTagsAsString(MiddleImageTags);
+				}
+				if(HigherImageTags.TagGroupIsValid() == true){
+					darkfieldImages = darkfieldImages + "\n\t\tHigher";
+					darkfieldImages = darkfieldImages + self.getImageTagsAsString(HigherImageTags);
+				}
+				if(LowerImageTags.TagGroupIsValid() == true){
+					darkfieldImages = darkfieldImages + "\n\t\tLower";
+					darkfieldImages = darkfieldImages + self.getImageTagsAsString(LowerImageTags);
+				}
+			}
+		}
+
 		textwin.EditorWindowAddText( textPart1 );
+		textwin.EditorWindowAddText( textPart2 );
+		textwin.EditorWindowAddText( textPart3 );
+		textwin.EditorWindowAddText( textPart4 );
+		textwin.EditorWindowAddText( targetSpots );
+		textwin.EditorWindowAddText( darkfieldImages );
 		editorwindowsavetofile(textwin,path);
 		if(debugMode==true){
 			result("\nImageSet saved to " + path);
 		}
 		// This closes the text file without any prompts. If you want the option to keep the file open
 		// change the (0) to (1)
-		textwin.windowclose(1)
+		textwin.windowclose(0);
 		return 1;
 	}
 	

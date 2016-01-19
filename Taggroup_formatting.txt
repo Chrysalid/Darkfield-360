@@ -99,7 +99,7 @@ ImageSets (tag group)
 					ExposureTime: <value>
 					XTiltValue: <value>
 					YTiltValue: <value>
-					XTiltRealtive: <value>
+					XTiltRelative: <value>
 					YTiltRelative: <value>
 					DSpacingAng: <value in Angstroms>
 					ShadowValue: <1/2/3> (0=no shadowing, 1= middle, 2= higher or low, 3= lower or high)
@@ -110,27 +110,27 @@ ImageSets (tag group)
 			[0] (spot numbers) 0 = BF image.
 			[1] 
 			...
-			Middle (only entry if no shadowing)
-				<image data>
-			Lower (only used for shadowed spots)
-				<image data>
-			Higher (only used for shadowed spots)
-				CreationTime
-				UniqueImageID ?
-				SavedAsFile: 0/1
-				FileName: <value. Does not include path>
-				ImageMode:<value reported by scope>
-				ImageType:<value recorded by toolkit> // Options are DP, DF, BF, Bin
-				ExposureTime: <value>
-				XTiltValue: <value>
-				YTiltValue: <value>
-				XTiltRealtive: <value>
-				YTiltRelative: <value>
-				DSpacingAng: <value in Angstroms>
-				ShadowValue: <1/2/3> (0=no shadowing, 1= middle, 2= higher or low, 3= lower or high)
-				ShadowDistance: <0/value in (1/nm)>
-				XShift: <value of shift in pixels>
-				YShift: <value of shift in pixels>
+				Middle (only entry if no shadowing)
+					<image data>
+				Lower (only used for shadowed spots)
+					<image data>
+				Higher (only used for shadowed spots)
+					CreationTime
+					UniqueImageID ?
+					SavedAsFile: 0/1
+					FileName: <value. Does not include path>
+					ImageMode:<value reported by scope>
+					ImageType:<value recorded by toolkit> // Options are DP, DF, BF, Bin
+					ExposureTime: <value>
+					XTiltValue: <value>
+					YTiltValue: <value>
+					XTiltRealtive: <value>
+					YTiltRelative: <value>
+					DSpacingAng: <value in Angstroms>
+					ShadowValue: <1/2/3> (0=no shadowing, 1= middle, 2= higher or low, 3= lower or high)
+					ShadowDistance: <0/value in (1/nm)>
+					XShift: <value of shift in pixels>
+					YShift: <value of shift in pixels>
 			
 Image Tags
 ----------
