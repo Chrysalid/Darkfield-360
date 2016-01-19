@@ -2,8 +2,6 @@ Required Features
 -----------------
 Make a function to produce persistent Image tags for integrated images
 
-Make Auto-Save always on?
-
 Disable adding points commands if no image set there.
 
 Check image processing systems.

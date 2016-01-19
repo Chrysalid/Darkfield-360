@@ -213,6 +213,8 @@ class ImageSetTools
 		imageSetData.TagGroupSetTagAsNumber("ShadowMode", 0 );
 		imageSetData.TagGroupSetTagAsNumber("ShadowDistance", 0 );
 		
+		imageSetData.TagGroupSetTagAsNumber("AutoSaveImages", 1 );
+		
 		imageSetData.TagGroupCreateNewLabeledTag("TiltXCenter");
 		imageSetData.TagGroupSetTagAsNumber("TiltXCenter", GetScriptObjectFromID(dataObjectID).getCentreXTilt() );
 		imageSetData.TagGroupCreateNewLabeledTag("TiltYCenter");
