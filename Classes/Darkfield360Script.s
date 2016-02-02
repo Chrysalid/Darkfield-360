@@ -7970,11 +7970,14 @@ class ImagingFunctions
 					middleSumImage = middleSumImage + middleIntegratedImage;
 					middleIntegratedImage.ImageSetName( "Integrated Image " + im + " Middle" );
 					if(displayImages == true){
-						showImage( middleIntegratedImage.ImageClone() );
+						image toShow = middleIntegratedImage.ImageClone();
+						copyTags(toShow, MiddleDFImage); // Put the image tags from the individual exposure onto the integrated image
+						showImage( toShow );
 					}
 					if(saveImages == true){
 						fileName = "Integrated_Image_" + im + "_Middle";
 						string filePath = PathConcatenate(fileDirectory, fileName); // Construct the full file path for the save command.
+						copyTags(middleIntegratedImage, MiddleDFImage); // Put the image tags from the individual exposure onto the integrated image
 						SaveAsGatan(middleIntegratedImage, filePath);
 					}
 					result("\nIntegrated " + NumberOfIntegrations + " exposures into Integrated Image " + im);
@@ -7984,11 +7987,14 @@ class ImagingFunctions
 						higherSumImage = higherSumImage + higherIntegratedImage;
 						higherIntegratedImage.ImageSetName( "Integrated Image " + im + " Higher" );
 						if(displayImages == true){
-							showImage( higherIntegratedImage.ImageClone() );
+							image toShow = higherIntegratedImage.ImageClone();
+							copyTags(toShow, HigherDFImage); // Put the image tags from the individual exposure onto the integrated image
+							showImage( toShow );
 						}
 						if(saveImages == true){
 							fileName = "Integrated_Image_" + im + "_Higher";
 							string filePath = PathConcatenate(fileDirectory, fileName); // Construct the full file path for the save command.
+							copyTags(higherIntegratedImage, HigherDFImage); // Put the image tags from the individual exposure onto the integrated image
 							SaveAsGatan(higherIntegratedImage, filePath);
 						}
 						higherIntegratedImage = higherIntegratedImage * 0; // Set old image to 0 for next integration sequence.
@@ -7997,11 +8003,14 @@ class ImagingFunctions
 						lowerSumImage = lowerSumImage + lowerIntegratedImage;
 						lowerIntegratedImage.ImageSetName( "Integrated Image " + im + " Lower" );
 						if(displayImages == true){
-							showImage( lowerIntegratedImage.ImageClone() );
+							image toShow = lowerIntegratedImage.ImageClone();
+							copyTags(toShow, lowerDFImage); // Put the image tags from the individual exposure onto the integrated image
+							showImage( toShow );
 						}
 						if(saveImages == true){
 							fileName = "Integrated_Image_" + im + "_Lower";
 							string filePath = PathConcatenate(fileDirectory, fileName); // Construct the full file path for the save command.
+							copyTags(lowerIntegratedImage, lowerDFImage); // Put the image tags from the individual exposure onto the integrated image
 							SaveAsGatan(lowerIntegratedImage, filePath);
 						}
 						lowerIntegratedImage = lowerIntegratedImage * 0; // Set old image to 0 for next integration sequence.
@@ -9635,7 +9644,7 @@ class DF360Dialog : uiframe
 			if(TwoButtonDialog("Export Binaries as Gifs?", "Yes","No")){
 				ExportImages = 1;
 			}
-			self.binaryAllImages(imageList, targetPercentage, ExportImages, directory)
+			ImageProcessingObject.binaryAllImages(imageList, targetPercentage, ExportImages, directory)
 			result("Directory Processed");
 			return;
 		}		
@@ -9698,7 +9707,7 @@ class DF360Dialog : uiframe
 			displayImages = 1;
 		}
 		
-		image binarySum = self.processDarkFieldImages(DFList, useShadowImages, makeBinaries, targetPercentage,\
+		image binarySum = ImageProcessingObject.processDarkFieldImages(DFList, useShadowImages, makeBinaries, targetPercentage,\
 		DisplayImages, SaveImages, ExportImages)
 		result("\nDirectory Processing Complete")
 	}
@@ -9713,7 +9722,7 @@ class DF360Dialog : uiframe
 		}
 		number targetPercentage = 99;
 		getNumber("Enter % of dimmest pixels to be ignored", targetPercentage, targetPercentage);
-		image filteredImage := self.levelAndDespeckleImage(im1, targetPercentage);
+		image filteredImage := ImageProcessingObject.levelAndDespeckleImage(im1, targetPercentage);
 		showImage(filteredImage);
 	}
 
@@ -9751,7 +9760,7 @@ class DF360Dialog : uiframe
 	void alignDirectoryButtonPress(object self)
 	{
 		TagGroup imageList = makeImageIDList( makeFileListGroup() );
-		self.alignAllImages(imageList);
+		ImageProcessingObject.alignAllImages(imageList);
 	}
 	
 	void mapDirectoryButtonPress(object self){
@@ -9759,7 +9768,7 @@ class DF360Dialog : uiframe
 		string directory;
 		fileList.TagGroupGetTagAsString( "Directory" , directory )
 		TagGroup imageList = makeImageIDList( fileList );
-		self.createMap(imageList);	
+		ImageProcessingObject.createMap(imageList);	
 	}
 	/* OPTION PANEL BUTTON FUNCTIONS */
 	

@@ -899,7 +899,7 @@ class DF360Dialog : uiframe
 			if(TwoButtonDialog("Export Binaries as Gifs?", "Yes","No")){
 				ExportImages = 1;
 			}
-			self.binaryAllImages(imageList, targetPercentage, ExportImages, directory)
+			ImageProcessingObject.binaryAllImages(imageList, targetPercentage, ExportImages, directory)
 			result("Directory Processed");
 			return;
 		}		
@@ -962,7 +962,7 @@ class DF360Dialog : uiframe
 			displayImages = 1;
 		}
 		
-		image binarySum = self.processDarkFieldImages(DFList, useShadowImages, makeBinaries, targetPercentage,\
+		image binarySum = ImageProcessingObject.processDarkFieldImages(DFList, useShadowImages, makeBinaries, targetPercentage,\
 		DisplayImages, SaveImages, ExportImages)
 		result("\nDirectory Processing Complete")
 	}
@@ -977,7 +977,7 @@ class DF360Dialog : uiframe
 		}
 		number targetPercentage = 99;
 		getNumber("Enter % of dimmest pixels to be ignored", targetPercentage, targetPercentage);
-		image filteredImage := self.levelAndDespeckleImage(im1, targetPercentage);
+		image filteredImage := ImageProcessingObject.levelAndDespeckleImage(im1, targetPercentage);
 		showImage(filteredImage);
 	}
 
@@ -1015,7 +1015,7 @@ class DF360Dialog : uiframe
 	void alignDirectoryButtonPress(object self)
 	{
 		TagGroup imageList = makeImageIDList( makeFileListGroup() );
-		self.alignAllImages(imageList);
+		ImageProcessingObject.alignAllImages(imageList);
 	}
 	
 	void mapDirectoryButtonPress(object self){
@@ -1023,7 +1023,7 @@ class DF360Dialog : uiframe
 		string directory;
 		fileList.TagGroupGetTagAsString( "Directory" , directory )
 		TagGroup imageList = makeImageIDList( fileList );
-		self.createMap(imageList);	
+		ImageProcessingObject.createMap(imageList);	
 	}
 	/* OPTION PANEL BUTTON FUNCTIONS */
 	

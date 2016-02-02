@@ -1193,11 +1193,14 @@ class ImagingFunctions
 					middleSumImage = middleSumImage + middleIntegratedImage;
 					middleIntegratedImage.ImageSetName( "Integrated Image " + im + " Middle" );
 					if(displayImages == true){
-						showImage( middleIntegratedImage.ImageClone() );
+						image toShow = middleIntegratedImage.ImageClone();
+						copyTags(toShow, MiddleDFImage); // Put the image tags from the individual exposure onto the integrated image
+						showImage( toShow );
 					}
 					if(saveImages == true){
 						fileName = "Integrated_Image_" + im + "_Middle";
 						string filePath = PathConcatenate(fileDirectory, fileName); // Construct the full file path for the save command.
+						copyTags(middleIntegratedImage, MiddleDFImage); // Put the image tags from the individual exposure onto the integrated image
 						SaveAsGatan(middleIntegratedImage, filePath);
 					}
 					result("\nIntegrated " + NumberOfIntegrations + " exposures into Integrated Image " + im);
@@ -1207,11 +1210,14 @@ class ImagingFunctions
 						higherSumImage = higherSumImage + higherIntegratedImage;
 						higherIntegratedImage.ImageSetName( "Integrated Image " + im + " Higher" );
 						if(displayImages == true){
-							showImage( higherIntegratedImage.ImageClone() );
+							image toShow = higherIntegratedImage.ImageClone();
+							copyTags(toShow, HigherDFImage); // Put the image tags from the individual exposure onto the integrated image
+							showImage( toShow );
 						}
 						if(saveImages == true){
 							fileName = "Integrated_Image_" + im + "_Higher";
 							string filePath = PathConcatenate(fileDirectory, fileName); // Construct the full file path for the save command.
+							copyTags(higherIntegratedImage, HigherDFImage); // Put the image tags from the individual exposure onto the integrated image
 							SaveAsGatan(higherIntegratedImage, filePath);
 						}
 						higherIntegratedImage = higherIntegratedImage * 0; // Set old image to 0 for next integration sequence.
@@ -1220,11 +1226,14 @@ class ImagingFunctions
 						lowerSumImage = lowerSumImage + lowerIntegratedImage;
 						lowerIntegratedImage.ImageSetName( "Integrated Image " + im + " Lower" );
 						if(displayImages == true){
-							showImage( lowerIntegratedImage.ImageClone() );
+							image toShow = lowerIntegratedImage.ImageClone();
+							copyTags(toShow, lowerDFImage); // Put the image tags from the individual exposure onto the integrated image
+							showImage( toShow );
 						}
 						if(saveImages == true){
 							fileName = "Integrated_Image_" + im + "_Lower";
 							string filePath = PathConcatenate(fileDirectory, fileName); // Construct the full file path for the save command.
+							copyTags(lowerIntegratedImage, lowerDFImage); // Put the image tags from the individual exposure onto the integrated image
 							SaveAsGatan(lowerIntegratedImage, filePath);
 						}
 						lowerIntegratedImage = lowerIntegratedImage * 0; // Set old image to 0 for next integration sequence.

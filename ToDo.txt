@@ -1,9 +1,5 @@
 Required Features
 -----------------
-Make a function to produce persistent Image tags for integrated images
-
-Disable adding points commands if no image set there.
-
 Check image processing systems.
 
 Bugs
@@ -13,6 +9,7 @@ StartDPStoring / calibration does not update any current image sets yet
 Press Take DF Images button before image set made.
 Setting camera length to the 'select camera length' option causes an error message.
 Setting camera length with no image present causes error message
+Integrated image tags do not save File Saved tags
 
 Desired Features
 ----------------
@@ -23,6 +20,8 @@ Allow colour selection in createMap()
 Save the central DP and highlight + label the target coordinates in an image set.
 
 'Get' the marker ring's d-spacing with a button on the new image config dialog.
+
+Load image sets saved as text
 
 Currently
 ----------
