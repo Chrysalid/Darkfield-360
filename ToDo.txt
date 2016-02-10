@@ -21,7 +21,7 @@ Save the central DP and highlight + label the target coordinates in an image set
 
 'Get' the marker ring's d-spacing with a button on the new image config dialog.
 
-Load image sets saved as text
 
 Currently
 ----------
+Save the central DP and highlight + label the target coordinates in an image set.

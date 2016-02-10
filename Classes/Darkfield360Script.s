@@ -7191,10 +7191,12 @@ class ImagingFunctions
 		TagGroup ImageTags = GetScriptObjectFromID(ImageSetToolsID).createImageTags();
 
 		// Retrive image values
-		number shadowValue, shadowDistance, DSpacingAng;
+		number shadowValue, shadowDistance, DSpacingAng, xShift, yShift;
 		DPImageTags.TagGroupGetTagAsNumber("ShadowValue", ShadowValue);
 		DPImageTags.TagGroupGetTagAsNumber("ShadowDistance", ShadowDistance);
 		DPImageTags.TagGroupGetTagAsNumber("DSpacingAng", DSpacingAng);
+		DPImageTags.TagGroupGetTagAsNumber("XShift", XShift);
+		DPImageTags.TagGroupGetTagAsNumber("YShift", YShift);
 		// retrive calibration values
 		number xTiltx, xTilty, yTiltx, yTilty;
 		imageSet.TagGroupGetTagAsNumber("TiltCalibration:xTiltx", xTiltx);
@@ -7218,7 +7220,9 @@ class ImagingFunctions
 		ImageTags.TagGroupSetTagAsNumber("XTiltRelative", relativeXTilt);
 		ImageTags.TagGroupSetTagAsNumber("YTiltRelative", relativeYTilt);		
 		ImageTags.TagGroupSetTagAsNumber("XTiltValue", xTiltTarget);
-		ImageTags.TagGroupSetTagAsNumber("YTiltValue", yTiltTarget);		
+		ImageTags.TagGroupSetTagAsNumber("YTiltValue", yTiltTarget);
+		ImageTags.TagGroupSetTagAsNumber("XShift", XShift);
+		ImageTags.TagGroupSetTagAsNumber("YShift", YShift);		
 		ImageTags.TagGroupSetTagAsNumber("ShadowValue", shadowValue);
 		ImageTags.TagGroupSetTagAsNumber("ShadowDistance", shadowDistance);
 		ImageTags.TagGroupSetTagAsNumber("DSpacingAng", DSpacingAng);
@@ -7531,6 +7535,9 @@ class ImagingFunctions
 			return
 		}
 		
+		image DiffractionPointsRecord; // image will be the central DP pattern and will have all diffraction points stored on it and given their number.
+		Component comp; // used to get the ImageDisplay as a component so additional components can be added to it.
+		
 		number i;
 		for(i=0; i < NumberOfSpots; i++){
 			// Check if the image acquisition has been cancelled by the user
@@ -7546,6 +7553,52 @@ class ImagingFunctions
 			TagGroup newDFImageData;
 			image DPImage := self.takeDPImage( targetImageSet, i, "Middle", newDFImageData)
 			if(debugMode==true){result("\n\t Exposure done.");}
+			if(i == 0){ // central image used to make a record of spots and their numbers.
+				if(debugMode==true){result("\n\t Creating Record of DP spots image.");}
+				DiffractionPointsRecord = DPImage; // Note: Just a copy of the image, not a reference to the actual image.
+				showImage(DiffractionPointsRecord);
+				DiffractionPointsRecord.ImageSetName("Record of Diffraction Spots");
+				comp = ImageGetImageDisplay( DiffractionPointsRecord, 0 );
+				Component patternName = NewTextAnnotation( 10, 10, "Diffraction Pattern Name", 25 );
+				patternName.componentsetfillmode(1); // mode 2 is not filled. Important for circles.
+				patternName.componentsetdrawingmode(2); // mode 1 outlines the shape in the background colour
+				patternName.componentsetforegroundcolor(1,1,1); // Colour that the shape is drawn in
+				patternName.componentsetbackgroundcolor(0,0,0); // Colour the shape is outlined in.
+				patternName.componentsetfontfacename("Microsoft Sans Serif");
+				comp.ComponentAddChildAtEnd( patternName ); // add the component to the image display
+				if(debugMode==true){result("\n\t Record of DP spots image created.");}
+			} else {
+				if(debugMode==true){result("\n\t Adding spot to Record of DP spots image.");}
+				number pixelShiftX, pixelShiftY, markerCenterX, markerCenterY;
+				newDFImageData.TagGroupGetTagAsNumber("XShift", pixelShiftX);
+				newDFImageData.TagGroupGetTagAsNumber("YShift", pixelShiftY);
+				
+				number markerRadius, markerLeft, markerRight, markerTop, markerBottom;
+				markerRadius = 10; // set radius of marker rings here.
+				
+				markerCenterX = ( GetScriptObjectFromID(CameraControlObjectID).getCameraWidth() / 2 ) - pixelShiftX;
+				markerCenterY = ( GetScriptObjectFromID(CameraControlObjectID).getCameraHeight() / 2 ) + pixelShiftY;
+				markerTop = markerCenterY + markerRadius;
+				markerBottom = markerCenterY - markerRadius;
+				markerLeft = markerCenterX - markerRadius;
+				markerRight = markerCenterX + markerRadius;
+				
+				component marker = NewOvalAnnotation( markerTop , markerLeft, markerBottom, markerRight );
+				marker.componentsetfillmode(2); // mode 2 is not filled. Important for circles.
+				marker.componentsetdrawingmode(2); // mode 1 outlines the shape in the background colour
+				marker.componentsetforegroundcolor(1,0,0);// Colour that the shape is drawn in
+				marker.componentsetbackgroundcolor(0,0,0); // Colour the shape is outlined in.
+				comp.ComponentAddChildAtEnd( marker ); // add the component to the image display
+				
+				component markerID = NewTextAnnotation(markerRight, markerCenterY - 25, Decimal(i), 50);
+				markerID.componentsetfillmode(1); // mode 2 is not filled. Important for circles.
+				markerID.componentsetdrawingmode(2); // mode 1 outlines the shape in the background colour
+				markerID.componentsetforegroundcolor(1,0,0); // Colour that the shape is drawn in
+				markerID.componentsetbackgroundcolor(0,0,0); // Colour the shape is outlined in.
+				markerID.componentsetfontfacename("Microsoft Sans Serif");
+				comp.ComponentAddChildAtEnd( markerID ); // add the component to the image display
+				if(debugMode==true){result("\n\t Spot added to Record of DP spots image.");}
+			}
 			image DPImageLower, DPImageHigher;
 			TagGroup NewSpotSet, NewMiddleDF, higherImageData, NewHigherDF, lowerImageData, NewLowerDF;
 
@@ -7721,6 +7774,8 @@ class ImagingFunctions
 			}
 			result("\n\tTilt coordinates have been generated for RingMode DF imaging");
 		}
+		
+		showImage(DiffractionPointsRecord);
 		
 		if(debugMode==true){result("\nAll Diffraction Patterns imaged. Setting DPsTaken flag to 1");}
 		// update the image set to show that DP were taken.
